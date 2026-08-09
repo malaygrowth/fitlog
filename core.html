@@ -575,6 +575,71 @@ function foodTotals(date){
     kcal+=+e.kcal||0; p+=+e.p||0; c+=+e.c||0; f+=+e.f||0; }); });
   return {kcal:kcal,p:p,c:c,f:f};
 }
+/* ============ coach ============ */
+const PROGRAM={start:'2026-08-09', phases:[
+  {w:4,  name:'Phase 0 — Rebuild', desc:'Daily rehab block, the three return routines, 8k steps, sleep by 11. Exit test: one fully pain-free week + a brisk 30-minute walk feeling easy.'},
+  {w:12, name:'Phase 1 — Base', desc:'Run/walk intervals 3×/week, strength rebuilt to ~80% of May weights, full Push/Pull/Legs returns. Exit test: 5 km continuous run and squat 50×8, both pain-free.'},
+  {w:20, name:'Phase 2 — Hyrox strength', desc:'Runs grow to 6–8 km with one weekly tempo. Hyrox stations once a week — wall balls light, burpee broad jumps low volume. Exit test: 8 km easy run, 50 unbroken wall balls.'},
+  {w:32, name:'Phase 3 — Simulation', desc:'Weekly bricks (1 km run + station + 1 km run), half-simulation ~week 26, full simulation ~week 30 — then enter the race.'}
+]};
+function programWeek(){
+  const ms=new Date(today()+'T12:00:00')-new Date(PROGRAM.start+'T12:00:00');
+  return Math.max(1, Math.floor(ms/604800000)+1);
+}
+function currentPhase(){
+  const wk=programWeek();
+  for(let i=0;i<PROGRAM.phases.length;i++){ if(wk<=PROGRAM.phases[i].w) return PROGRAM.phases[i]; }
+  return {w:99, name:'Race ready', desc:'The build is done — maintain, simulate, compete.'};
+}
+function phaseInfo(){
+  const wk=programWeek(), cur=currentPhase();
+  let from=1, h='<h3>Your Hyrox comeback</h3><p class="tiny muted" style="margin:-6px 0 12px">Week '+wk+' since restart ('+fmtD(PROGRAM.start)+')</p>';
+  PROGRAM.phases.forEach(function(p){
+    const on=p.name===cur.name;
+    h+='<div style="border-left:3px solid '+(on?'var(--wk)':'var(--line)')+'; padding:2px 0 2px 12px; margin-bottom:14px'+(on?'':'; opacity:.65')+'">'+
+      '<b class="small">'+p.name+'</b> <span class="tiny muted num">wk '+from+'–'+p.w+(on?' · you are here':'')+'</span>'+
+      '<div class="tiny muted" style="margin-top:2px">'+p.desc+'</div></div>';
+    from=p.w+1;
+  });
+  openSheet(h);
+}
+function round25(x){ return Math.round(x/2.5)*2.5; }
+function targetFor(exId){
+  const g=exGroupOf(exId);
+  if(g==='Cardio'||g==='Mobility') return null;
+  const pa=prevArr(exId); if(!pa) return null;
+  const work=pa.filter(function(s){ return !s.wu && (+s.w||+s.r); });
+  if(!work.length) return null;
+  const top=work.reduce(function(a,s){ return (+s.w||0)>(+a.w||0)?s:a; }, work[0]);
+  const w=+top.w||0, r=+top.r||0;
+  if(!w) return r ? 'target: '+(r+1)+' reps' : null;
+  if(r>=12) return 'target: '+round25(w+2.5)+'×8 — add weight, reset reps';
+  return 'target: '+w+'×'+(r+1)+' — one more rep than last time';
+}
+function warmupFor(exId){
+  const pa=prevArr(exId); if(!pa) return null;
+  const work=pa.filter(function(s){ return !s.wu && +s.w; });
+  if(!work.length) return null;
+  const w=Math.max.apply(null, work.map(function(s){return +s.w;}));
+  if(w<30) return null;
+  return 'warm-up: bar×10 · '+Math.max(20,round25(w*0.5))+'×5 · '+round25(w*0.75)+'×3';
+}
+const CUES={
+  'Squat':'Brace before you descend; knees track over the toes; only as deep as stays pain-free.',
+  'Bench press':'Shoulder blades pinched, feet planted; bar to mid-chest; wrists stacked straight over forearms.',
+  'Deadlift':'Bar against the shins, flat back, push the floor away; hips and chest rise together.',
+  'Romanian deadlift':'Soft knees, hips back until the hamstrings load; bar slides along the thighs.',
+  'Overhead press':'Glutes squeezed, ribs down; finish with the bar over mid-foot, wrists neutral.',
+  'Barbell row':'Hinge ~45°, pull to the lower ribs; no jerking from the lower back.',
+  'Pull-ups':'Active shoulders, controlled negative; skip these until the wrist has a pain-free week.',
+  'Hip thrust':'Chin tucked, ribs down; squeeze the glutes at the top instead of arching the back.',
+  'Lunges':'Long step, tall torso; back knee kisses the floor; drive through the front heel.',
+  'Leg press':'Feet mid-platform; stay in the pain-free knee range; never slam into lockout.',
+  'Wall balls':'It is a squat plus a push, not an arm throw; hit the same spot every rep.',
+  'Kettlebell swing':'A hip hinge, not a squat; arms are ropes — the hips snap, the glutes finish.',
+  'Burpee broad jump':'Land soft with bent knees; step back instead of jumping back while the wrists heal.',
+  'Farmer’s carry':'Tall posture, packed shoulders, quick small steps; tight grip, neutral wrists.'
+};
 function todaysPlanRoutine(){
   const id=(S.plan||{})[new Date().getDay()];
   return id ? S.routines.find(function(r){return r.id===id;})||null : null;
@@ -596,6 +661,13 @@ function savePlan(){
   S.plan={};
   [].slice.call(document.querySelectorAll('[data-plan]')).forEach(function(s){ S.plan[s.dataset.plan]=s.value; });
   save(); closeSheet(); render(); toast('Weekly plan saved');
+}
+function waterPace(w,goal){
+  const now=new Date(), t=now.getHours()+now.getMinutes()/60;
+  if(t<8 || t>=22) return '';
+  const expect=goal*Math.min(1,(t-8)/14);
+  if(w>=expect-250) return '<b style="color:var(--good)">On pace ✓</b> · ';
+  return '<b style="color:var(--wk)">'+(Math.round((expect-w)/50)*50)+'ml behind pace</b> · ';
 }
 function customWater(){
   const v=prompt('Millilitres to add (negative to correct):');
@@ -683,10 +755,39 @@ function dif(c,p,unitTxt,goodUp){
   const up=d>0, good=(goodUp===false)? !up : up;
   return '<span style="color:var(--'+(good?'good':'bad')+')">'+(up?'▲':'▼')+Math.abs(d)+(unitTxt||'')+' vs last wk</span>';
 }
+function coachNotes(cur,prv,adh){
+  const n=[];
+  if(cur.ses===0) n.push('No workouts this week. Restart small — one 15-minute rehab session tonight beats a perfect plan tomorrow.');
+  else if(adh.planned>0 && adh.done>=adh.planned) n.push('You followed the plan '+adh.done+'/'+adh.planned+' days. This is the consistency that changes bodies.');
+  else if(adh.planned>0) n.push('Plan adherence '+adh.done+'/'+adh.planned+'. Missed days happen — the rule is: never miss twice in a row.');
+  if(cur.slN>=3 && cur.sleep<7) n.push('Sleep averaged '+cur.sleep+'h. Under 7 hours, strength and recovery stall — protect the 22:30 wind-down.');
+  if(prv.vol>0 && cur.vol>prv.vol*1.25) n.push('Training volume jumped '+Math.round((cur.vol/prv.vol-1)*100)+'% vs last week. Keep increases near 10% — your knee and wrist are watching.');
+  if(cur.fdN>=3 && cur.prot<(+S.settings.proteinGoal||120)*0.8) n.push('Protein averaged '+cur.prot+'g against your '+S.settings.proteinGoal+'g goal — one more whey scoop or 100g paneer daily closes it.');
+  if(cur.wLast && prv.wLast && cur.wLast<prv.wLast-0.3 && cur.vol>=prv.vol) n.push('Body weight fell while training rose — you are under-eating for a muscle-building goal. Add ~200 kcal/day.');
+  return n.slice(0,3);
+}
 function openReport(ws){
   ws = ws || wkMonday(today());
   const curWk = wkMonday(today());
   const cur=weekStats(ws), prv=weekStats(dShift(ws,-7));
+  /* plan adherence + sets per muscle for this week */
+  const we=dShift(ws,6), adh={planned:0, done:0}, gsets={};
+  for(let i=0;i<7;i++){
+    const d=dShift(ws,i);
+    if(d>today()) break;
+    const pid=(S.plan||{})[new Date(d+'T12:00:00').getDay()];
+    if(pid){ adh.planned++; if(S.sessions.some(function(s){return s.date===d;})) adh.done++; }
+  }
+  S.sessions.forEach(function(s){
+    if(s.date<ws||s.date>we) return;
+    s.ex.forEach(function(e){
+      const g=exGroupOf(e.exId);
+      if(g==='Mobility') return;
+      gsets[g]=(gsets[g]||0)+e.sets.filter(function(t){return !t.wu;}).length;
+    });
+  });
+  const gtxt=Object.keys(gsets).sort(function(a,b){return gsets[b]-gsets[a];})
+    .map(function(g){return g+' '+gsets[g];}).join(' · ');
   function row(l,v,d){ return '<div class="listrow"><span class="small">'+l+'</span><span class="small num" style="text-align:right">'+v+(d?'<div class="tiny">'+d+'</div>':'')+'</span></div>'; }
   function sect(t){ return '<div class="tiny muted" style="margin:14px 0 2px; font-weight:700; letter-spacing:.07em; text-transform:uppercase">'+t+'</div>'; }
   let h='<h3 style="margin-bottom:4px">Weekly report</h3>'+
@@ -695,9 +796,11 @@ function openReport(ws){
     '<button class="btn sm" onclick="openReport(\''+dShift(ws,7)+'\')" '+(ws>=curWk?'disabled style="opacity:.35"':'')+'>›</button></div>';
   h+=sect('Training')+
     row('Workouts', cur.ses, dif(cur.ses,prv.ses,''))+
+    (adh.planned? row('Plan adherence', adh.done+' / '+adh.planned,'') : '')+
     row('Volume', Math.round(cur.vol).toLocaleString()+' '+unit(), dif(Math.round(cur.vol),Math.round(prv.vol),''))+
     row('Time training', Math.round(cur.dur/60)+' min','')+
-    row('New PRs', cur.pr,'');
+    row('New PRs', cur.pr,'')+
+    (gtxt? '<div class="tiny muted num" style="padding:8px 2px">Working sets: '+gtxt+'</div>' : '');
   h+=sect('Cardio & steps')+
     row('Distance', cur.km+' km', dif(cur.km,prv.km,' km'))+
     row('Steps', cur.steps.toLocaleString(), dif(cur.steps,prv.steps,''))+
@@ -713,6 +816,11 @@ function openReport(ws){
   h+=sect('Body')+
     row('Weight', cur.wLast? cur.wLast+' '+unit():'—',
         cur.wDelta!==null? '<span class="muted">'+(cur.wDelta>0?'+':'')+cur.wDelta+' '+unit()+' within week</span>':'');
+  const notes=coachNotes(cur,prv,adh);
+  if(notes.length){
+    h+=sect('Coach’s notes');
+    notes.forEach(function(x){ h+='<p class="small" style="margin:6px 0; color:var(--ink2)">— '+x+'</p>'; });
+  }
   h+='<p class="tiny muted" style="margin-top:14px">Deltas compare with the previous week. Green = moving the right way for your goals.</p>';
   openSheet(h);
 }
@@ -767,6 +875,10 @@ function renderToday(){
         : 'One tap and your water, workout, sleep and custom reminders can ring properly. Reminders fire while the app is open.')+
       '</div></button>';
   }
+  /* program phase */
+  const pwk=programWeek(), pph=currentPhase();
+  h+='<button class="card" style="width:100%; text-align:left; display:block" onclick="phaseInfo()">'+
+    '<div class="spread"><span class="small"><b>Week '+pwk+'</b> · '+pph.name+'</span><span class="muted">›</span></div></button>';
   /* water */
   h+='<div class="card"><h2><span class="dot" style="background:var(--wa)"></span>Water</h2>'+
     '<div class="row" style="gap:16px">'+
@@ -778,7 +890,7 @@ function renderToday(){
       '<button class="btn sm" onclick="addWater(1000)">+1L</button>'+
       '<button class="btn sm" onclick="customWater()">custom</button>'+
       '<button class="btn ghost sm" onclick="addWater(-250)">undo −250</button></div>'+
-    '<p class="tiny muted" style="margin-top:10px">'+
+    '<p class="tiny muted" style="margin-top:10px">'+waterPace(w,st.waterGoal)+
       (st.waterRemind ? 'Reminders every '+st.waterEvery+' min (8:00–22:00)' : 'Reminders off — turn on in Settings')+
       (st.waterRemind && !notifOK ? ' · <a href="#" onclick="askNotify();return false">allow notifications</a>' : '')+
     '</p></div></div></div>';
@@ -980,6 +1092,12 @@ function sessionHTML(){
       '<button class="btn ghost sm danger" onclick="rmSessionEx('+ei+')">✕</button></span></div>';
     const pv=prevSets(e.exId), grp=exGroupOf(e.exId), pa=prevArr(e.exId);
     if(pv) h+='<div class="tiny muted num" style="margin-top:2px">last time: '+pv+'</div>';
+    const tg=targetFor(e.exId);
+    if(tg) h+='<div class="tiny num" style="color:var(--wk); margin-top:2px">'+tg+'</div>';
+    if(!e.sets.some(function(s){return s.done;})){
+      const wupp=warmupFor(e.exId);
+      if(wupp) h+='<div class="tiny muted num" style="margin-top:2px">'+wupp+'</div>';
+    }
     const c1=grp==='Cardio'?'km':unit(), c2=grp==='Cardio'?'min':(grp==='Mobility'?'secs':'reps');
     h+='<div class="sethead"><span>Set</span><span></span><span style="text-align:center">'+c1+'</span><span style="text-align:center">'+c2+'</span><span></span></div>';
     e.sets.forEach(function(st,si){
@@ -1172,6 +1290,7 @@ function delExercise(id){ if(!confirm('Delete exercise? Past logs keep their dat
 function openExInfo(exId){
   const name=exName(exId), g=exGroupOf(exId);
   let h='<h3>'+esc(name)+'</h3><div class="tiny muted" style="margin:-8px 0 12px">'+esc(g)+'</div>';
+  if(CUES[name]) h+='<p class="small" style="margin-bottom:14px; color:var(--ink2)">💡 '+CUES[name]+'</p>';
   if(g==='Cardio'){
     const cb=cardioBest(exId);
     h+= cb
