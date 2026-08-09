@@ -301,7 +301,8 @@ const DEF_EX=[
   ['Bear crawl','Conditioning'],['Broad jump','Conditioning'],
   ['Rowing (erg)','Cardio'],['SkiErg','Cardio'],
   ['Wall balls','Conditioning'],['Burpee broad jump','Conditioning'],
-  ['Sled push','Conditioning'],['Sled pull','Conditioning'],['Sandbag lunges','Conditioning']
+  ['Sled push','Conditioning'],['Sled pull','Conditioning'],['Sandbag lunges','Conditioning'],
+  ['Dumbbell bench press','Chest'],['Decline dumbbell press','Chest'],['Goblet squat','Legs']
 ];
 /* starter routines (by exercise name) and lacto-veg quick foods */
 const SEED_RT=[
@@ -460,6 +461,79 @@ const HIST=[
     S.sessions.push({id:uid(), name:h.n, date:h.d, dur:h.min*60, vol:vol, ex:ex, imported:true});
   });
   S.sessions.sort(function(a,b){ return a.date<b.date?-1:1; });
+  save();
+})();
+/* v8: full Feb–June training block from the previous app (best set per
+   exercise; session volume/duration taken from that app's totals),
+   today's return workout, and the 58→67→63.9 kg weight journey */
+const H2=[
+['Midday Workout','2026-03-22',13,10480,[['Squat',0,20],['Romanian deadlift',40,10],['Front squat',40,10],['Hip thrust',35,12],['Lunges',20,16],['Leg curl',40,12],['Seated calf raise',20,16]]],
+['Morning Workout','2026-03-23',48,8905,[['Push-ups',0,15],['Bench press',50,8],['Incline dumbbell press',15,10],['Cable crossover',20,12],['Overhead press',12.5,11],['Lateral raise',7.5,5],['Triceps pushdown',30,15],['Overhead triceps extension',15,15]]],
+['Back A','2026-03-24',53,4993,[['Barbell row',30,8],['Lat pulldown',35,10],['Seated cable row',50,10],['Face pull',20,20],['Barbell curl',15,12],['Hammer curl',7.5,12]]],
+['Legs A','2026-03-26',36,4430,[['Squat',25,8],['Leg press',70,10],['Bulgarian split squat',10,10],['Leg extension',35,12],['Leg curl',35,10],['Calf raise',0,12]]],
+['Pull B','2026-03-28',13,6502,[['Pull-ups',0,6],['Deadlift',65,6],['One-arm dumbbell row',12.5,10],['Triceps pushdown',30,15],['Reverse fly',25,15],['Incline curl',10,12],['Wrist curl',5,20]]],
+['Legs B Workout','2026-03-29',115,10440,[['Squat',0,20],['Romanian deadlift',60,8],['Front squat',35,8],['Hip thrust',35,12],['Lunges',20,16],['Leg curl',40,12],['Seated calf raise',20,16]]],
+['Back A','2026-04-01',57,5683,[['Barbell row',45,8],['Lat pulldown',45,8],['Seated cable row',45,12],['Face pull',32.5,12],['Barbell curl',15,15],['Hammer curl',7.5,12]]],
+['Legs','2026-04-02',48,5460,[['Squat',35,8],['Leg extension',90,8],['Bulgarian split squat',10,10],['Calf raise',10,20],['Leg extension',40,12],['Leg curl',35,10]]],
+['Pull B','2026-04-05',4,7608,[['Deadlift',75,8],['Pull-ups',0,6],['One-arm dumbbell row',15,12],['Triceps pushdown',32.5,20],['Reverse fly',25,12],['Incline curl',10,12],['Wrist curl',7.5,20]]],
+['Push A','2026-04-07',60,5581,[['Bench press',55,5],['Incline dumbbell press',17.5,10],['Cable crossover',13.8,12],['Overhead press',12.5,12],['Lateral raise',5,13],['Triceps pushdown',30,15],['Overhead triceps extension',15,15]]],
+['Back A','2026-04-08',53,5845,[['Barbell row',35,8],['Lat pulldown',45,8],['Seated cable row',55,12],['Face pull',20,20],['Barbell curl',20,12],['Hammer curl',7.5,12]]],
+['Legs A','2026-04-11',47,4440,[['Squat',30,12],['Leg press',80,10],['Bulgarian split squat',0,10],['Leg extension',40,12],['Calf raise',0,12]]],
+['Push B','2026-04-13',70,5350,[['Overhead press',40,4],['Incline barbell press',45,5],['Chest fly (dumbbell)',7.5,12],['Arnold press',12.5,10],['Lateral raise',15,18],['Close-grip bench press',40,10],['Triceps dip',20,20]]],
+['Pull B','2026-04-14',63,7197,[['Deadlift',80,8],['Pull-ups',0,5],['One-arm dumbbell row',15,12],['Triceps pushdown',25,20],['Reverse fly',20,12],['Incline curl',10,12],['Wrist curl',10,20]]],
+['Legs B Workout','2026-04-16',58,5785,[['Romanian deadlift',70,6],['Front squat',40,6],['Hip thrust',30,12],['Lunges',20,16],['Leg curl',20,10],['Seated calf raise',20,13]]],
+['Push A','2026-04-17',64,5664,[['Bench press',60,3],['Incline dumbbell press',17.5,8],['Cable crossover',13.8,10],['Overhead press',12.5,10],['Lateral raise',9.2,10],['Triceps pushdown',30,15],['Overhead triceps extension',15,15]]],
+['Back A','2026-04-18',53,6690,[['Barbell row',60,6],['Lat pulldown',35,12],['Seated cable row',60,12],['Face pull',20,20],['Barbell curl',20,12],['Hammer curl',10,12]]],
+['Push A','2026-04-23',49,4966,[['Bench press',35,12],['Incline dumbbell press',10,12],['Cable crossover',9.2,12],['Overhead press',10,12],['Lateral raise',2.5,15],['Triceps pushdown',20,20],['Overhead triceps extension',10,18]]],
+['Back A','2026-04-24',50,6135,[['Barbell row',40,12],['Lat pulldown',35,12],['Seated cable row',40,12],['Face pull',15,20],['Barbell curl',10,20],['Hammer curl',7.5,15]]],
+['Legs A','2026-04-30',38,5580,[['Squat',45,8],['Leg press',90,10],['Leg extension',40,12],['Leg curl',35,8],['Calf raise',0,12]]],
+['Push B','2026-05-01',70,5665,[['Overhead press',30,10],['Incline barbell press',40,8],['Chest fly (dumbbell)',7.5,12],['Arnold press',12.5,8],['Lateral raise',10,12],['Close-grip bench press',40,10],['Triceps dip',25,20]]],
+['Pull B','2026-05-02',62,6632,[['Deadlift',100,1],['Pull-ups',0,6],['One-arm dumbbell row',17.5,10],['Triceps pushdown',35,12],['Reverse fly',20,12],['Incline curl',10,12],['Wrist curl',15,20]]],
+['Legs B Workout','2026-05-04',59,7345,[['Romanian deadlift',70,6],['Front squat',40,7],['Hip thrust',50,10],['Lunges',25,16],['Leg curl',20,12],['Seated calf raise',25,13]]],
+['Push A','2026-05-05',58,5866,[['Bench press',40,12],['Incline dumbbell press',15,12],['Cable crossover',13.8,10],['Overhead press',12.5,10],['Lateral raise',5,12],['Triceps pushdown',30,15],['Overhead triceps extension',17.5,15]]],
+['Back A','2026-05-20',57,8050,[['Barbell row',55,9],['Lat pulldown',40,12],['Seated cable row',80,12],['Face pull',25,21],['Barbell curl',20,13],['Hammer curl',10,4]]],
+['Morning Workout','2026-05-21',32,11160,[['Push-ups',0,15]]],
+['Push B','2026-05-25',81,4630,[['Overhead press',35,8],['Incline barbell press',35,12],['Chest fly (dumbbell)',10,12],['Arnold press',12.5,12],['Lateral raise',5,12],['Close-grip bench press',45,6],['Triceps dip',0,12]]],
+['Pull B','2026-05-26',76,8670,[['Deadlift',80,6],['Pull-ups',0,5],['One-arm dumbbell row',17.5,12],['Triceps pushdown',35,12],['Reverse fly',20,12],['Incline curl',10,10],['Wrist curl',20,20]]],
+['Legs A','2026-05-27',53,6380,[['Squat',50,8],['Leg press',100,10],['Bulgarian split squat',0,12],['Leg extension',45,12],['Leg curl',30,10],['Calf raise',0,20]]],
+['Push A','2026-05-29',69,7305,[['Bench press',55,10],['Incline dumbbell press',15,12],['Decline dumbbell press',15,12],['Overhead press',12.5,10],['Lateral raise',5,12],['Triceps pushdown',25,16],['Overhead triceps extension',17.5,12]]],
+['Back A','2026-06-02',87,8170,[['Barbell row',60,5],['Lat pulldown',40,12],['Seated cable row',85,12],['Face pull',25,20],['Barbell curl',20,12],['Hammer curl',10,10]]]
+];
+(function seedV8(){
+  if(S.seedV8) return; S.seedV8=true;
+  DEF_EX.forEach(function(e){
+    if(!S.exercises.some(function(x){return x.name===e[0];}))
+      S.exercises.push({id:uid(), name:e[0], group:e[1]});
+  });
+  function exId(n){ const e=S.exercises.find(function(x){return x.name===n;}); return e&&e.id; }
+  H2.forEach(function(h){
+    if(S.sessions.some(function(s){return s.date===h[1] && s.name===h[0];})) return;
+    const ex=[], seen={};
+    h[4].forEach(function(row){
+      const id=exId(row[0]); if(!id) return;
+      if(seen[id]){ seen[id].sets.push({w:row[1], r:row[2], done:true}); return; }
+      const e={exId:id, sets:[{w:row[1], r:row[2], done:true}]};
+      seen[id]=e; ex.push(e);
+    });
+    S.sessions.push({id:uid(), name:h[0], date:h[1], dur:h[2]*60, vol:h[3], ex:ex, imported:true});
+  });
+  /* today's return workout, logged from the user's description
+     (reps on the DB presses and reverse flys estimated) */
+  if(!S.sessions.some(function(s){return s.date==='2026-08-09';})){
+    function E(n,sets){ return {exId:exId(n), sets:sets.map(function(p){return {w:p[0], r:p[1], done:true};})}; }
+    S.sessions.push({id:uid(), name:'Return — full body (light)', date:'2026-08-09', dur:52*60, vol:1270,
+      ex:[E('Walking',[[1.2,15]]), E('Treadmill run',[[1,7]]), E('Jumping jacks',[[0,20]]),
+          E('Goblet squat',[[5,12],[5,12],[5,12]]),
+          E('Dumbbell bench press',[[5,12],[7.5,12],[10,10]]),
+          E('Lat pulldown',[[30,12],[30,12]]),
+          E('Reverse fly',[[5,12],[5,12]])].filter(function(e){return e.exId;}),
+      prs:[], note:'First day back after the break. Walk distance and some reps estimated from memory.'});
+  }
+  S.sessions.sort(function(a,b){ return a.date<b.date?-1:1; });
+  [['2026-02-28',58],['2026-06-02',67],['2026-08-09',63.9]].forEach(function(w){
+    if(!S.weights.some(function(x){return x.date===w[0];})) S.weights.push({date:w[0], kg:w[1]});
+  });
+  S.weights.sort(function(a,b){ return a.date<b.date?-1:1; });
   save();
 })();
 /* v5: Hyrox station exercises + routine */
