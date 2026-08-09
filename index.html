@@ -338,7 +338,7 @@ function defaults(){
       sleepRemind:'22:30', sleepGoal:8, stepGoal:8000},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}
   };
 }
 let S;
@@ -480,6 +480,23 @@ const HIST=[
   });
   save();
 })();
+/* v6: default weekly plan (injury-safe comeback schedule) */
+(function seedV6(){
+  if(S.seedV6) return; S.seedV6=true;
+  if(!S.plan || !Object.keys(S.plan).some(function(k){return S.plan[k];})){
+    const byName=function(n){ const r=S.routines.find(function(x){return x.name===n;}); return r? r.id : ''; };
+    S.plan={
+      1: byName('Push — wrist-safe return'),
+      2: byName('Rehab: knee & wrist (~15 min)'),
+      3: byName('Pull — wrist-safe return'),
+      4: byName('Conditioning — joint-friendly'),
+      5: byName('Legs — knee-safe return'),
+      6: byName('Mobility & flexibility (~20 min)'),
+      0: ''
+    };
+  }
+  save();
+})();
 function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toast('Could not save — storage unavailable'); } }
 
 /* ============ utils ============ */
@@ -571,6 +588,28 @@ function foodTotals(date){
   ['b','l','d','s'].forEach(function(m){ (day[m]||[]).forEach(function(e){
     kcal+=+e.kcal||0; p+=+e.p||0; c+=+e.c||0; f+=+e.f||0; }); });
   return {kcal:kcal,p:p,c:c,f:f};
+}
+function todaysPlanRoutine(){
+  const id=(S.plan||{})[new Date().getDay()];
+  return id ? S.routines.find(function(r){return r.id===id;})||null : null;
+}
+function planEditor(){
+  const days=[['1','Monday'],['2','Tuesday'],['3','Wednesday'],['4','Thursday'],['5','Friday'],['6','Saturday'],['0','Sunday']];
+  openSheet('<h3>Weekly plan</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">The Today screen suggests each day’s workout from this plan. When the knee and wrist have a fully pain-free week, swap the return routines for the full Push / Pull / Legs days.</p>'+
+    days.map(function(d){
+      const cur=(S.plan||{})[d[0]]||'';
+      return '<div class="field"><label>'+d[1]+'</label><select data-plan="'+d[0]+'">'+
+        '<option value="">Rest day</option>'+
+        S.routines.map(function(r){ return '<option value="'+r.id+'"'+(cur===r.id?' selected':'')+'>'+esc(r.name)+'</option>'; }).join('')+
+        '</select></div>';
+    }).join('')+
+    '<button class="btn primary wide" onclick="savePlan()">Save plan</button>');
+}
+function savePlan(){
+  S.plan={};
+  [].slice.call(document.querySelectorAll('[data-plan]')).forEach(function(s){ S.plan[s.dataset.plan]=s.value; });
+  save(); closeSheet(); render(); toast('Weekly plan saved');
 }
 function customWater(){
   const v=prompt('Millilitres to add (negative to correct):');
@@ -784,19 +823,26 @@ function renderToday(){
     '<button class="btn" style="background:var(--stp); border-color:var(--stp); color:#0a1f19" onclick="stepsForm()">Enter steps</button></div>'+
     '<div class="bar" style="margin-top:10px"><i style="width:'+(Math.min(1,stp/sgoal)*100)+'%; background:var(--stp)"></i></div>'+
     '<div class="mini stp" aria-label="last 7 days of steps">'+sbars+'</div></div>';
-  /* workout */
-  h+='<div class="card"><h2><span class="dot" style="background:var(--wk)"></span>Workout</h2>';
+  /* workout — plan-driven */
+  const planRt=todaysPlanRoutine();
+  h+='<div class="card"><h2><span class="dot" style="background:var(--wk)"></span>Today’s workout</h2>';
   if(S.active){
     h+='<div class="spread"><div><b>Session in progress</b><div class="tiny muted">'+S.active.ex.length+' exercises</div></div>'+
        '<button class="btn primary" onclick="go(\'workout\')">Resume</button></div>';
   } else if(sToday.length){
     const s=sToday[sToday.length-1];
     h+='<div class="spread"><div><b>Done for today ✓</b><div class="tiny muted">'+esc(s.name)+' · '+s.ex.length+(s.ex.length===1?' exercise · ':' exercises · ')+Math.round(s.vol).toLocaleString()+' '+unit()+' volume</div></div>'+
-       '<button class="btn" onclick="go(\'workout\')">Again</button></div>';
+       '<div class="tiny muted num">'+wk7+'/wk</div></div>';
+  } else if(planRt){
+    h+='<b style="font-size:17px">'+esc(planRt.name)+'</b>'+
+       '<div class="tiny muted" style="margin:3px 0 12px">'+planRt.exIds.map(exName).slice(0,4).join(' · ')+(planRt.exIds.length>4?' +'+(planRt.exIds.length-4):'')+'</div>'+
+       '<button class="btn primary wide" onclick="startSession(\''+planRt.id+'\')">Start today’s workout</button>';
   } else {
-    h+='<div class="spread"><div><b>No workout yet</b><div class="tiny muted">'+(wk7>0?(wk7+' workout'+(wk7>1?'s':'')+' in the last 7 days'):'Start one when ready')+'</div></div>'+
-       '<button class="btn primary" onclick="go(\'workout\')">Start</button></div>';
+    h+='<div class="spread"><div><b>Rest day 🛌</b><div class="tiny muted">Recovery is where the training sticks.'+(wk7>0?' '+wk7+' workout'+(wk7>1?'s':'')+' this week already.':'')+'</div></div>'+
+       '<button class="btn ghost" onclick="go(\'workout\')">Browse</button></div>';
   }
+  h+='<div class="row" style="gap:14px; margin-top:10px"><a href="#" class="tiny" onclick="planEditor();return false" style="color:var(--ink2)">Edit weekly plan</a>'+
+     (planRt&&!sToday.length&&!S.active?'<a href="#" class="tiny" onclick="go(\'workout\');return false" style="color:var(--ink2)">Do something else</a>':'')+'</div>';
   h+='</div>';
   /* food */
   const kp=Math.min(1, ft.kcal/st.calGoal), pp=Math.min(1, ft.p/st.proteinGoal);
@@ -883,7 +929,12 @@ function renderWorkout(){
   if(WV==='history'){ el.innerHTML=historyHTML(); return; }
   if(WV==='routine'){ el.innerHTML=routineHTML(); return; }
   /* home */
+  const planRt=todaysPlanRoutine();
+  const trainedToday=S.sessions.some(function(s){return s.date===today();});
   let h='<div class="card"><h2><span class="dot" style="background:var(--wk)"></span>Train</h2>'+
+    (planRt && !trainedToday
+      ? '<div class="tiny muted" style="margin-bottom:10px">Suggested today: <b style="color:var(--ink)">'+esc(planRt.name)+'</b> — or pick anything below.</div>'
+      : (!planRt && !trainedToday ? '<div class="tiny muted" style="margin-bottom:10px">Planned rest day — train anyway if you feel good.</div>':''))+
     '<button class="btn primary wide" onclick="startSession()">Start empty workout</button>';
   if(S.routines.length){
     h+='<div style="margin-top:12px">';
@@ -1604,7 +1655,8 @@ setInterval(function(){
   if(st.workoutRemind && wkRemindedOn!==today()){
     if(hm===st.workoutRemind && !S.sessions.some(function(s){return s.date===today();})){
       wkRemindedOn=today();
-      notify('Workout time 🏋️','You planned to train at '+st.workoutRemind, true);
+      const prt=todaysPlanRoutine();
+      notify('Workout time 🏋️', prt? 'Today’s plan: '+prt.name : 'You planned to train at '+st.workoutRemind, true);
     }
   }
 }, 30000);
