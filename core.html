@@ -302,7 +302,8 @@ const DEF_EX=[
   ['Rowing (erg)','Cardio'],['SkiErg','Cardio'],
   ['Wall balls','Conditioning'],['Burpee broad jump','Conditioning'],
   ['Sled push','Conditioning'],['Sled pull','Conditioning'],['Sandbag lunges','Conditioning'],
-  ['Dumbbell bench press','Chest'],['Decline dumbbell press','Chest'],['Goblet squat','Legs']
+  ['Dumbbell bench press','Chest'],['Decline dumbbell press','Chest'],['Goblet squat','Legs'],
+  ['Breathwork','Mobility']
 ];
 /* starter routines (by exercise name) and lacto-veg quick foods */
 const SEED_RT=[
@@ -536,6 +537,28 @@ const H2=[
   S.weights.sort(function(a,b){ return a.date<b.date?-1:1; });
   save();
 })();
+/* v9: BCA-report calibration — push-ups added to the return session,
+   BMR-informed calorie target, breathwork habit, April weigh-in */
+(function seedV9(){
+  if(S.seedV9) return; S.seedV9=true;
+  DEF_EX.forEach(function(e){
+    if(!S.exercises.some(function(x){return x.name===e[0];}))
+      S.exercises.push({id:uid(), name:e[0], group:e[1]});
+  });
+  const ret=S.sessions.find(function(s){return s.date==='2026-08-09' && s.name==='Return — full body (light)';});
+  const pu=S.exercises.find(function(x){return x.name==='Push-ups';});
+  if(ret && pu && !ret.ex.some(function(e){return e.exId===pu.id;})){
+    ret.ex.push({exId:pu.id, sets:[{w:0,r:15,done:true},{w:0,r:15,done:true},{w:0,r:15,done:true}]});
+  }
+  /* BCA Apr 16 2026: BMR 1532 -> TDEE ~2350; small appetite -> tighter surplus */
+  if(S.settings.calGoal===2600) S.settings.calGoal=2500;
+  if(!S.weights.some(function(x){return x.date==='2026-04-16';}))
+    S.weights.push({date:'2026-04-16', kg:65.6});
+  S.weights.sort(function(a,b){ return a.date<b.date?-1:1; });
+  if(!S.supps.some(function(x){return /breathwork/i.test(x.name);}))
+    S.supps.push({id:uid(), name:'Breathwork (15–30 min)', kcal:0, p:0, c:0, f:0, logFood:false});
+  save();
+})();
 /* v5: Hyrox station exercises + routine */
 (function seedV5(){
   if(S.seedV5) return; S.seedV5=true;
@@ -553,13 +576,14 @@ const H2=[
 /* v7: the user's actual supplement stack */
 (function seedV7(){
   if(S.seedV7) return; S.seedV7=true;
-  if(!S.supps.length){
-    S.supps=[
-      {id:uid(), name:'Creatine 5g — GNC monohydrate', kcal:0, p:0, c:0, f:0, logFood:false},
-      {id:uid(), name:'Whey — Avatar Malay Kulfi (1 scoop)', kcal:150, p:27.5, c:4, f:2, logFood:true},
-      {id:uid(), name:'Casein — before bed', kcal:120, p:24, c:4, f:1, logFood:true}
-    ];
-  }
+  [
+    {name:'Creatine 5g — GNC monohydrate', kcal:0, p:0, c:0, f:0, logFood:false},
+    {name:'Whey — Avatar Malay Kulfi (1 scoop)', kcal:150, p:27.5, c:4, f:2, logFood:true},
+    {name:'Casein — before bed', kcal:120, p:24, c:4, f:1, logFood:true}
+  ].forEach(function(sp){
+    if(!S.supps.some(function(x){return x.name===sp.name;}))
+      S.supps.push(Object.assign({id:uid()}, sp));
+  });
   save();
 })();
 /* v6: default weekly plan (injury-safe comeback schedule) */
