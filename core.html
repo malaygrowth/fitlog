@@ -1869,9 +1869,16 @@ const FOODDB=[
 ['Bread slice (1)',70,2.5,13,1],['Bread + butter (1 slice)',115,2.5,13,6],['Daliya (bowl)',180,5,30,4],
 ['Cornflakes + milk (bowl)',200,6,35,4],['Sprouts chaat (bowl)',130,9,18,1.5],['Sabudana khichdi (bowl)',300,3,50,10],
 /* rotis & rice */
-['Phulka — no ghee (1)',80,3,15,0.5],['Bajra roti (1)',120,3.5,22,1.5],['Missi roti (1)',130,5,20,3],
-['Tandoori roti (1)',120,4,24,1],['Butter naan (1)',260,6,40,8],['Jeera rice (bowl)',250,4,45,6],
+['Atta roti / chapati with ghee (1)',100,3,15,3],['Atta roti / phulka — no ghee (1)',80,3,15,0.5],
+['Bajra roti (1)',120,3.5,22,1.5],['Missi roti (1)',130,5,20,3],
+['Tandoori roti (1)',120,4,24,1],['Butter naan (1)',260,6,40,8],
+['Steamed rice (bowl)',200,4,44,1],['Jeera rice (bowl)',250,4,45,6],
 ['Veg pulao (bowl)',280,6,45,8],['Khichdi (bowl)',220,8,35,5],['Curd rice (bowl)',240,7,38,7],
+/* everyday basics */
+['Dal tadka (bowl)',150,9,22,3],['Moong dal boiled (bowl)',150,10,25,1],
+['Milk full-fat (250ml)',150,8,12,8],['Curd / dahi (bowl, 200g)',120,7,9,6],['Hung curd (150g)',130,15,6,5],
+['Paneer raw (100g)',265,18,4,20],['Peanut butter (1 tbsp)',95,4,3,8],['Banana (1)',105,1,27,0],
+['Oats with milk (bowl)',330,14,45,9],
 /* dals, sabzis & curries */
 ['Dal makhani (bowl)',280,10,25,15],['Kadhi (bowl)',160,6,12,9],['Gatte ki sabzi (bowl)',250,8,20,15],
 ['Ker sangri (bowl)',180,4,15,12],['Sev tamatar (bowl)',220,5,15,15],['Aloo sabzi (bowl)',150,3,20,7],
@@ -1906,8 +1913,12 @@ function fdbSearch(q){
   q=(q||'').trim().toLowerCase();
   const box=$('#fdbRes'); FDSEL=-1; $('#fdbSel').innerHTML='';
   if(!q){ box.innerHTML=''; return; }
+  const toks=q.split(/\s+/);
   const hits=[];
-  FOODDB.forEach(function(f,i){ if(f[0].toLowerCase().indexOf(q)>-1) hits.push(i); });
+  FOODDB.forEach(function(f,i){
+    const n=f[0].toLowerCase();
+    if(toks.every(function(t){ return n.indexOf(t)>-1; })) hits.push(i);
+  });
   box.innerHTML = hits.slice(0,8).map(function(i){
     const f=FOODDB[i];
     return '<div class="listrow" style="cursor:pointer" onclick="fdbPick('+i+')"><span class="small">'+f[0]+'</span><span class="tiny muted num">'+f[1]+' kcal · P'+f[2]+'</span></div>';
