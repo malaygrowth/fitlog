@@ -1,13 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="110" fill="#0e1214"/>
-  <g stroke="#f2a03d" stroke-width="34" stroke-linecap="round" fill="none">
-    <path d="M156 256h200"/>
-  </g>
-  <g fill="#f2a03d">
-    <rect x="96" y="176" width="52" height="160" rx="20"/>
-    <rect x="364" y="176" width="52" height="160" rx="20"/>
-  </g>
-  <g stroke="#f2a03d" stroke-width="26" stroke-linecap="round">
-    <path d="M62 216v80M450 216v80"/>
-  </g>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c2530"/>
+      <stop offset="1" stop-color="#0b0f13"/>
+    </linearGradient>
+    <linearGradient id="am" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffc76e"/>
+      <stop offset="1" stop-color="#f08a2b"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="174" fill="none" stroke="#f2a03d" stroke-opacity="0.16" stroke-width="24"/>
+  <circle cx="256" cy="256" r="174" fill="none" stroke="url(#am)" stroke-width="24" stroke-linecap="round"
+          stroke-dasharray="765 1094" transform="rotate(-90 256 256)"/>
+  <rect x="158" y="240" width="196" height="32" rx="16" fill="url(#am)"/>
+  <rect x="126" y="192" width="46" height="128" rx="20" fill="url(#am)"/>
+  <rect x="340" y="192" width="46" height="128" rx="20" fill="url(#am)"/>
+  <rect x="96" y="218" width="24" height="76" rx="12" fill="#f2a03d" opacity="0.75"/>
+  <rect x="392" y="218" width="24" height="76" rx="12" fill="#f2a03d" opacity="0.75"/>
+  <circle cx="256" cy="82" r="12" fill="#ffc76e"/>
 </svg>

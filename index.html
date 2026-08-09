@@ -633,6 +633,13 @@ function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toa
     S.reminders.push({id:uid(), label:'Book BCA re-scan at Build & Trim (compare vs 16 Apr)', time:'10:00', date:'2026-10-18'});
   save();
 })();
+/* v11: wedding break around 24–25 Nov */
+(function seedV11(){
+  if(S.seedV11) return; S.seedV11=true;
+  if(!S.breaks.some(function(b){return /wedding/i.test(b.label);}))
+    S.breaks.push({id:uid(), from:'2026-11-20', to:'2026-11-27', label:'Wedding 💍'});
+  save();
+})();
 
 /* ============ utils ============ */
 function $(s){ return document.querySelector(s); }
@@ -1834,6 +1841,82 @@ function hiReset(){ clearInterval(hi.int); hi={run:false,phase:'ready',round:0,e
   $('#hiMain').textContent='Start'; }
 
 /* ============ FOOD ============ */
+/* Indian vegetarian food database — [name, kcal, protein, carbs, fat] per stated unit */
+const FOODDB=[
+/* dry fruits & nuts — per piece, because that's how they're eaten */
+['Almond (1 piece)',7,0.3,0.2,0.6],['Cashew (1 piece)',9,0.3,0.5,0.7],['Raisin (1 piece)',2,0,0.5,0],
+['Walnut (1 half)',13,0.3,0.3,1.3],['Pistachio (1 piece)',4,0.2,0.2,0.3],['Date / khajur (1)',23,0.2,6,0],
+['Dried fig / anjeer (1)',10,0.1,2.5,0],['Dried apricot (1)',17,0.2,4,0],
+['Mixed dry fruits (small handful, 25g)',140,4,8,11],['Makhana ghee-roasted (bowl, 30g)',150,3.5,20,6],
+['Coconut dry (1 tbsp grated)',35,0.3,1.5,3],['Peanut chikki (1 small, 20g)',100,3,12,5],
+/* breakfast */
+['Poha (1 plate)',250,5,45,7],['Upma (1 bowl)',230,6,35,8],['Idli (1)',40,1.5,8,0.2],
+['Plain dosa (1)',130,3,20,4],['Masala dosa (1)',250,5,35,10],['Besan chilla (1)',130,6,12,6],
+['Plain paratha with ghee (1)',200,4,28,8],['Aloo paratha (1)',250,5,35,10],['Thepla (1)',120,3,17,5],
+['Bread slice (1)',70,2.5,13,1],['Bread + butter (1 slice)',115,2.5,13,6],['Daliya (bowl)',180,5,30,4],
+['Cornflakes + milk (bowl)',200,6,35,4],['Sprouts chaat (bowl)',130,9,18,1.5],['Sabudana khichdi (bowl)',300,3,50,10],
+/* rotis & rice */
+['Phulka — no ghee (1)',80,3,15,0.5],['Bajra roti (1)',120,3.5,22,1.5],['Missi roti (1)',130,5,20,3],
+['Tandoori roti (1)',120,4,24,1],['Butter naan (1)',260,6,40,8],['Jeera rice (bowl)',250,4,45,6],
+['Veg pulao (bowl)',280,6,45,8],['Khichdi (bowl)',220,8,35,5],['Curd rice (bowl)',240,7,38,7],
+/* dals, sabzis & curries */
+['Dal makhani (bowl)',280,10,25,15],['Kadhi (bowl)',160,6,12,9],['Gatte ki sabzi (bowl)',250,8,20,15],
+['Ker sangri (bowl)',180,4,15,12],['Sev tamatar (bowl)',220,5,15,15],['Aloo sabzi (bowl)',150,3,20,7],
+['Bhindi sabzi (bowl)',120,2,10,8],['Mixed veg / gobi sabzi (bowl)',130,3,12,8],['Baingan bharta (bowl)',140,3,12,9],
+['Palak paneer (bowl)',240,12,10,17],['Paneer butter masala (bowl)',350,14,15,26],['Shahi paneer (bowl)',330,13,16,24],
+['Matar paneer (bowl)',280,12,18,18],['Dal baati with ghee (1 baati)',250,6,35,10],['Churma (small bowl)',350,5,45,17],
+['Papad roasted (1)',40,2,7,0.3],['Papad fried (1)',80,2,7,4.5],['Salad — kheera/tamatar/pyaaz (plate)',40,2,8,0],
+['Ghee (1 tsp)',45,0,0,5],['Butter (1 tsp)',35,0,0,4],['Boiled potato (1 medium)',90,2,21,0],
+/* snacks — Jaipur specials included */
+['Samosa (1)',260,4,30,14],['Pyaaz kachori (1)',300,5,30,18],['Dal kachori (1)',250,4,25,15],
+['Mirchi vada (1)',220,4,22,13],['Bhujia / namkeen (small bowl, 30g)',160,5,15,10],['Mathri (1)',90,1.5,10,5],
+['Dhokla (2 pieces)',120,4,20,3],['Pakora (4–5 pieces)',200,5,18,12],['Pav bhaji (plate)',400,10,55,15],
+['Papdi chaat (plate)',350,7,40,18],['Vada pav (1)',300,6,40,13],['Parle-G / Marie (2 biscuits)',55,1,10,1.5],
+['Rusk (1)',45,1,8,1],['Roasted chana (handful, 30g)',110,6,18,2],
+/* sweets */
+['Besan ladoo (1)',180,4,20,10],['Motichoor ladoo (1)',150,2,22,6],['Gulab jamun (1)',150,2,20,7],
+['Jalebi (2 pieces, 40g)',150,1,25,5],['Ghewar (1 slice, 50g)',220,3,28,11],['Barfi (1 piece)',120,3,15,6],
+['Rasgulla (1)',106,2,25,0.5],['Kheer (bowl)',250,7,35,9],['Sooji halwa (bowl)',300,4,40,14],
+['Gajar halwa (bowl)',280,5,35,13],['Dark chocolate (2 squares)',110,1,10,7],
+/* drinks */
+['Chai with milk + sugar (1 cup)',90,2,12,3.5],['Chai no sugar (1 cup)',45,2,4,2.5],['Black coffee (1 cup)',5,0,0,0],
+['Nimbu pani with sugar (glass)',60,0,15,0],['Chaas / buttermilk (glass)',40,2,3,1.5],['Sweet lassi (glass)',220,6,30,8],
+['Coconut water (1)',45,1,10,0],['Fresh fruit juice (glass)',120,1,28,0],['Cold drink (300ml)',130,0,33,0],
+['Beer (330ml)',140,1,11,0],['Whisky (30ml peg)',65,0,0,0],
+/* fruits */
+['Apple (1)',80,0.4,21,0.3],['Mango (1 medium)',150,1.5,35,0.6],['Orange (1)',60,1,15,0.2],
+['Papaya (bowl)',60,1,15,0.2],['Grapes (bowl)',100,1,26,0.2],['Watermelon (bowl)',45,1,11,0.2],
+['Pomegranate / anaar (1)',105,2,26,1.5],['Guava (1)',60,2,14,1],['Chikoo (1)',80,0.5,20,1]
+];
+let FDMEAL='s', FDSEL=-1;
+function fdbSearch(q){
+  q=(q||'').trim().toLowerCase();
+  const box=$('#fdbRes'); FDSEL=-1; $('#fdbSel').innerHTML='';
+  if(!q){ box.innerHTML=''; return; }
+  const hits=[];
+  FOODDB.forEach(function(f,i){ if(f[0].toLowerCase().indexOf(q)>-1) hits.push(i); });
+  box.innerHTML = hits.slice(0,8).map(function(i){
+    const f=FOODDB[i];
+    return '<div class="listrow" style="cursor:pointer" onclick="fdbPick('+i+')"><span class="small">'+f[0]+'</span><span class="tiny muted num">'+f[1]+' kcal · P'+f[2]+'</span></div>';
+  }).join('') || '<div class="tiny muted" style="padding:8px 2px">Nothing found — use the manual fields below.</div>';
+}
+function fdbPick(i){
+  FDSEL=i; const f=FOODDB[i];
+  $('#fdbRes').innerHTML='';
+  $('#fdbSel').innerHTML='<div class="card" style="background:var(--raised); margin:8px 0 4px"><b class="small">'+f[0]+'</b>'+
+    '<div class="tiny muted num" style="margin:2px 0 10px">'+f[1]+' kcal · P '+f[2]+' · C '+f[3]+' · F '+f[4]+' (per unit)</div>'+
+    '<div class="row"><span class="small">Quantity</span><input id="fdbQty" type="number" inputmode="decimal" value="1" min="0.5" step="0.5" style="max-width:90px; text-align:center">'+
+    '<button class="btn food grow" onclick="fdbAdd()">Add</button></div></div>';
+}
+function fdbAdd(){
+  if(FDSEL<0) return;
+  const f=FOODDB[FDSEL], n=Math.max(0.5, +$('#fdbQty').value||1);
+  const e={id:uid(), name:(n!==1? n+'× ':'')+f[0], kcal:Math.round(f[1]*n), p:Math.round(f[2]*n*10)/10, c:Math.round(f[3]*n*10)/10, f:Math.round(f[4]*n*10)/10};
+  const day=S.food[foodDate]=S.food[foodDate]||{};
+  (day[FDMEAL]=day[FDMEAL]||[]).push(e);
+  save(); closeSheet(); renderFood();
+  toast(e.name+' — '+e.kcal+' kcal logged');
+}
 let foodDate=today();
 const MEALS=[['b','Breakfast'],['l','Lunch'],['d','Dinner'],['s','Snacks']];
 function renderFood(){
@@ -1862,7 +1945,12 @@ function renderFood(){
 }
 function foodNav(d){ const nx=dShift(foodDate,d); if(nx>today()) return; foodDate=nx; renderFood(); }
 function addFoodForm(meal){
-  let h='<h3>Add food</h3>';
+  FDMEAL=meal; FDSEL=-1;
+  let h='<h3>Add food</h3>'+
+    '<div class="field"><label for="fdbQ">Search '+FOODDB.length+' Indian foods (per-piece dry fruits included)</label>'+
+    '<input id="fdbQ" placeholder="almond, dal, ghewar, chai, kachori…" oninput="fdbSearch(this.value)"></div>'+
+    '<div id="fdbRes"></div><div id="fdbSel"></div>'+
+    '<hr style="border:0; border-top:1px solid var(--line); margin:12px 0">';
   if(S.quick.length){
     h+='<div class="tiny muted" style="margin-bottom:6px">Quick add</div><div class="row wrap" style="margin-bottom:14px">'+
       S.quick.map(function(q){ return '<button class="chip" onclick="quickAdd(\''+meal+'\',\''+q.id+'\')">'+esc(q.name)+' · '+Math.round(q.kcal)+'</button>'; }).join('')+'</div>';
