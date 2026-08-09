@@ -1,4 +1,4 @@
-const CACHE = 'fitlog-v1';
+const CACHE = 'fitlog-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -15,6 +15,20 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // App shell: network-first so updates land; cache fallback keeps it offline-capable.
+  if (e.request.mode === 'navigate' || e.request.destination === 'document') {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put('./index.html', copy));
+          return res;
+        })
+        .catch(() => caches.match('./index.html', { ignoreSearch: true }))
+    );
+    return;
+  }
+  // Static assets (exercise images etc.): cache-first, fill cache on first fetch.
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(
       (hit) =>
@@ -24,6 +38,6 @@ self.addEventListener('fetch', (e) => {
           caches.open(CACHE).then((c) => c.put(e.request, copy));
           return res;
         })
-    ).catch(() => caches.match('./index.html'))
+    )
   );
 });

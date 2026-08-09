@@ -350,7 +350,7 @@ function defaults(){
       sleepRemind:'22:30', sleepGoal:8, stepGoal:8000},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[]
   };
 }
 let S;
@@ -619,6 +619,21 @@ const H2=[
 })();
 function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toast('Could not save — storage unavailable'); } }
 
+/* v10: coach optimization — density shake, breathwork in routines, BCA re-scan */
+(function seedV10(){
+  if(S.seedV10) return; S.seedV10=true;
+  if(!S.quick.some(function(x){return /mass shake/i.test(x.name);}))
+    S.quick.push({id:uid(), name:'Mass shake (milk+oats+PB+banana+whey)', kcal:700, p:40, c:75, f:22});
+  const bw=S.exercises.find(function(x){return x.name==='Breathwork';});
+  if(bw) ['Rehab: knee & wrist (~15 min)','Mobility & flexibility (~20 min)'].forEach(function(n){
+    const r=S.routines.find(function(x){return x.name===n;});
+    if(r && r.exIds.indexOf(bw.id)<0) r.exIds.push(bw.id);
+  });
+  if(!S.reminders.some(function(x){return /re-?scan/i.test(x.label);}))
+    S.reminders.push({id:uid(), label:'Book BCA re-scan at Build & Trim (compare vs 16 Apr)', time:'10:00', date:'2026-10-18'});
+  save();
+})();
+
 /* ============ utils ============ */
 function $(s){ return document.querySelector(s); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -772,7 +787,12 @@ const CUES={
   'Wall balls':'It is a squat plus a push, not an arm throw; hit the same spot every rep.',
   'Kettlebell swing':'A hip hinge, not a squat; arms are ropes — the hips snap, the glutes finish.',
   'Burpee broad jump':'Land soft with bent knees; step back instead of jumping back while the wrists heal.',
-  'Farmer’s carry':'Tall posture, packed shoulders, quick small steps; tight grip, neutral wrists.'
+  'Farmer’s carry':'Tall posture, packed shoulders, quick small steps; tight grip, neutral wrists.',
+  'Walking':'Nasal breathing only — recovery and aerobic engine in one.',
+  'Treadmill run':'Easy pace, nasal breathing where possible; land soft, feet under the hips.',
+  'Running (outdoor)':'Conversational pace; short quick steps, land under your hips, breathe through the nose on easy runs.',
+  'Cycling':'Smooth circles, easy gear — zone 2 is where the engine grows.',
+  'Breathwork':'Post-training or pre-sleep. Slow nasal inhale, longer exhale; 15–30 min daily.'
 };
 /* movement-pattern diagrams: grey = start, amber = finish */
 const STAND_A='<circle cx="55" cy="22" r="6.5" class="fs"/><polyline points="55,29 55,62" class="fs"/><polyline points="55,36 63,54" class="fs"/><polyline points="55,62 52,86 53,110" class="fs"/><polyline points="55,62 59,86 58,110" class="fs"/>';
@@ -849,13 +869,22 @@ function patternOf(n,g){
   if(/press/.test(n)) return 'vpush';
   return null;
 }
+function exImgAlt(){
+  const a=$('#exImgWrap'), b=$('#exSvgWrap');
+  if(a) a.style.display='none';
+  if(b) b.style.display='';
+}
 function patternSVG(p){
   const d=PATTERNS[p]; if(!d) return '';
   return '<svg viewBox="0 0 200 124" class="exfig" style="width:100%; max-width:270px; display:block; margin:2px auto 2px" role="img" aria-label="'+d.label+'">'+
     '<line x1="8" y1="112" x2="192" y2="112" class="fg"/>'+d.svg+'</svg>'+
     '<div class="tiny muted" style="text-align:center; margin-bottom:12px">'+d.label+'</div>';
 }
+function activeBreak(d){
+  return (S.breaks||[]).find(function(b){ return d>=b.from && d<=b.to; })||null;
+}
 function todaysPlanRoutine(){
+  if(activeBreak(today())) return null;
   const id=(S.plan||{})[new Date().getDay()];
   return id ? S.routines.find(function(r){return r.id===id;})||null : null;
 }
@@ -870,12 +899,36 @@ function planEditor(){
         S.routines.map(function(r){ return '<option value="'+r.id+'"'+(cur===r.id?' selected':'')+'>'+esc(r.name)+'</option>'; }).join('')+
         '</select></div>';
     }).join('')+
-    '<button class="btn primary wide" onclick="savePlan()">Save plan</button>');
+    '<button class="btn primary wide" onclick="savePlan()">Save plan</button>'+
+    '<hr style="border:0; border-top:1px solid var(--line); margin:16px 0">'+
+    '<div class="tiny muted" style="font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin-bottom:8px">Planned breaks (trips, wedding, exams)</div>'+
+    ((S.breaks&&S.breaks.length)
+      ? S.breaks.map(function(b){ return '<div class="listrow"><span class="small">'+esc(b.label||'Break')+' <span class="tiny muted num">'+fmtD(b.from)+' – '+fmtD(b.to)+'</span></span><button class="btn ghost sm danger" onclick="delBreak(\''+b.id+'\')">✕</button></div>'; }).join('')
+      : '<p class="tiny muted" style="margin-bottom:6px">Days inside a break count as planned rest — no missed-day marks, no guilt-tripping coach notes.</p>')+
+    '<div class="field" style="margin-top:8px"><input id="bkLabel" placeholder="e.g. Wedding week 💍"></div>'+
+    '<div class="row" style="gap:8px; margin-bottom:4px"><input id="bkFrom" type="date"><input id="bkTo" type="date"><button class="btn sm" onclick="addBreak()">Add</button></div>');
+}
+function collectPlan(){
+  const sel=document.querySelectorAll('[data-plan]');
+  if(!sel.length) return;
+  S.plan={};
+  [].slice.call(sel).forEach(function(s){ S.plan[s.dataset.plan]=s.value; });
 }
 function savePlan(){
-  S.plan={};
-  [].slice.call(document.querySelectorAll('[data-plan]')).forEach(function(s){ S.plan[s.dataset.plan]=s.value; });
+  collectPlan();
   save(); closeSheet(); render(); toast('Weekly plan saved');
+}
+function addBreak(){
+  const from=$('#bkFrom').value, to=$('#bkTo').value, label=$('#bkLabel').value.trim();
+  if(!from||!to||to<from){ toast('Pick a valid date range'); return; }
+  collectPlan();
+  S.breaks.push({id:uid(), from:from, to:to, label:label||'Break'});
+  save(); planEditor(); toast('Break added — those days are guilt-free');
+}
+function delBreak(id){
+  collectPlan();
+  S.breaks=S.breaks.filter(function(b){return b.id!==id;});
+  save(); planEditor();
 }
 function waterPace(w,goal){
   const now=new Date(), t=now.getHours()+now.getMinutes()/60;
@@ -943,6 +996,9 @@ function logSleepForm(){
     '<div class="fields2">'+
     '<div class="field"><label for="slBed">In bed at</label><input id="slBed" type="time" value="'+(cur.bed||'23:00')+'"></div>'+
     '<div class="field"><label for="slWake">Woke at</label><input id="slWake" type="time" value="'+(cur.wake||'07:00')+'"></div></div>'+
+    '<div class="row" style="gap:8px; margin-bottom:14px">'+
+    '<label class="chip grow" style="text-align:center; cursor:pointer"><input type="radio" name="slQ" value="r" '+(cur.q==='r'?'checked':'')+' style="accent-color:var(--good)"> Woke rested</label>'+
+    '<label class="chip grow" style="text-align:center; cursor:pointer"><input type="radio" name="slQ" value="g" '+(cur.q==='g'?'checked':'')+' style="accent-color:var(--bad)"> Woke groggy</label></div>'+
     '<button class="btn wide" style="background:var(--sl); border-color:var(--sl); color:#101526" onclick="saveSleep()">Save</button>'+
     (cur.hrs?'<button class="btn ghost wide danger" style="margin-top:10px" onclick="delSleep()">Remove entry</button>':'')+
     '<p class="tiny muted" style="margin-top:12px">Logged against this morning’s date. 7–9 hours is where muscle recovery actually happens.</p>');
@@ -953,7 +1009,8 @@ function saveSleep(){
   const bm=+bed.slice(0,2)*60 + +bed.slice(3), wm=+wake.slice(0,2)*60 + +wake.slice(3);
   const hrs=Math.round(((wm-bm+1440)%1440)/6)/10;
   if(!hrs){ toast('Those times are the same'); return; }
-  S.sleep[today()]={bed:bed, wake:wake, hrs:hrs};
+  const q=(document.querySelector('input[name=slQ]:checked')||{}).value||'';
+  S.sleep[today()]={bed:bed, wake:wake, hrs:hrs, q:q};
   save(); closeSheet(); renderToday();
   toast(hrs+'h logged'+(hrs<(+S.settings.sleepGoal||8)-1?' — try for an earlier night today':''));
 }
@@ -994,17 +1051,17 @@ function weekStats(ws){
     });
     if(inBest>0 && preBest>0 && inBest>preBest) pr++;
   });
-  let slS=0,slN=0, waS=0,waN=0,waHit=0, stS=0,stN=0,stHit=0, kcS=0,ptS=0,fdN=0;
+  let slS=0,slN=0,slG7=0, waS=0,waN=0,waHit=0, stS=0,stN=0,stHit=0, kcS=0,ptS=0,fdN=0;
   for(let i=0;i<7;i++){
     const d=dShift(ws,i);
-    const sl=S.sleep[d]; if(sl){ slS+=sl.hrs; slN++; }
+    const sl=S.sleep[d]; if(sl){ slS+=sl.hrs; slN++; if(sl.q==='g'&&sl.hrs>=7) slG7++; }
     const w=S.water[d]||0; if(w>0){ waS+=w; waN++; if(w>=S.settings.waterGoal) waHit++; }
     const sp=S.steps[d]||0; if(sp>0){ stS+=sp; stN++; if(sp>=(+S.settings.stepGoal||8000)) stHit++; }
     const ft=foodTotals(d); if(ft.kcal>0){ kcS+=ft.kcal; ptS+=ft.p; fdN++; }
   }
   const wts=S.weights.filter(function(x){return inR(x.date);}).sort(function(a,b){return a.date<b.date?-1:1;});
   return {ses:ses.length, vol:vol, dur:dur, km:Math.round(km*10)/10, pr:pr,
-    sleep: slN? Math.round(slS/slN*10)/10 :0, slN:slN,
+    sleep: slN? Math.round(slS/slN*10)/10 :0, slN:slN, slG7:slG7,
     water: waN? Math.round(waS/waN) :0, waHit:waHit,
     steps: stS, stHit:stHit,
     kcal: fdN? Math.round(kcS/fdN) :0, prot: fdN? Math.round(ptS/fdN) :0, fdN:fdN,
@@ -1020,7 +1077,9 @@ function dif(c,p,unitTxt,goodUp){
 }
 function coachNotes(cur,prv,adh){
   const n=[];
-  if(cur.ses===0) n.push('No workouts this week. Restart small — one 15-minute rehab session tonight beats a perfect plan tomorrow.');
+  if(adh.brk>0) n.push('Planned break covered '+adh.brk+' day'+(adh.brk>1?'s':'')+' this week — that was the plan, so it counts as following the plan. Walks, protein and sleep keep everything you built.');
+  if(cur.ses===0 && !(adh.brk>=4)) n.push('No workouts this week. Restart small — one 15-minute rehab session tonight beats a perfect plan tomorrow.');
+  if(cur.slG7>=3) n.push('You got the hours but woke groggy '+cur.slG7+' mornings — that is quality, not quantity. Late screens and late smoke fragment deep sleep; move both earlier in the evening.');
   else if(adh.planned>0 && adh.done>=adh.planned) n.push('You followed the plan '+adh.done+'/'+adh.planned+' days. This is the consistency that changes bodies.');
   else if(adh.planned>0) n.push('Plan adherence '+adh.done+'/'+adh.planned+'. Missed days happen — the rule is: never miss twice in a row.');
   if(cur.slN>=3 && cur.sleep<7) n.push('Sleep averaged '+cur.sleep+'h. Under 7 hours, strength and recovery stall — protect the 22:30 wind-down.');
@@ -1034,10 +1093,11 @@ function openReport(ws){
   const curWk = wkMonday(today());
   const cur=weekStats(ws), prv=weekStats(dShift(ws,-7));
   /* plan adherence + sets per muscle for this week */
-  const we=dShift(ws,6), adh={planned:0, done:0}, gsets={};
+  const we=dShift(ws,6), adh={planned:0, done:0, brk:0}, gsets={};
   for(let i=0;i<7;i++){
     const d=dShift(ws,i);
     if(d>today()) break;
+    if(activeBreak(d)){ adh.brk++; continue; }
     const pid=(S.plan||{})[new Date(d+'T12:00:00').getDay()];
     if(pid){ adh.planned++; if(S.sessions.some(function(s){return s.date===d;})) adh.done++; }
   }
@@ -1060,6 +1120,7 @@ function openReport(ws){
   h+=sect('Training')+
     row('Workouts', cur.ses, dif(cur.ses,prv.ses,''))+
     (adh.planned? row('Plan adherence', adh.done+' / '+adh.planned,'') : '')+
+    (adh.brk? row('Planned break days', adh.brk,'') : '')+
     row('Volume', Math.round(cur.vol).toLocaleString()+' '+unit(), dif(Math.round(cur.vol),Math.round(prv.vol),''))+
     row('Time training', Math.round(cur.dur/60)+' min','')+
     row('New PRs', cur.pr,'')+
@@ -1163,11 +1224,11 @@ function renderToday(){
   for(let i=6;i>=0;i--){
     const e=S.sleep[dShift(today(),-i)];
     if(e){ sum+=e.hrs; cnt++; }
-    bars+='<i class="'+(e?'':'off')+'" style="height:'+(e?Math.max(6,Math.min(1,e.hrs/sg)*36):4)+'px" title="'+(e?e.hrs+'h':'—')+'"></i>';
+    bars+='<i class="'+(e?'':'off')+'" style="height:'+(e?Math.max(6,Math.min(1,e.hrs/sg)*36):4)+'px'+(e&&e.q==='g'?'; opacity:.45':'')+'" title="'+(e?e.hrs+'h':'—')+'"></i>';
   }
   h+='<div class="card"><h2><span class="dot" style="background:var(--sl)"></span>Sleep</h2>'+
     '<div class="spread"><div>'+
-    (sl ? '<span class="big num" style="font-size:26px">'+sl.hrs+'h</span><div class="tiny muted num">'+sl.bed+' → '+sl.wake+(cnt>1?' · 7-day avg '+(Math.round(sum/cnt*10)/10)+'h':'')+'</div>'
+    (sl ? '<span class="big num" style="font-size:26px">'+sl.hrs+'h</span>'+(sl.q?'<span class="tiny" style="color:var(--'+(sl.q==='r'?'good':'bad')+')"> · woke '+(sl.q==='r'?'rested':'groggy')+'</span>':'')+'<div class="tiny muted num">'+sl.bed+' → '+sl.wake+(cnt>1?' · 7-day avg '+(Math.round(sum/cnt*10)/10)+'h':'')+'</div>'
         : '<b>Last night not logged</b><div class="tiny muted">Aim: in bed by 11pm, '+sg+'h goal'+(st.sleepRemind?' · wind-down ping at '+st.sleepRemind:'')+'</div>')+
     '</div><button class="btn" style="background:var(--sl); border-color:var(--sl); color:#101526" onclick="logSleepForm()">Log sleep</button></div>'+
     '<div class="mini" aria-label="last 7 nights">'+bars+'</div></div>';
@@ -1198,6 +1259,10 @@ function renderToday(){
     h+='<b style="font-size:17px">'+esc(planRt.name)+'</b>'+
        '<div class="tiny muted" style="margin:3px 0 12px">'+planRt.exIds.map(exName).slice(0,4).join(' · ')+(planRt.exIds.length>4?' +'+(planRt.exIds.length-4):'')+'</div>'+
        '<button class="btn primary wide" onclick="startSession(\''+planRt.id+'\')">Start today’s workout</button>';
+  } else if(activeBreak(today())){
+    const bk=activeBreak(today());
+    h+='<div class="spread"><div><b>🎉 '+esc(bk.label||'Planned break')+'</b><div class="tiny muted">Break until '+fmtD(bk.to)+'. Maintenance mode: walk, water, protein, sleep — zero guilt.</div></div>'+
+       '<button class="btn ghost" onclick="go(\'workout\')">Browse</button></div>';
   } else {
     h+='<div class="spread"><div><b>Rest day 🛌</b><div class="tiny muted">Recovery is where the training sticks.'+(wk7>0?' '+wk7+' workout'+(wk7>1?'s':'')+' this week already.':'')+'</div></div>'+
        '<button class="btn ghost" onclick="go(\'workout\')">Browse</button></div>';
@@ -1504,6 +1569,8 @@ function finishSession(){
   const sess={id:a.id, name:a.name, date:a.date, dur:dur, vol:vol, ex:a.ex, prs:prs};
   S.sessions.push(sess);
   S.active=null; save(); WV='home'; renderWorkout();
+  const total=S.sessions.length;
+  if(total%10===0) setTimeout(function(){ toast('🏅 Workout #'+total+' all-time — consistency compounds'); }, 600);
   openSheet('<h3>Workout complete 💪</h3>'+
     '<div class="row" style="gap:18px; margin-bottom:8px">'+
     '<div><div class="big num" style="font-size:24px">'+Math.round(dur/60)+'m</div><div class="tiny muted">duration</div></div>'+
@@ -1566,7 +1633,14 @@ function openExInfo(exId){
   const name=exName(exId), g=exGroupOf(exId);
   let h='<h3>'+esc(name)+'</h3><div class="tiny muted" style="margin:-8px 0 12px">'+esc(g)+'</div>';
   const pat=patternOf(name,g);
-  if(pat && PATTERNS[pat]) h+=patternSVG(pat);
+  const im=(window.EXIMG||{})[name];
+  if(im){
+    h+='<div id="exImgWrap"><div class="pcompare" style="background:#fff; border-radius:12px; padding:6px">'+
+      '<img src="img/ex/'+im+'_0.jpg" alt="start position" onerror="exImgAlt()">'+
+      '<img src="img/ex/'+im+'_1.jpg" alt="finish position" onerror="exImgAlt()"></div>'+
+      '<div class="tiny muted" style="text-align:center; margin:6px 0 12px">start → finish</div></div>'+
+      (pat&&PATTERNS[pat] ? '<div id="exSvgWrap" style="display:none">'+patternSVG(pat)+'</div>' : '');
+  } else if(pat && PATTERNS[pat]) h+=patternSVG(pat);
   if(CUES[name]) h+='<p class="small" style="margin-bottom:12px; color:var(--ink2)">💡 '+CUES[name]+'</p>';
   const steps=PATTERN_STEPS[pat];
   if(steps) h+='<ol class="small" style="margin:0 0 12px 20px; color:var(--ink2)">'+steps.map(function(s){return '<li style="margin-bottom:4px">'+s+'</li>';}).join('')+'</ol>';
@@ -2014,9 +2088,11 @@ function openSettings(){
     '<div class="field"><label for="sStpGoal">Step goal (per day)</label><input id="sStpGoal" type="number" inputmode="numeric" value="'+(+st.stepGoal||8000)+'"></div>'+
     '<div class="tiny muted" style="font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin:14px 0 8px">Custom daily reminders</div>'+
     ((S.reminders&&S.reminders.length)
-      ? S.reminders.map(function(r){ return '<div class="listrow"><span class="small">'+esc(r.label)+' <span class="muted num">· '+r.time+'</span></span><button class="btn ghost sm danger" onclick="delReminder(\''+r.id+'\')">✕</button></div>'; }).join('')
+      ? S.reminders.map(function(r){ return '<div class="listrow"><span class="small">'+esc(r.label)+' <span class="muted num">· '+r.time+(r.date?' · once on '+fmtD(r.date):' daily')+'</span></span><button class="btn ghost sm danger" onclick="delReminder(\''+r.id+'\')">✕</button></div>'; }).join('')
       : '<p class="tiny muted" style="margin-bottom:6px">e.g. “Creatine” at 09:00, “Casein shake” at 22:45, “Stretch break” at 17:00</p>')+
-    '<div class="row" style="margin:8px 0 12px"><input id="remLabel" placeholder="Reminder name"><input id="remTime" type="time" value="09:00" style="max-width:130px"><button class="btn sm" onclick="addReminder()">Add</button></div>'+
+    '<div class="field" style="margin:8px 0 0"><input id="remLabel" placeholder="Reminder name"></div>'+
+    '<div class="row" style="margin:8px 0 12px"><input id="remTime" type="time" value="09:00" style="max-width:120px"><input id="remDate" type="date" style="max-width:160px" title="leave empty for daily"><button class="btn sm" onclick="addReminder()">Add</button></div>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">Leave the date empty for a daily reminder; set it for a one-time reminder.</p>'+
     (notifState!=='granted' && notifState!=='unsupported'
       ? '<button class="btn wide" style="margin-bottom:10px" onclick="askNotify()">Allow notifications</button>' : '')+
     (notifState==='granted' ? '<p class="tiny muted" style="margin-bottom:10px">Notifications: allowed ✓ (they fire while the app is open)</p>':'')+
@@ -2032,8 +2108,11 @@ function addReminder(){
   const label=$('#remLabel').value.trim(), time=$('#remTime').value;
   if(!label || !time){ toast('Give the reminder a name and a time'); return; }
   collectSettings();
-  S.reminders.push({id:uid(), label:label, time:time});
-  save(); openSettings(); toast('Reminder added — '+time+' daily');
+  const date=$('#remDate')?$('#remDate').value:'';
+  const r={id:uid(), label:label, time:time};
+  if(date) r.date=date;
+  S.reminders.push(r);
+  save(); openSettings(); toast('Reminder added — '+time+(date?' on '+fmtD(date):' daily'));
 }
 function delReminder(id){
   collectSettings();
@@ -2096,9 +2175,11 @@ setInterval(function(){
     notify('Wind down 🌙','In bed by 11pm — sleep is where the muscle gets built.', true);
   }
   (S.reminders||[]).forEach(function(r){
+    if(r.date && r.date!==today()) return;
     if(remFiredOn[r.id]===today() || hm!==r.time) return;
     remFiredOn[r.id]=today();
     notify('⏰ '+r.label,'', true);
+    if(r.date){ S.reminders=S.reminders.filter(function(x){return x.id!==r.id;}); save(); }
   });
   if(S.supps.length && spRemindedOn!==today() && hm==='21:00'){
     spRemindedOn=today();
@@ -2129,6 +2210,7 @@ drawRestPresets();
 hiReset();
 renderToday();
 </script>
+<script>window.EXIMG={"Bench press": "bench-press", "Incline dumbbell press": "incline-dumbbell-press", "Push-ups": "push-ups", "Squat": "squat", "Leg press": "leg-press", "Romanian deadlift": "romanian-deadlift", "Lunges": "lunges", "Calf raise": "calf-raise", "Deadlift": "deadlift", "Barbell row": "barbell-row", "Lat pulldown": "lat-pulldown", "Pull-ups": "pull-ups", "Seated cable row": "seated-cable-row", "Overhead press": "overhead-press", "Lateral raise": "lateral-raise", "Face pull": "face-pull", "Barbell curl": "barbell-curl", "Dumbbell curl": "dumbbell-curl", "Triceps pushdown": "triceps-pushdown", "Skull crushers": "skull-crushers", "Plank": "plank", "Crunches": "crunches", "Hanging leg raise": "hanging-leg-raise", "Treadmill run": "treadmill-run", "Running (outdoor)": "running-outdoor", "Walking": "walking", "Cycling": "cycling", "Jump rope": "jump-rope", "Chest fly (dumbbell)": "chest-fly-dumbbell", "Cable crossover": "cable-crossover", "One-arm dumbbell row": "one-arm-dumbbell-row", "Reverse fly": "reverse-fly", "Arnold press": "arnold-press", "Front squat": "front-squat", "Hip thrust": "hip-thrust", "Bulgarian split squat": "bulgarian-split-squat", "Leg extension": "leg-extension", "Leg curl": "leg-curl", "Seated calf raise": "seated-calf-raise", "Close-grip bench press": "close-grip-bench-press", "Triceps dip": "triceps-dip", "Hammer curl": "hammer-curl", "Incline curl": "incline-curl", "Incline barbell press": "incline-barbell-press", "Overhead triceps extension": "overhead-triceps-extension", "Wrist curl": "wrist-curl", "Glute bridge": "glute-bridge", "Mountain climbers": "mountain-climbers", "Jumping jacks": "jumping-jacks", "Kettlebell swing": "kettlebell-swing", "Farmer’s carry": "farmer-s-carry", "Rowing (erg)": "rowing-erg", "Sled push": "sled-push", "Dumbbell bench press": "dumbbell-bench-press", "Decline dumbbell press": "decline-dumbbell-press", "Goblet squat": "goblet-squat", "Cat-cow": "cat-cow", "Standing hamstring fold": "standing-hamstring-fold"};</script>
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function(){});
