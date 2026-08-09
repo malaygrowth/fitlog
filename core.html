@@ -193,6 +193,26 @@
     opacity:0; pointer-events:none; transition:opacity .2s; max-width:88vw; text-align:center;
   }
   #toast.on{opacity:1}
+  /* motion identity — one orchestrated entrance, not scattered effects */
+  .ring circle.rp{transition:stroke-dashoffset .9s cubic-bezier(.22,1,.36,1)}
+  @keyframes fadeup{from{opacity:0; transform:translateY(8px)}}
+  @keyframes dotin{from{transform:scale(0); opacity:0}}
+  .anim .card{animation:fadeup .35s both}
+  .anim .tiles .tile{animation:fadeup .4s both}
+  .anim .tiles .tile:nth-child(1){animation-delay:.06s}
+  .anim .tiles .tile:nth-child(2){animation-delay:.12s}
+  .anim .tiles .tile:nth-child(3){animation-delay:.18s}
+  .anim .tiles .tile:nth-child(4){animation-delay:.24s}
+  .di{animation:dotin .32s both}
+  /* PR celebration */
+  #celebrate{position:fixed; inset:0; z-index:120; display:none; overflow:hidden;
+    background:radial-gradient(circle at 50% 38%, #2a2416d9, #0b0e10f5)}
+  #celebrate.on{display:block; animation:celein .25s}
+  #celebrate .cin{position:absolute; left:0; right:0; top:34%; text-align:center; animation:pop .55s cubic-bezier(.22,1.6,.36,1) both}
+  #celebrate i{position:absolute; top:-18px; border-radius:50%; animation:fall linear both}
+  @keyframes fall{to{transform:translateY(112vh) rotate(220deg)}}
+  @keyframes pop{from{transform:scale(.55); opacity:0}}
+  @keyframes celein{from{opacity:0}}
   @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} }
 
   .empty{color:var(--ink3); font-size:14px; text-align:center; padding:18px 8px}
@@ -788,6 +808,7 @@ function askNotify(){
 /* ============ tabs ============ */
 let TAB='today';
 function go(t){
+  window.__ANIM = (t!==TAB);
   TAB=t;
   document.querySelectorAll('section.tab').forEach(function(s){ s.classList.remove('on'); });
   $('#tab-'+t).classList.add('on');
@@ -1135,8 +1156,9 @@ function dotStrip(getVal, goal, color){
     const d=dShift(today(),-i);
     const v=getVal(d)||0;
     const n=Math.round(Math.min(1,v/goal)*4);
+    const p=6-i;
     let col='';
-    for(let k=0;k<4;k++) col+='<i'+((3-k)<n?' style="background:'+color+'"':'')+'></i>';
+    for(let k=0;k<4;k++) col+='<i class="di" style="animation-delay:'+(p*45+k*25)+'ms'+((3-k)<n?'; background:'+color:'')+'"></i>';
     const dd=new Date(d+'T12:00:00');
     h+='<div class="dcol">'+col+'<span class="dl">'+L[(dd.getDay()+6)%7]+'</span></div>';
   }
@@ -1156,7 +1178,7 @@ function weekDots(){
     else if(planned && !activeBreak(d)) style='background:transparent; border:1.5px solid var(--ink3)';
     else style='background:var(--raised); opacity:.5';
     if(isToday) style+='; outline:2px solid var(--wk); outline-offset:2px';
-    h+='<div class="wd"><i style="'+style+'"></i><span>'+L[i]+'</span></div>';
+    h+='<div class="wd"><i class="di" style="animation-delay:'+(i*55)+'ms; '+style+'"></i><span>'+L[i]+'</span></div>';
   }
   return h+'</div>';
 }
@@ -1178,6 +1200,7 @@ function waterSheet(){
       (trained? 'Training day — aim ~500ml extra. ':'')+
       (st.waterRemind ? 'Reminders every '+st.waterEvery+' min (8:00–22:00).' : 'Reminders off — turn on in Settings.')+
       (st.waterRemind && !notifOK ? ' <a href="#" onclick="askNotify();return false">Allow notifications</a>' : '')+'</p>');
+  armRings();
 }
 function checklistSheet(){
   const slog=S.suppLog[today()]||{};
@@ -1428,8 +1451,13 @@ function ring(pct,color,size,text,sub){
   return '<div class="ring" style="width:'+size+'px;height:'+size+'px">'+
     '<svg width="'+size+'" height="'+size+'">'+
     '<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="var(--raised)" stroke-width="10"/>'+
-    '<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="10" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+off+'"/>'+
+    '<circle class="rp" cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="10" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+C+'" data-off="'+off+'"/>'+
     '</svg><div class="mid"><div class="big num" style="font-size:24px">'+text+'</div><div class="tiny muted">'+sub+'</div></div></div>';
+}
+function armRings(){
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    document.querySelectorAll('circle.rp').forEach(function(c){ c.style.strokeDashoffset=c.dataset.off; });
+  });});
 }
 function renderToday(){
   const st=S.settings, w=waterToday(), ft=foodTotals(today());
@@ -1540,7 +1568,10 @@ function renderToday(){
     h+='<button class="card" style="width:100%; text-align:left; display:block" onclick="openSettings()">'+
       '<span class="small muted">Your data lives only on this phone — export a backup from Settings (tap here). Last backup: '+(S.lastBackup?fmtD(S.lastBackup):'never')+'.</span></button>';
   }
-  $('#tab-today').innerHTML=h;
+  const tt=$('#tab-today');
+  tt.classList.toggle('anim', !!window.__ANIM); window.__ANIM=false;
+  tt.innerHTML=h;
+  armRings();
 }
 function addWater(ml){
   const d=today(); S.water[d]=Math.max(0,(S.water[d]||0)+ml);
@@ -1990,7 +2021,8 @@ function finishSession(){
   S.active=null; save(); WV='home'; renderWorkout();
   const total=S.sessions.length;
   if(total%10===0) setTimeout(function(){ toast('🏅 Workout #'+total+' all-time — consistency compounds'); }, 600);
-  openSheet('<h3>Workout complete 💪</h3>'+
+  const showSummary=function(){ openSheet(summaryHTML); };
+  const summaryHTML='<h3>Workout complete 💪</h3>'+
     '<div class="row" style="gap:18px; margin-bottom:8px">'+
     '<div><div class="big num" style="font-size:24px">'+Math.round(dur/60)+'m</div><div class="tiny muted">duration</div></div>'+
     '<div><div class="big num" style="font-size:24px">'+Math.round(vol).toLocaleString()+'</div><div class="tiny muted">'+unit()+' volume</div></div>'+
@@ -2001,7 +2033,26 @@ function finishSession(){
       : '<p class="small muted">No records today — showing up is the base of every PR.</p>')+
     '<div class="field" style="margin-top:14px"><label for="sesNote">Note (optional)</label>'+
     '<textarea id="sesNote" rows="2" placeholder="How did it feel? Knee/wrist okay?"></textarea></div>'+
-    '<button class="btn primary wide" onclick="saveSesNote(\''+sess.id+'\')">Done</button>');
+    '<button class="btn primary wide" onclick="saveSesNote(\''+sess.id+'\')">Done</button>';
+  if(prs.length) prCelebrate(prs, showSummary); else showSummary();
+}
+function prCelebrate(prs, done){
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches){ done(); return; }
+  let el=$('#celebrate');
+  if(!el){ el=document.createElement('div'); el.id='celebrate'; document.body.appendChild(el); }
+  let dots='';
+  for(let i=0;i<46;i++){
+    const l=Math.random()*100, dl=Math.random()*0.7, sz=6+Math.random()*9, dur=1.4+Math.random()*1.0;
+    const c=['#ffc76e','#f2a03d','#f08a2b','#4fc98a'][i%4];
+    dots+='<i style="left:'+l+'%; width:'+sz+'px; height:'+sz+'px; background:'+c+'; animation-delay:'+dl+'s; animation-duration:'+dur+'s"></i>';
+  }
+  el.innerHTML=dots+'<div class="cin">'+
+    '<div class="tclock" style="font-size:76px; margin:0">PR</div>'+
+    '<div class="serifacc" style="font-size:23px; color:var(--ink)">'+(prs.length>1? prs.length+' records today':'New record')+'</div>'+
+    '<div class="tiny muted" style="margin-top:8px">'+esc(prs.map(function(p){return p.ex;}).join(' · '))+'</div></div>';
+  el.classList.add('on');
+  beep(4); vib([80,40,80,40,240]);
+  setTimeout(function(){ el.classList.remove('on'); done(); }, 2300);
 }
 function saveSesNote(id){
   const s=S.sessions.find(function(x){return x.id===id;});

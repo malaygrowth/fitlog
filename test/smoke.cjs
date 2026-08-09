@@ -17,6 +17,7 @@ function check(name, cond, detail) {
 (async () => {
   const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.emulateMedia({ reducedMotion: 'reduce' }); // deterministic flows; motion tested separately
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
   page.on('dialog', (d) => d.accept());
@@ -161,6 +162,27 @@ function check(name, cond, detail) {
     return { fired: window.__xss, injected: raw.includes('<img src=x') };
   });
   check('no XSS from exercise/routine names', xss.fired === 0 && !xss.injected, xss);
+
+  console.log('PR celebration (motion on)');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const cel = await page.evaluate(() => {
+    startSession(); closeSheet();
+    addExToSession(S.exercises.find((e) => e.name === 'Bench press').id);
+    setVal(0, 0, 'w', '75'); setVal(0, 0, 'r', '3'); toggleSet(0, 0); restSkip();
+    finishSession();
+    return { overlay: !!document.querySelector('#celebrate.on') };
+  });
+  check('celebration overlay fires on PR', cel.overlay);
+  await page.waitForTimeout(2700);
+  const afterCel = await page.evaluate(() => {
+    const sheetOpen = document.querySelector('#sheet').classList.contains('on');
+    const overlayGone = !document.querySelector('#celebrate.on');
+    const s = S.sessions[S.sessions.length - 1];
+    S.sessions = S.sessions.filter((x) => x.id !== s.id); save(); closeSheet();
+    return { sheetOpen, overlayGone };
+  });
+  check('summary sheet after celebration', afterCel.sheetOpen && afterCel.overlayGone, afterCel);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
 
   await page.waitForTimeout(300);
   check('zero page errors for entire run', pageErrors.length === 0, pageErrors.slice(0, 3));
