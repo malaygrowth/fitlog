@@ -633,6 +633,21 @@ function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toa
     S.reminders.push({id:uid(), label:'Book BCA re-scan at Build & Trim (compare vs 16 Apr)', time:'10:00', date:'2026-10-18'});
   save();
 })();
+/* v12: micronutrient stack with absorption-aware timing */
+(function seedV12(){
+  if(S.seedV12) return; S.seedV12=true;
+  [
+    ['D3 + K2 — morning, with food', /d3/i],
+    ['B12 — morning', /b12/i],
+    ['Calcium — with lunch', /calcium/i],
+    ['Magnesium — before bed', /magnesium/i],
+    ['Zinc — before bed', /zinc/i]
+  ].forEach(function(sp){
+    if(!S.supps.some(function(x){return sp[1].test(x.name);}))
+      S.supps.push({id:uid(), name:sp[0], kcal:0, p:0, c:0, f:0, logFood:false});
+  });
+  save();
+})();
 /* v11: wedding break around 24–25 Nov */
 (function seedV11(){
   if(S.seedV11) return; S.seedV11=true;
