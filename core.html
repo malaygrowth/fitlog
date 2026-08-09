@@ -162,6 +162,12 @@
   .mini i.off{background:var(--raised)}
   .mini.stp i{background:var(--stp)}
   .mini.stp i.off{background:var(--raised)}
+  .pgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px}
+  .pgrid button{padding:0; border-radius:10px; overflow:hidden; position:relative}
+  .pgrid img{display:block; width:100%; aspect-ratio:3/4; object-fit:cover}
+  .pgrid .pdate{position:absolute; left:0; right:0; bottom:0; font-size:10px; padding:3px 5px; background:#000a; color:#fff; text-align:left}
+  .pcompare{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .pcompare img{width:100%; border-radius:10px}
   a{color:var(--wa)}
 </style>
 
@@ -324,7 +330,7 @@ function defaults(){
       sleepRemind:'22:30', sleepGoal:8, stepGoal:8000},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}, photos:[]
   };
 }
 let S;
@@ -1580,6 +1586,25 @@ function renderBody(){
     h+='</div><div class="tiny muted" style="margin-top:10px">Updated '+fmtD(mLast.date)+'</div>';
   } else h+='<div class="empty">Chest, waist, arms and more — the scale misses what the tape sees.</div>';
   h+='<button class="btn wide" style="margin-top:12px" onclick="measForm()">Update measurements</button></div>';
+  /* progress photos */
+  const ph=S.photos||[];
+  h+='<div class="card"><h2><span class="dot" style="background:var(--bd)"></span>Progress photos</h2>';
+  if(ph.length){
+    h+='<div class="pgrid">'+ph.slice(-9).reverse().map(function(p){
+      return '<button onclick="viewPhoto(\''+p.id+'\')" aria-label="photo from '+p.date+'"><img src="'+p.data+'" alt=""><span class="pdate">'+fmtD(p.date)+'</span></button>';
+    }).join('')+'</div>';
+    if(ph.length>9) h+='<div class="tiny muted" style="margin-bottom:10px">Showing latest 9 of '+ph.length+'</div>';
+  } else {
+    h+='<div class="empty">Same pose, same light, same mirror — every 2 weeks. In 3 months these photos will say more than the scale ever will.</div>';
+  }
+  h+='<div class="row" style="gap:10px">'+
+    '<label class="btn body grow" style="cursor:pointer">Add photo<input type="file" accept="image/*" capture="user" style="display:none" onchange="addPhoto(this)"></label>'+
+    (ph.length>1?'<button class="btn grow" onclick="comparePhotos()">Then vs now</button>':'')+'</div>';
+  try{
+    const used=Math.round((localStorage.getItem(K)||'').length/1024/102.4)/10;
+    if(ph.length) h+='<div class="tiny muted" style="margin-top:10px">Using ~'+used+' MB of ~5 MB app storage. Photos are compressed and never leave this phone (backups include them).</div>';
+  }catch(e){}
+  h+='</div>';
   if(ws.length){
     h+='<div class="card"><h2><span class="dot" style="background:var(--bd)"></span>Entries</h2>';
     ws.slice().reverse().slice(0,30).forEach(function(w){
@@ -1632,6 +1657,58 @@ function addWeight(){
   save(); renderBody(); toast('Logged '+kg+' '+unit());
 }
 function delWeight(date){ S.weights=S.weights.filter(function(w){return w.date!==date;}); save(); renderBody(); }
+
+/* ============ progress photos ============ */
+function addPhoto(inp){
+  const f=inp.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=function(){
+    const img=new Image();
+    img.onload=function(){
+      const MAX=720;
+      let w=img.width, h=img.height;
+      const sc=Math.min(1, MAX/Math.max(w,h));
+      w=Math.round(w*sc); h=Math.round(h*sc);
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      const data=c.toDataURL('image/jpeg',0.72);
+      const entry={id:uid(), date:today(), data:data};
+      S.photos.push(entry);
+      try{
+        localStorage.setItem(K, JSON.stringify(S));
+        renderBody(); toast('Photo saved ('+Math.round(data.length/1365)+' KB)');
+      }catch(e){
+        S.photos.pop();
+        toast('Storage full — delete old photos or export a backup first');
+      }
+    };
+    img.onerror=function(){ toast('Could not read that image'); };
+    img.src=rd.result;
+  };
+  rd.readAsDataURL(f);
+  inp.value='';
+}
+function viewPhoto(id){
+  const p=S.photos.find(function(x){return x.id===id;}); if(!p) return;
+  openSheet('<h3>'+fmtD(p.date)+'</h3>'+
+    '<img src="'+p.data+'" alt="progress photo" style="width:100%; border-radius:12px">'+
+    '<button class="btn danger wide" style="margin-top:12px" onclick="delPhoto(\''+p.id+'\')">Delete photo</button>');
+}
+function delPhoto(id){
+  if(!confirm('Delete this photo?')) return;
+  S.photos=S.photos.filter(function(p){return p.id!==id;});
+  save(); closeSheet(); renderBody();
+}
+function comparePhotos(){
+  const ph=S.photos; if(ph.length<2) return;
+  const a=ph[0], b=ph[ph.length-1];
+  const days=Math.round((new Date(b.date+'T12:00:00')-new Date(a.date+'T12:00:00'))/86400000);
+  openSheet('<h3>Then vs now</h3><p class="tiny muted" style="margin:-6px 0 12px">'+days+' days apart</p>'+
+    '<div class="pcompare">'+
+    '<div><img src="'+a.data+'" alt="first photo"><div class="tiny muted" style="margin-top:4px">'+fmtD(a.date)+'</div></div>'+
+    '<div><img src="'+b.data+'" alt="latest photo"><div class="tiny muted" style="margin-top:4px">'+fmtD(b.date)+'</div></div>'+
+    '</div>');
+}
 
 /* ============ SETTINGS ============ */
 function openSettings(){
