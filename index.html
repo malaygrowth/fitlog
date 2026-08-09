@@ -69,7 +69,13 @@
   section.tab.on{display:block}
 
   .card{background:var(--surface); border:0; border-radius:var(--r); padding:17px; margin-bottom:14px}
-  .card h2{font-family:var(--fd-disp); font-size:11.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--ink2); margin-bottom:12px; display:flex; align-items:center; gap:8px}
+  .osec{padding:4px 4px 0; margin-bottom:24px}
+  .statrow{display:flex; gap:10px; margin:2px 6px 22px}
+  .stat{flex:1}
+  .stat .tv{font-family:var(--fd-disp); font-size:34px; font-weight:700; line-height:1.05}
+  .stat .tl{font-family:var(--fd-disp); font-size:10px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--ink3); margin-bottom:7px; display:block}
+  .orow{width:100%; text-align:left; padding:13px 2px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:10px}
+  .card h2,.osec h2{font-family:var(--fd-disp); font-size:11.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--ink2); margin-bottom:12px; display:flex; align-items:center; gap:8px}
   .card h2 .dot{width:8px;height:8px;border-radius:50%}
   .row{display:flex; align-items:center; gap:10px}
   .row.wrap{flex-wrap:wrap}
@@ -1834,17 +1840,17 @@ function renderWorkout(){
   }
   h+='</div>';
   /* lifetime stats */
-  h+='<div class="tiles" style="grid-template-columns:repeat(3,1fr)">'+
-    '<div class="tile"><span class="tl">This week</span><div class="tv num">'+wkN+'</div><div class="ts">workouts</div></div>'+
-    '<div class="tile"><span class="tl">All-time</span><div class="tv num">'+nAll+'</div><div class="ts">workouts</div></div>'+
-    '<div class="tile"><span class="tl">Lifted</span><div class="tv num">'+(Math.round(volAll/100)/10).toLocaleString()+'</div><div class="ts">tonnes</div></div>'+
+  h+='<div class="statrow">'+
+    '<div class="stat"><span class="tl">This week</span><div class="tv num">'+wkN+'</div></div>'+
+    '<div class="stat"><span class="tl">All-time</span><div class="tv num">'+nAll+'</div></div>'+
+    '<div class="stat"><span class="tl">Tonnes lifted</span><div class="tv num">'+(Math.round(volAll/100)/10).toLocaleString()+'</div></div>'+
     '</div>';
   /* achievements */
-  h+='<button class="card" style="width:100%; text-align:left; display:block" onclick="achievementsSheet()">'+
-    '<div class="spread"><span class="small"><b>Achievements</b> <span class="muted num">'+achGot.length+'/'+ach.length+'</span></span><span class="muted">›</span></div>'+
-    '<div style="font-size:22px; margin-top:6px; letter-spacing:4px">'+achGot.slice(-7).map(function(a){return a.i;}).join('')+(achGot.length<ach.length?' <span style="opacity:.3">'+ach.filter(function(a){return !a.ok;})[0].i+'</span>':'')+'</div></button>';
+  h+='<button class="orow" onclick="achievementsSheet()" style="border-top:1px solid var(--line)">'+
+    '<span class="small"><b>Achievements</b> <span class="muted num">'+achGot.length+'/'+ach.length+'</span></span>'+
+    '<span style="font-size:19px; letter-spacing:3px">'+achGot.slice(-6).map(function(a){return a.i;}).join('')+(achGot.length<ach.length?' <span style="opacity:.3">'+ach.filter(function(a){return !a.ok;})[0].i+'</span>':'')+' <span class="muted">›</span></span></button>';
   /* routines */
-  h+='<div class="card"><h2><span class="dot" style="background:var(--wk)"></span>Routines</h2>';
+  h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Routines</h2>';
   S.routines.forEach(function(r){
     h+='<div class="listrow"><div><b>'+esc(r.name)+'</b><div class="tiny muted">'+r.exIds.map(function(id){return esc(exName(id));}).slice(0,4).join(' · ')+(r.exIds.length>4?' +'+(r.exIds.length-4):'')+'</div></div>'+
       '<div class="row"><button class="btn sm" onclick="editRoutine(\''+r.id+'\')">Edit</button>'+
@@ -1865,7 +1871,7 @@ function renderWorkout(){
     }
   });
   prs.sort(function(a,b){ return b.est-a.est; });
-  h+='<div class="card"><h2><span class="dot" style="background:var(--wk)"></span>Personal records</h2>';
+  h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Personal records</h2>';
   h+= prs.length
     ? prs.slice(0,8).map(function(p){ return '<div class="listrow"><span class="small">'+esc(p.name)+'</span><span class="small num">'+p.txt+'</span></div>'; }).join('')
     : '<div class="empty">Finish a workout and your bests appear here.</div>';
@@ -1902,7 +1908,7 @@ function heatCalHTML(){
 function progressHTML(){
   let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
   /* consistency heat map */
-  h+='<div class="card" style="margin-top:10px"><h2><span class="dot" style="background:var(--wk)"></span>Consistency — 16 weeks</h2>'+heatCalHTML()+'</div>';
+  h+='<div class="osec" style="margin-top:12px"><h2><span class="dot" style="background:var(--wk)"></span>Consistency — 16 weeks</h2>'+heatCalHTML()+'</div>';
   /* weekly volume — last 10 weeks */
   const wkStart=wkMonday(today());
   const bars=[];
@@ -1913,7 +1919,7 @@ function progressHTML(){
     const dd=new Date(ws+'T12:00:00');
     bars.push({l:dd.getDate()+'/'+(dd.getMonth()+1), y:Math.round(v)});
   }
-  h+='<div class="card"><h2><span class="dot" style="background:var(--wk)"></span>Weekly volume ('+unit()+')</h2>'+barChartSVG(bars,'var(--wk)')+
+  h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Weekly volume ('+unit()+')</h2>'+barChartSVG(bars,'var(--wk)')+
      '<p class="tiny muted" style="margin-top:6px">The gap is the injury break — watch it climb back. Keep increases near 10%.</p></div>';
   /* strength trends for the most-trained lifts */
   const counts={};
@@ -1933,11 +1939,11 @@ function progressHTML(){
       if(best>0) series.push({d:s.date, y:Math.round(best)});
     });
     if(series.length<3) return;
-    h+='<div class="card"><h2><span class="dot" style="background:var(--wk)"></span>'+esc(exName(id))+' — est 1RM</h2>'+
+    h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>'+esc(exName(id))+' — est 1RM</h2>'+
        lineChartSVG(series.slice(-15),'var(--wk)')+
        '<div class="tiny muted num" style="margin-top:4px">best '+Math.max.apply(null,series.map(function(p){return p.y;}))+' '+unit()+' · '+series.length+' sessions</div></div>';
   });
-  if(!topIds.length) h+='<div class="card"><div class="empty">Charts appear once a lift has 3+ logged sessions.</div></div>';
+  if(!topIds.length) h+='<div class="osec"><div class="empty">Charts appear once a lift has 3+ logged sessions.</div></div>';
   return h;
 }
 function startSession(routineId){
@@ -2169,7 +2175,7 @@ function saveSesNote(id){
 function cancelSession(){ if(confirm('Discard this workout?')){ S.active=null; save(); WV='home'; renderWorkout(); } }
 function historyHTML(){
   let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
-  h+='<div class="card" style="margin-top:10px"><h2><span class="dot" style="background:var(--wk)"></span>History</h2>';
+  h+='<div class="osec" style="margin-top:12px"><h2><span class="dot" style="background:var(--wk)"></span>History</h2>';
   if(!S.sessions.length) h+='<div class="empty">No workouts yet.</div>';
   S.sessions.slice().reverse().forEach(function(s){
     const mins=Math.round(s.dur/60);
@@ -2201,7 +2207,7 @@ function editSession(id){
 }
 function libraryHTML(){
   let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
-  h+='<div class="card" style="margin-top:10px"><h2><span class="dot" style="background:var(--wk)"></span>Exercise library</h2>';
+  h+='<div class="osec" style="margin-top:12px"><h2><span class="dot" style="background:var(--wk)"></span>Exercise library</h2>';
   const groups={};
   S.exercises.forEach(function(e){ (groups[e.group]=groups[e.group]||[]).push(e); });
   Object.keys(groups).sort().forEach(function(g){
@@ -2732,7 +2738,7 @@ function renderBody(){
   }catch(e){}
   h+='</div>';
   if(ws.length){
-    h+='<div class="card"><h2><span class="dot" style="background:var(--bd)"></span>Entries</h2>';
+    h+='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Entries</h2>';
     ws.slice().reverse().slice(0,30).forEach(function(w){
       h+='<div class="listrow"><span class="small">'+fmtD(w.date)+'</span><span class="row"><span class="small num"><b>'+w.kg+'</b> '+unit()+'</span>'+
         '<button class="btn ghost sm danger" onclick="delWeight(\''+w.date+'\')">✕</button></span></div>';
