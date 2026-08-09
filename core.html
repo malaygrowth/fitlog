@@ -2597,25 +2597,29 @@ let foodDate=today();
 const MEALS=[['b','Breakfast'],['l','Lunch'],['d','Dinner'],['s','Snacks']];
 function renderFood(){
   const st=S.settings, ft=foodTotals(foodDate), day=S.food[foodDate]||{};
-  let h='<div class="datebar"><button class="btn" onclick="foodNav(-1)">‹</button><b>'+(foodDate===today()?'Today':fmtD(foodDate))+'</b><button class="btn" onclick="foodNav(1)" '+(foodDate>=today()?'disabled style="opacity:.35"':'')+'>›</button></div>';
-  const kp=Math.min(1, ft.kcal/st.calGoal);
-  h+='<div class="card"><div class="spread"><span class="small">Calories</span><span class="small num"><b>'+Math.round(ft.kcal)+'</b> / '+st.calGoal+'</span></div>'+
-    '<div class="bar" style="margin:6px 0 10px"><i style="width:'+(kp*100)+'%; background:'+(ft.kcal>st.calGoal*1.05?'var(--bad)':'var(--fd)')+'"></i></div>'+
-    '<div class="row" style="gap:14px" role="group" aria-label="macros">'+
-    '<span class="tiny muted num">P <b style="color:var(--ink)">'+Math.round(ft.p)+'</b>/'+st.proteinGoal+'g</span>'+
-    '<span class="tiny muted num">C <b style="color:var(--ink)">'+Math.round(ft.c)+'</b>/'+st.carbGoal+'g</span>'+
-    '<span class="tiny muted num">F <b style="color:var(--ink)">'+Math.round(ft.f)+'</b>/'+st.fatGoal+'g</span></div></div>';
+  let h='<div class="datebar"><button class="btn" onclick="foodNav(-1)">‹</button>'+
+    '<b style="font-family:var(--fd-disp); text-transform:uppercase; letter-spacing:.1em; font-size:14px">'+(foodDate===today()?'Today':fmtD(foodDate))+'</b>'+
+    '<button class="btn" onclick="foodNav(1)" '+(foodDate>=today()?'disabled style="opacity:.35"':'')+'>›</button></div>';
+  const over=ft.kcal>st.calGoal;
+  const kp=Math.min(1, ft.kcal/st.calGoal), ppr=Math.min(1, ft.p/st.proteinGoal);
+  h+='<div class="osec"><div class="statrow" style="margin-bottom:14px">'+
+    '<div class="stat"><span class="tl">Eaten</span><div class="tv num">'+Math.round(ft.kcal)+'</div></div>'+
+    '<div class="stat"><span class="tl">'+(over?'Over by':'Left today')+'</span><div class="tv num" style="color:'+(over?'var(--bad)':'var(--good)')+'">'+Math.round(Math.abs(st.calGoal-ft.kcal))+'</div></div>'+
+    '<div class="stat"><span class="tl">Protein</span><div class="tv num">'+Math.round(ft.p)+'<span style="font-size:15px; color:var(--ink3)"> /'+st.proteinGoal+'</span></div></div></div>'+
+    '<div class="bar"><i style="width:'+(kp*100)+'%; background:'+(over?'var(--bad)':'var(--fd)')+'"></i></div>'+
+    '<div class="bar" style="margin-top:5px"><i style="width:'+(ppr*100)+'%; background:var(--fd); opacity:.55"></i></div>'+
+    '<div class="tiny muted num" style="margin-top:8px">Carbs '+Math.round(ft.c)+' / '+st.carbGoal+'g · Fat '+Math.round(ft.f)+' / '+st.fatGoal+'g</div></div>';
   MEALS.forEach(function(m){
     const list=day[m[0]]||[];
     const mk=list.reduce(function(a,e){return a+(+e.kcal||0);},0);
-    h+='<div class="card"><div class="spread"><h2 style="margin:0"><span class="dot" style="background:var(--fd)"></span>'+m[1]+'</h2>'+
-      '<span class="tiny muted num">'+(mk?Math.round(mk)+' kcal':'')+'</span></div>';
+    h+='<div class="osec"><h2><span class="dot" style="background:var(--fd)"></span>'+m[1]+
+      '<span class="num" style="margin-left:auto; letter-spacing:0">'+(mk?Math.round(mk)+' kcal':'')+'</span></h2>';
     list.forEach(function(e){
       h+='<div class="listrow"><div><span class="small">'+esc(e.name)+'</span>'+
         '<div class="tiny muted num">'+Math.round(e.kcal)+' kcal'+((+e.p)?' · P'+e.p:'')+((+e.c)?' · C'+e.c:'')+((+e.f)?' · F'+e.f:'')+'</div></div>'+
-        '<button class="btn ghost sm danger" onclick="delFood(\''+m[0]+'\',\''+e.id+'\')">✕</button></div>';
+        '<button class="btn ghost sm" style="color:var(--ink3)" onclick="delFood(\''+m[0]+'\',\''+e.id+'\')">✕</button></div>';
     });
-    h+='<button class="btn sm wide" style="margin-top:'+(list.length?'10px':'0')+'" onclick="addFoodForm(\''+m[0]+'\')">+ Add to '+m[1].toLowerCase()+'</button></div>';
+    h+='<button class="btn sm wide ghost" style="border:1px dashed var(--line); margin-top:'+(list.length?'10px':'2px')+'" onclick="addFoodForm(\''+m[0]+'\')">+ Add</button></div>';
   });
   $('#tab-food').innerHTML=h;
 }
@@ -2665,27 +2669,22 @@ function renderBody(){
   const ws=S.weights.slice().sort(function(a,b){ return a.date<b.date?-1:1; });
   const last=ws[ws.length-1], prev=ws[ws.length-2];
   const st=S.settings;
-  let h='<div class="card"><h2><span class="dot" style="background:var(--bd)"></span>Body weight</h2>';
+  let h='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Body weight</h2>';
   if(last){
-    const d=prev? (last.kg-prev.kg) : 0;
-    const dTxt= prev ? (d===0?'no change':(d>0?'+':'')+(Math.round(d*10)/10)+' '+unit()+' since '+fmtD(prev.date)) : '';
-    h+='<div class="spread"><div><span class="big num">'+last.kg+'<span style="font-size:18px; color:var(--ink2)"> '+unit()+'</span></span>'+
-      '<div class="tiny" style="color:'+(d>0?'var(--bad)':d<0?'var(--good)':'var(--ink2)')+'">'+dTxt+'</div>'+
-      '<div class="tiny muted">'+fmtD(last.date)+'</div></div>';
-    if(st.height){
-      const m=+st.height/100, bmi=Math.round(last.kg/(m*m)*10)/10;
-      h+='<div style="text-align:right"><div class="big num" style="font-size:22px">'+bmi+'</div><div class="tiny muted">BMI</div></div>';
-    }
-    h+='</div>';
-  } else h+='<div class="empty">Log your first weigh-in below.</div>';
+    const d=prev? Math.round((last.kg-prev.kg)*10)/10 : 0;
+    let bmi='—';
+    if(st.height){ const mt=+st.height/100; bmi=Math.round(last.kg/(mt*mt)*10)/10; }
+    h+='<div class="statrow" style="margin-bottom:10px">'+
+      '<div class="stat"><span class="tl">Current</span><div class="tv num">'+last.kg+'<span style="font-size:15px; color:var(--ink3)"> '+unit()+'</span></div></div>'+
+      '<div class="stat"><span class="tl">Change</span><div class="tv num" style="color:'+(d>0?'var(--wk)':d<0?'var(--good)':'var(--ink2)')+'">'+(d>0?'+':'')+d+'</div></div>'+
+      '<div class="stat"><span class="tl">BMI</span><div class="tv num">'+bmi+'</div></div></div>'+
+      '<div class="tiny muted" style="margin-bottom:6px">Last logged '+fmtD(last.date)+(prev?' · change since '+fmtD(prev.date):'')+' · goal '+(st.goalWeight||'—')+' '+unit()+'</div>';
+  } else h+='<div class="empty">Log your first weigh-in.</div>';
   if(ws.length>1) h+=weightChart(ws);
-  h+='<div class="fields3" style="margin-top:14px">'+
-    '<div class="field" style="grid-column:span 1"><label for="wKg">'+unit()+'</label><input id="wKg" type="number" inputmode="decimal" step="0.1" placeholder="'+(last?last.kg:'70')+'"></div>'+
-    '<div class="field" style="grid-column:span 2"><label for="wDate">Date</label><input id="wDate" type="date" value="'+today()+'" max="'+today()+'"></div></div>'+
-    '<button class="btn body wide" onclick="addWeight()">Log weight</button></div>';
+  h+='<button class="btn body wide" style="margin-top:14px" onclick="weightForm()">Log weight</button></div>';
   /* measurements */
   const mAll=S.measures, mLast=mAll[mAll.length-1], mPrev=mAll[mAll.length-2];
-  h+='<div class="card"><h2><span class="dot" style="background:var(--bd)"></span>Measurements</h2>';
+  h+='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Measurements</h2>';
   if(mLast){
     h+='<div class="fields3" style="gap:12px">';
     MEAS.forEach(function(k){
@@ -2693,14 +2692,14 @@ function renderBody(){
       let d='';
       if(v!=null && pv!=null){ const dd=Math.round((v-pv)*10)/10;
         if(dd) d=' <span class="tiny muted num">'+(dd>0?'+':'')+dd+'</span>'; }
-      h+='<div><div class="tiny muted">'+k[1]+'</div><div class="small num">'+(v!=null? '<b>'+v+'</b> cm'+d : '<span class="muted">—</span>')+'</div></div>';
+      h+='<div><span class="tl" style="margin-bottom:2px">'+k[1]+'</span><div class="small num">'+(v!=null? '<b>'+v+'</b> cm'+d : '<span class="muted">—</span>')+'</div></div>';
     });
     h+='</div><div class="tiny muted" style="margin-top:10px">Updated '+fmtD(mLast.date)+'</div>';
   } else h+='<div class="empty">Chest, waist, arms and more — the scale misses what the tape sees.</div>';
   h+='<button class="btn wide" style="margin-top:12px" onclick="measForm()">Update measurements</button></div>';
   /* progress photos */
   const ph=S.photos||[];
-  h+='<div class="card"><h2><span class="dot" style="background:var(--bd)"></span>Progress photos</h2>';
+  h+='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Progress photos</h2>';
   if(ph.length){
     h+='<div class="pgrid">'+ph.slice(-9).reverse().map(function(p){
       return '<button onclick="viewPhoto(\''+p.id+'\')" aria-label="photo from '+p.date+'"><img src="'+p.data+'" alt=""><span class="pdate">'+fmtD(p.date)+'</span></button>';
@@ -2714,18 +2713,28 @@ function renderBody(){
     (ph.length>1?'<button class="btn grow" onclick="comparePhotos()">Then vs now</button>':'')+'</div>';
   try{
     const used=Math.round((localStorage.getItem(K)||'').length*2/1024/104.8576)/10;
-    if(ph.length) h+='<div class="tiny muted" style="margin-top:10px">Using ~'+used+' MB of ~5 MB app storage. Photos are compressed and never leave this phone (backups include them).</div>';
+    if(ph.length) h+='<div class="tiny muted" style="margin-top:10px">Using ~'+used+' MB of ~5 MB app storage. Photos never leave this phone.</div>';
   }catch(e){}
   h+='</div>';
+  /* entries */
   if(ws.length){
     h+='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Entries</h2>';
     ws.slice().reverse().slice(0,30).forEach(function(w){
       h+='<div class="listrow"><span class="small">'+fmtD(w.date)+'</span><span class="row"><span class="small num"><b>'+w.kg+'</b> '+unit()+'</span>'+
-        '<button class="btn ghost sm danger" onclick="delWeight(\''+w.date+'\')">✕</button></span></div>';
+        '<button class="btn ghost sm" style="color:var(--ink3)" onclick="delWeight(\''+w.date+'\')">✕</button></span></div>';
     });
     h+='</div>';
   }
   $('#tab-body').innerHTML=h;
+}
+function weightForm(){
+  const last=S.weights.length? S.weights[S.weights.length-1] : null;
+  openSheet('<h3>Log weight</h3>'+
+    '<div class="fields2">'+
+    '<div class="field"><label for="wKg">'+unit()+'</label><input id="wKg" type="number" inputmode="decimal" step="0.1" placeholder="'+(last?last.kg:'70')+'"></div>'+
+    '<div class="field"><label for="wDate">Date</label><input id="wDate" type="date" value="'+today()+'" max="'+today()+'"></div></div>'+
+    '<button class="btn body wide" onclick="addWeight()">Save</button>'+
+    '<p class="tiny muted" style="margin-top:12px">Same morning routine each time: after the toilet, before food. Weekly is plenty — daily weight is mostly noise.</p>');
 }
 function weightChart(ws){
   const data=ws.slice(-30);
@@ -2766,7 +2775,7 @@ function addWeight(){
   if(!kg){ toast('Enter your weight'); return; }
   S.weights=S.weights.filter(function(w){return w.date!==date;});
   S.weights.push({date:date, kg:kg});
-  save(); renderBody(); toast('Logged '+kg+' '+unit());
+  save(); closeSheet(); renderBody(); toast('Logged '+kg+' '+unit());
 }
 function delWeight(date){ S.weights=S.weights.filter(function(w){return w.date!==date;}); save(); renderBody(); }
 
