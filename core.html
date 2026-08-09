@@ -774,6 +774,13 @@ function phaseInfo(){
   openSheet(h);
 }
 function round25(x){ return Math.round(x/2.5)*2.5; }
+function lastDateFor(exId){
+  for(let i=S.sessions.length-1;i>=0;i--){
+    const ex=S.sessions[i].ex.find(function(e){ return e.exId===exId; });
+    if(ex && ex.sets.length) return S.sessions[i].date;
+  }
+  return null;
+}
 function targetFor(exId){
   const g=exGroupOf(exId);
   if(g==='Cardio'||g==='Mobility') return null;
@@ -782,6 +789,15 @@ function targetFor(exId){
   if(!work.length) return null;
   const top=work.reduce(function(a,s){ return (+s.w||0)>(+a.w||0)?s:a; }, work[0]);
   const w=+top.w||0, r=+top.r||0;
+  /* layoff detection: after 3+ weeks away from a lift, prescribe a
+     comeback load instead of progression — old numbers are a ceiling, not a target */
+  const ld=lastDateFor(exId);
+  if(ld){
+    const gap=Math.round((new Date(today()+'T12:00:00')-new Date(ld+'T12:00:00'))/86400000);
+    if(gap>21 && w>0){
+      return 'comeback: ~'+Math.max(2.5,round25(w*0.6))+'×10–12 light — '+gap+' days since last time, rebuild first';
+    }
+  }
   if(!w) return r ? 'target: '+(r+1)+' reps' : null;
   if(r>=12) return 'target: '+round25(w+2.5)+'×8 — add weight, reset reps';
   return 'target: '+w+'×'+(r+1)+' — one more rep than last time';
