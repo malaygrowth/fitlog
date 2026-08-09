@@ -1,4 +1,4 @@
-# FitLog — personal health tracker
+# CoachZ — personal health coach
 
 A private, single-user mobile app for tracking workouts, food, water, and body
 weight. No accounts, no server, no analytics — **all data lives in your phone's

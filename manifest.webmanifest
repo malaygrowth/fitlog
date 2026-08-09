@@ -1,6 +1,6 @@
 {
-  "name": "FitLog — personal health tracker",
-  "short_name": "FitLog",
+  "name": "CoachZ — personal health coach",
+  "short_name": "CoachZ",
   "description": "Private workout, food, water and body tracker",
   "start_url": "./",
   "scope": "./",

@@ -177,7 +177,7 @@
 
 <div id="app">
   <header class="top">
-    <div class="brand">FitLog<small id="hello">personal tracker</small></div>
+    <div class="brand">CoachZ<small id="hello">personal tracker</small></div>
     <button class="gear" onclick="openSettings()" aria-label="Settings">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>
     </button>
@@ -2287,7 +2287,7 @@ function exportData(){
   const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='fitlog-backup-'+today()+'.json';
+  a.download='coachz-backup-'+today()+'.json';
   document.body.appendChild(a); a.click(); a.remove();
   S.lastBackup=today(); save();
   toast('Backup downloaded');
@@ -2301,7 +2301,7 @@ function importData(inp){
       if(!d.settings || !d.exercises) throw 0;
       S=Object.assign(defaults(), d);
       save(); closeSheet(); render(); toast('Backup restored');
-    }catch(e){ toast('That file is not a FitLog backup'); }
+    }catch(e){ toast('That file is not a CoachZ backup'); }
   };
   rd.readAsText(f);
 }
