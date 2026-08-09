@@ -10,9 +10,9 @@
     --sl:#8ea0e8; --stp:#5ecfb5;
     --bad:#e8695e; --good:#4fc98a;
     --r:16px;
-    --fd-disp:'Archivo', -apple-system, Roboto, system-ui, sans-serif;
+    --fd-disp:'Oswald', 'Arial Narrow', -apple-system, Roboto, system-ui, sans-serif;
     --fd-serif:'Instrument Serif', Georgia, 'Times New Roman', serif;
-    --fd-dot:'Doto', ui-monospace, monospace;
+    
     --grad-am:linear-gradient(135deg, #ffc76e, #f08a2b);
   }
   *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent}
@@ -55,18 +55,24 @@
   .serifacc{font-family:var(--fd-serif); font-style:italic; font-size:1.18em; letter-spacing:.01em}
   .qcard{font-family:var(--fd-serif); font-style:italic; font-size:19.5px; line-height:1.4; color:var(--ink)}
   .qcard .qtip{font-family:-apple-system, Roboto, system-ui, sans-serif; font-style:normal; font-size:12px; color:var(--ink2); margin-top:10px; line-height:1.5}
-  .dots{display:flex; gap:8px; margin-top:12px}
-  .dcol{display:flex; flex-direction:column; gap:3px; flex:1; align-items:center}
-  .dcol i{width:9px; height:9px; border-radius:50%; background:var(--raised); display:block}
-  .dcol .dl{font-size:9px; color:var(--ink3); margin-top:3px; font-weight:700}
-  .wkdots{display:flex; gap:10px; margin-top:12px}
-  .wkdots .wd{display:flex; flex-direction:column; align-items:center; gap:4px}
-  .wkdots .wd i{width:13px; height:13px; border-radius:50%; background:var(--raised); display:block; box-sizing:border-box}
-  .wkdots .wd span{font-size:9px; color:var(--ink3); font-weight:700}
+  .mini2{display:flex; gap:8px; margin-top:14px; align-items:flex-end; height:52px}
+  .mcol{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; height:100%}
+  .mcol b{width:100%; max-width:24px; border-radius:7px 7px 4px 4px; background:var(--raised); display:block; min-height:4px; transform-origin:bottom}
+  .mcol .dl{font-size:9px; color:var(--ink3); font-weight:700; font-family:var(--fd-disp); letter-spacing:.06em}
+  .wkrow{display:flex; gap:8px; margin-top:14px}
+  .wkrow .wc{flex:1; max-width:42px; aspect-ratio:1; border-radius:11px; background:var(--raised);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; box-sizing:border-box;
+    font-family:var(--fd-disp); font-size:9.5px; letter-spacing:.05em; color:var(--ink3); font-weight:600}
+  .wkrow .wc .ck{font-size:13px; line-height:1; font-weight:700}
+  .wkrow .wc.done{background:var(--grad-am); color:#191106}
+  .wkrow .wc.plan{border:1.5px dashed var(--ink3); background:transparent}
+  .wkrow .wc.today{outline:2px solid var(--wk); outline-offset:2px}
+  @keyframes barup{from{transform:scaleY(0)}}
+  .anim2 b{animation:barup .5s cubic-bezier(.22,1,.36,1) both}
 
   .btn{background:var(--raised); border:1px solid var(--line); border-radius:12px; padding:11px 14px; font-weight:600; font-size:14.5px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:7px}
   .btn:active{transform:translateY(1px)}
-  .btn.primary{background:var(--grad-am); border-color:transparent; color:#191106; box-shadow:0 4px 16px #f2a03d33}
+  .btn.primary{background:var(--grad-am); border-color:transparent; color:#191106; box-shadow:0 4px 16px #f2a03d33; font-family:var(--fd-disp); font-weight:600; text-transform:uppercase; letter-spacing:.07em}
   .btn.water{background:var(--wa); border-color:var(--wa); color:#0a1920}
   .btn.food{background:var(--fd); border-color:var(--fd); color:#101b0a}
   .btn.body{background:var(--bd); border-color:var(--bd); color:#170f22}
@@ -86,7 +92,7 @@
     padding:6px 8px calc(6px + env(safe-area-inset-bottom));
   }
   nav.tabs .in{max-width:480px; margin:0 auto; display:grid; grid-template-columns:repeat(5,1fr)}
-  nav.tabs button{display:flex; flex-direction:column; align-items:center; gap:3px; padding:7px 2px 5px; color:var(--ink3); font-size:10.5px; font-weight:600; letter-spacing:.02em; border-radius:10px}
+  nav.tabs button{display:flex; flex-direction:column; align-items:center; gap:3px; padding:7px 2px 5px; color:var(--ink3); font-family:var(--fd-disp); font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; border-radius:10px}
   nav.tabs button svg{width:22px;height:22px}
   nav.tabs button.on{color:var(--ink)}
   nav.tabs button.on .ic-today{color:var(--wk)}
@@ -131,19 +137,19 @@
   /* timers */
   .clock{font-size:56px; font-weight:800; letter-spacing:-.01em; font-variant-numeric:tabular-nums; text-align:center; line-height:1.05; margin:8px 0 4px}
   .clock.small{font-size:40px}
-  .tclock{font-family:var(--fd-dot); font-size:56px; font-weight:900; letter-spacing:.01em; font-variant-numeric:tabular-nums; text-align:center; line-height:1; margin:24px 0 8px; color:var(--wk)}
+  .tclock{font-family:var(--fd-disp); font-size:88px; font-weight:700; letter-spacing:.02em; font-variant-numeric:tabular-nums; text-align:center; line-height:1; margin:20px 0 6px; color:var(--ink)}
   .tsub{text-align:center; color:var(--ink3); font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; margin-bottom:16px}
   .tbtns{display:flex; justify-content:center; align-items:center; gap:16px; margin:8px 0 6px}
   .tbtn{width:84px; height:84px; border-radius:50%; font-weight:700; font-size:14.5px; background:var(--raised); border:1px solid var(--line)}
   .tbtn:active{transform:scale(.96)}
-  .tbtn.primary{background:var(--grad-am); border-color:transparent; color:#191106; width:96px; height:96px; font-size:16px; box-shadow:0 6px 20px #f2a03d40}
+  .tbtn.primary{background:var(--grad-am); border-color:transparent; color:#191106; width:96px; height:96px; font-size:15px; box-shadow:0 6px 20px #f2a03d40; font-family:var(--fd-disp); font-weight:600; text-transform:uppercase; letter-spacing:.06em}
   .restgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
   .restgrid button{padding:20px 0; font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; background:var(--raised); border:1px solid var(--line); border-radius:14px}
   .restgrid button:active{background:var(--wk); color:#191106}
   .seg.seg4{grid-template-columns:repeat(4,1fr); margin-bottom:12px}
   .tpanel{display:none}
   .tpanel.on{display:block}
-  #rest .clock{font-family:var(--fd-dot); font-size:60px; font-weight:900; color:var(--wk)}
+  #rest .clock{font-family:var(--fd-disp); font-size:76px; font-weight:700; color:var(--ink)}
   /* dashboard tiles */
   .tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px}
   .tile{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:13px; text-align:left; display:block; width:100%}
@@ -169,7 +175,7 @@
   }
   #sheet.on{display:block}
   #sheet .in{max-width:480px; margin:0 auto; padding:18px 18px calc(24px + env(safe-area-inset-bottom))}
-  #sheet h3{font-size:18px; font-weight:800; letter-spacing:-.01em; margin-bottom:14px}
+  #sheet h3{font-family:var(--fd-disp); font-size:20px; font-weight:700; letter-spacing:.01em; margin-bottom:14px}
   .field{margin-bottom:12px}
   .field label{display:block; font-size:12.5px; font-weight:600; color:var(--ink2); margin-bottom:6px}
   .fields2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
@@ -213,11 +219,16 @@
   @keyframes fall{to{transform:translateY(112vh) rotate(220deg)}}
   @keyframes pop{from{transform:scale(.55); opacity:0}}
   @keyframes celein{from{opacity:0}}
-  @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} }
+  /* brand splash */
+  #splash{position:fixed; inset:0; z-index:200; background:var(--bg); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:12px; animation:splashout .45s ease .95s both; pointer-events:none}
+  #splash img{width:86px; height:86px; border-radius:20px; animation:pop .5s cubic-bezier(.22,1.4,.36,1) both}
+  @keyframes splashout{to{opacity:0; visibility:hidden}}
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} #splash{display:none} }
 
   .empty{color:var(--ink3); font-size:14px; text-align:center; padding:18px 8px}
   .seg{display:grid; grid-template-columns:1fr 1fr; gap:6px; background:var(--raised); border:1px solid var(--line); border-radius:12px; padding:4px}
-  .seg button{padding:8px; border-radius:9px; font-weight:600; font-size:13.5px; color:var(--ink2)}
+  .seg button{padding:8px; border-radius:9px; font-family:var(--fd-disp); font-weight:600; font-size:13px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink2)}
   .seg button.on{background:var(--bg); color:var(--ink)}
   .datebar{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px}
   .datebar b{font-size:15px}
@@ -236,6 +247,11 @@
   a{color:var(--wa)}
 </style>
 
+<div id="splash" aria-hidden="true">
+  <img src="icon.svg" alt="" onerror="this.style.display='none'">
+  <div style="font-family:var(--fd-disp); font-weight:700; font-size:31px; letter-spacing:.03em">CoachZ</div>
+  <div class="serifacc" style="font-size:19px; color:var(--ink2)">Show up. I’ll count.</div>
+</div>
 <div id="app">
   <header class="top">
     <div class="row" style="gap:10px"><img src="icon.svg" alt="" style="width:34px; height:34px; border-radius:9px" onerror="this.style.display='none'">
@@ -1146,39 +1162,35 @@ function customWater(){
   const n=Math.round(+v||0);
   if(n) addWater(n);
 }
-/* dot-matrix data strips — the CoachZ signature */
-function dotStrip(getVal, goal, color){
+/* bar strips — seven days, stacked like plates */
+function barStrip(getVal, goal, color){
   const L=['M','T','W','T','F','S','S'];
-  let h='<div class="dots">';
-  const mon=wkMonday(today());
-  /* show the trailing 7 days ending today */
+  let h='<div class="mini2 anim2">';
   for(let i=6;i>=0;i--){
     const d=dShift(today(),-i);
     const v=getVal(d)||0;
-    const n=Math.round(Math.min(1,v/goal)*4);
-    const p=6-i;
-    let col='';
-    for(let k=0;k<4;k++) col+='<i class="di" style="animation-delay:'+(p*45+k*25)+'ms'+((3-k)<n?'; background:'+color:'')+'"></i>';
+    const pct=Math.min(1, v/goal);
     const dd=new Date(d+'T12:00:00');
-    h+='<div class="dcol">'+col+'<span class="dl">'+L[(dd.getDay()+6)%7]+'</span></div>';
+    h+='<div class="mcol"><b style="height:'+Math.max(8, pct*100)+'%; animation-delay:'+((6-i)*55)+'ms'+
+      (v>0? '; background:'+color+(pct>=1?'':'; opacity:.55') : '')+'"></b>'+
+      '<span class="dl">'+L[(dd.getDay()+6)%7]+'</span></div>';
   }
   return h+'</div>';
 }
-function weekDots(){
-  const mon=wkMonday(today()), L=['M','T','W','T','F','S','S'];
-  let h='<div class="wkdots">';
+/* the gym attendance row — a week of check marks */
+function weekRow(){
+  const mon=wkMonday(today()), L=['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  let h='<div class="wkrow">';
   for(let i=0;i<7;i++){
     const d=dShift(mon,i);
     const trained=S.sessions.some(function(s){return s.date===d;});
-    const isToday=d===today();
     const planned=(S.plan||{})[new Date(d+'T12:00:00').getDay()];
-    let style='';
-    if(trained) style='background:var(--grad-am)';
-    else if(d<today()) style='background:var(--raised)';
-    else if(planned && !activeBreak(d)) style='background:transparent; border:1.5px solid var(--ink3)';
-    else style='background:var(--raised); opacity:.5';
-    if(isToday) style+='; outline:2px solid var(--wk); outline-offset:2px';
-    h+='<div class="wd"><i class="di" style="animation-delay:'+(i*55)+'ms; '+style+'"></i><span>'+L[i]+'</span></div>';
+    let cls='wc';
+    if(trained) cls+=' done';
+    else if(d>today() && planned && !activeBreak(d)) cls+=' plan';
+    if(d===today()) cls+=' today';
+    h+='<div class="'+cls+'" style="animation-delay:'+(i*45)+'ms">'+
+      (trained? '<span class="ck">✓</span>':'')+'<span>'+L[i]+'</span></div>';
   }
   return h+'</div>';
 }
@@ -1195,7 +1207,7 @@ function waterSheet(){
       '<button class="btn sm" onclick="addWater(1000);waterSheet()">+1L</button>'+
       '<button class="btn sm" onclick="customWater();waterSheet()">custom</button>'+
       '<button class="btn ghost sm" onclick="addWater(-250);waterSheet()">−250</button></div></div></div>'+
-    dotStrip(function(d){return S.water[d];}, st.waterGoal, 'var(--wa)')+
+    barStrip(function(d){return S.water[d];}, st.waterGoal, 'var(--wa)')+
     '<p class="tiny muted" style="margin-top:14px">'+waterPace(w,st.waterGoal)+
       (trained? 'Training day — aim ~500ml extra. ':'')+
       (st.waterRemind ? 'Reminders every '+st.waterEvery+' min (8:00–22:00).' : 'Reminders off — turn on in Settings.')+
@@ -1273,7 +1285,7 @@ function logSleepForm(){
     '<label class="chip grow" style="text-align:center; cursor:pointer"><input type="radio" name="slQ" value="r" '+(cur.q==='r'?'checked':'')+' style="accent-color:var(--good)"> Woke rested</label>'+
     '<label class="chip grow" style="text-align:center; cursor:pointer"><input type="radio" name="slQ" value="g" '+(cur.q==='g'?'checked':'')+' style="accent-color:var(--bad)"> Woke groggy</label></div>'+
     '<button class="btn wide" style="background:var(--sl); border-color:var(--sl); color:#101526" onclick="saveSleep()">Save</button>'+
-    dotStrip(function(d){return (S.sleep[d]||{}).hrs;}, +S.settings.sleepGoal||8, 'var(--sl)')+
+    barStrip(function(d){return (S.sleep[d]||{}).hrs;}, +S.settings.sleepGoal||8, 'var(--sl)')+
     (cur.hrs?'<button class="btn ghost wide danger" style="margin-top:10px" onclick="delSleep()">Remove entry</button>':'')+
     '<p class="tiny muted" style="margin-top:12px">Logged against this morning’s date. 7–9 hours is where muscle recovery actually happens.</p>');
 }
@@ -1294,7 +1306,7 @@ function stepsForm(){
     '<div class="field"><label for="stpN">Total steps (from your phone’s counter)</label>'+
     '<input id="stpN" type="number" inputmode="numeric" value="'+(S.steps[today()]||'')+'" placeholder="e.g. 7500"></div>'+
     '<button class="btn wide" style="background:var(--stp); border-color:var(--stp); color:#0a1f19" onclick="saveSteps()">Save</button>'+
-    dotStrip(function(d){return S.steps[d];}, +S.settings.stepGoal||8000, 'var(--stp)'));
+    barStrip(function(d){return S.steps[d];}, +S.settings.stepGoal||8000, 'var(--stp)'));
 }
 function saveSteps(){
   const n=Math.round(+$('#stpN').value||0);
@@ -1420,8 +1432,76 @@ function openReport(ws){
     h+=sect('Coach’s notes');
     notes.forEach(function(x){ h+='<p class="small" style="margin:6px 0; color:var(--ink2)">— '+x+'</p>'; });
   }
-  h+='<p class="tiny muted" style="margin-top:14px">Deltas compare with the previous week. Green = moving the right way for your goals.</p>';
+  h+='<button class="btn primary wide" style="margin-top:14px" onclick="shareWeek(\''+ws+'\')">Share this week</button>';
+  h+='<p class="tiny muted" style="margin-top:12px">Deltas compare with the previous week. Green = moving the right way for your goals.</p>';
   openSheet(h);
+}
+/* ============ share card ============ */
+function shareWeek(ws){
+  const cur=weekStats(ws), we=dShift(ws,6);
+  const trained=[];
+  for(let i=0;i<7;i++){ const d=dShift(ws,i); trained.push(S.sessions.some(function(s){return s.date===d;})); }
+  const ready = (document.fonts && document.fonts.load)
+    ? Promise.all([document.fonts.load('700 90px Oswald'), document.fonts.load('500 40px Oswald'), document.fonts.load('italic 46px "Instrument Serif"')])
+    : Promise.resolve();
+  ready.then(function(){
+    const cv=document.createElement('canvas'); cv.width=1080; cv.height=1350;
+    const x=cv.getContext('2d');
+    x.fillStyle='#0e1214'; x.fillRect(0,0,1080,1350);
+    const g=x.createLinearGradient(0,0,1080,0); g.addColorStop(0,'#ffc76e'); g.addColorStop(1,'#f08a2b');
+    x.fillStyle=g; x.fillRect(0,0,1080,14);
+    x.fillStyle='#f2a03d'; x.font='700 58px Oswald'; x.textAlign='left';
+    x.fillText('COACHZ', 72, 128);
+    x.fillStyle='#93a6b0'; x.font='italic 42px "Instrument Serif"';
+    x.fillText('Week of '+fmtD(ws)+' – '+fmtD(we), 72, 190);
+    const stats=[[String(cur.ses),'WORKOUTS'],[Math.round(cur.vol).toLocaleString(),'KG LIFTED'],[String(cur.pr),'RECORDS']];
+    stats.forEach(function(st2,i){
+      const cx=72+i*330;
+      x.fillStyle='#edf2f4'; x.font='700 108px Oswald'; x.fillText(st2[0], cx, 400);
+      x.fillStyle='#5c6d76'; x.font='500 30px Oswald'; x.fillText(st2[1], cx, 448);
+    });
+    const L=['M','T','W','T','F','S','S'];
+    for(let i=0;i<7;i++){
+      const bx=72+i*136;
+      x.fillStyle = trained[i] ? '#f2a03d' : '#1f282e';
+      if(x.roundRect){ x.beginPath(); x.roundRect(bx,520,112,112,26); x.fill(); }
+      else x.fillRect(bx,520,112,112);
+      x.fillStyle = trained[i] ? '#191106' : '#5c6d76';
+      x.font='700 44px Oswald'; x.textAlign='center';
+      x.fillText(trained[i]?'✓':L[i], bx+56, trained[i]?592:588);
+      x.fillStyle='#5c6d76'; x.font='500 24px Oswald';
+      x.fillText(L[i], bx+56, 676);
+      x.textAlign='left';
+    }
+    x.fillStyle='#93a6b0'; x.font='500 38px Oswald';
+    const bits=[];
+    if(cur.slN) bits.push('SLEEP '+cur.sleep+'H AVG');
+    if(cur.steps) bits.push((Math.round(cur.steps/100)/10)+'K STEPS');
+    if(cur.waHit) bits.push('WATER GOAL ×'+cur.waHit);
+    if(cur.km) bits.push(cur.km+' KM');
+    x.fillText(bits.join('   ·   ')||'THE WORK CONTINUES', 72, 790);
+    const q='“'+QUOTES[dayIdx()%QUOTES.length]+'”';
+    x.fillStyle='#edf2f4'; x.font='italic 52px "Instrument Serif"';
+    const words=q.split(' '); let line='', y=980;
+    words.forEach(function(w2){
+      if(x.measureText(line+w2).width>930){ x.fillText(line, 72, y); y+=68; line=''; }
+      line+=w2+' ';
+    });
+    x.fillText(line.trim(), 72, y);
+    x.fillStyle='#5c6d76'; x.font='500 28px Oswald';
+    x.fillText('TRACKED ON COACHZ', 72, 1270);
+    cv.toBlob(function(blob){
+      const file=new File([blob], 'coachz-week.png', {type:'image/png'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        navigator.share({files:[file], title:'My CoachZ week'}).catch(function(){});
+      } else {
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(blob); a.download='coachz-week.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        toast('Week card downloaded');
+      }
+    }, 'image/png');
+  });
 }
 
 /* ============ measurements ============ */
@@ -1520,7 +1600,7 @@ function renderToday(){
   h+='</div></div>'+
     '<div class="row wrap" style="gap:6px; margin-top:14px">'+
     pillars.map(function(p){ return '<span class="pp'+(p.on?' on':'')+'">'+(p.on?'✓ ':'')+p.l+'</span>'; }).join('')+
-    '</div>'+weekDots()+'</div>';
+    '</div>'+weekRow()+'</div>';
   /* ===== quote + coach fact ===== */
   const qi=dayIdx();
   h+='<div class="card qcard" style="padding:16px 18px">“'+QUOTES[qi%QUOTES.length]+'”'+
@@ -2047,7 +2127,7 @@ function prCelebrate(prs, done){
     dots+='<i style="left:'+l+'%; width:'+sz+'px; height:'+sz+'px; background:'+c+'; animation-delay:'+dl+'s; animation-duration:'+dur+'s"></i>';
   }
   el.innerHTML=dots+'<div class="cin">'+
-    '<div class="tclock" style="font-size:76px; margin:0">PR</div>'+
+    '<div class="tclock" style="font-size:120px; margin:0; color:var(--wk)">PR</div>'+
     '<div class="serifacc" style="font-size:23px; color:var(--ink)">'+(prs.length>1? prs.length+' records today':'New record')+'</div>'+
     '<div class="tiny muted" style="margin-top:8px">'+esc(prs.map(function(p){return p.ex;}).join(' · '))+'</div></div>';
   el.classList.add('on');
@@ -2881,6 +2961,7 @@ setInterval(function(){
 
 /* ============ boot ============ */
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSheet(); });
+setTimeout(function(){ const sp=$('#splash'); if(sp) sp.remove(); }, 1700);
 drawRestPresets();
 if(S.settings.hiit){
   $('#hiWork').value=S.settings.hiit.w; $('#hiRest').value=S.settings.hiit.r; $('#hiRounds').value=S.settings.hiit.n;
