@@ -371,7 +371,7 @@ function defaults(){
       sleepRemind:'22:30', sleepGoal:8, stepGoal:8000},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[]
   };
 }
 let S;
@@ -380,7 +380,7 @@ catch(e){ S = defaults(); }
 S.settings = Object.assign(defaults().settings, S.settings||{});
 /* one-time seed/upgrade: adds new exercises, starter routines and quick foods
    to an existing store without touching anything the user already changed */
-(function seedV2(){
+function seedV2(){
   if(S.seedV2) return; S.seedV2=true;
   DEF_EX.forEach(function(e,i){
     if(!S.exercises.some(function(x){return x.name===e[0];}))
@@ -402,9 +402,9 @@ S.settings = Object.assign(defaults().settings, S.settings||{});
   up('calGoal',2200,2600); up('proteinGoal',130,120);
   up('carbGoal',250,340); up('fatGoal',70,75);
   save();
-})();
+}
 /* v3: PPL routines modeled on the user's real training history; no soya/tofu */
-(function seedV3(){
+function seedV3(){
   if(S.seedV3) return; S.seedV3=true;
   DEF_EX.forEach(function(e){
     if(!S.exercises.some(function(x){return x.name===e[0];}))
@@ -426,7 +426,7 @@ S.settings = Object.assign(defaults().settings, S.settings||{});
       S.quick.push(Object.assign({id:uid()}, q));
   });
   save();
-})();
+}
 /* v4: import previous app's workout history (May 2026) + injury-return routines */
 const HIST=[
   {n:'Back A', d:'2026-05-06', min:53, ex:[
@@ -475,7 +475,7 @@ const HIST=[
     ['Triceps pushdown',[[25,15],[30,15],[35,15]]],
     ['Overhead triceps extension',[[15,15],[17.5,15],[15,18]]] ]}
 ];
-(function seedV4(){
+function seedV4(){
   if(S.seedV4) return; S.seedV4=true;
   DEF_EX.forEach(function(e){
     if(!S.exercises.some(function(x){return x.name===e[0];}))
@@ -498,7 +498,7 @@ const HIST=[
   });
   S.sessions.sort(function(a,b){ return a.date<b.date?-1:1; });
   save();
-})();
+}
 /* v8: full Feb–June training block from the previous app (best set per
    exercise; session volume/duration taken from that app's totals),
    today's return workout, and the 58→67→63.9 kg weight journey */
@@ -535,7 +535,7 @@ const H2=[
 ['Push A','2026-05-29',69,7305,[['Bench press',55,10],['Incline dumbbell press',15,12],['Decline dumbbell press',15,12],['Overhead press',12.5,10],['Lateral raise',5,12],['Triceps pushdown',25,16],['Overhead triceps extension',17.5,12]]],
 ['Back A','2026-06-02',87,8170,[['Barbell row',60,5],['Lat pulldown',40,12],['Seated cable row',85,12],['Face pull',25,20],['Barbell curl',20,12],['Hammer curl',10,10]]]
 ];
-(function seedV8(){
+function seedV8(){
   if(S.seedV8) return; S.seedV8=true;
   DEF_EX.forEach(function(e){
     if(!S.exercises.some(function(x){return x.name===e[0];}))
@@ -571,10 +571,10 @@ const H2=[
   });
   S.weights.sort(function(a,b){ return a.date<b.date?-1:1; });
   save();
-})();
+}
 /* v9: BCA-report calibration — push-ups added to the return session,
    BMR-informed calorie target, breathwork habit, April weigh-in */
-(function seedV9(){
+function seedV9(){
   if(S.seedV9) return; S.seedV9=true;
   DEF_EX.forEach(function(e){
     if(!S.exercises.some(function(x){return x.name===e[0];}))
@@ -593,9 +593,9 @@ const H2=[
   if(!S.supps.some(function(x){return /breathwork/i.test(x.name);}))
     S.supps.push({id:uid(), name:'Breathwork (15–30 min)', kcal:0, p:0, c:0, f:0, logFood:false});
   save();
-})();
+}
 /* v5: Hyrox station exercises + routine */
-(function seedV5(){
+function seedV5(){
   if(S.seedV5) return; S.seedV5=true;
   DEF_EX.forEach(function(e){
     if(!S.exercises.some(function(x){return x.name===e[0];}))
@@ -607,9 +607,9 @@ const H2=[
     if(ids.length) S.routines.push({id:uid(), name:r.name, exIds:ids});
   });
   save();
-})();
+}
 /* v7: the user's actual supplement stack */
-(function seedV7(){
+function seedV7(){
   if(S.seedV7) return; S.seedV7=true;
   [
     {name:'Creatine 5g — GNC monohydrate', kcal:0, p:0, c:0, f:0, logFood:false},
@@ -620,9 +620,9 @@ const H2=[
       S.supps.push(Object.assign({id:uid()}, sp));
   });
   save();
-})();
+}
 /* v6: default weekly plan (injury-safe comeback schedule) */
-(function seedV6(){
+function seedV6(){
   if(S.seedV6) return; S.seedV6=true;
   if(!S.plan || !Object.keys(S.plan).some(function(k){return S.plan[k];})){
     const byName=function(n){ const r=S.routines.find(function(x){return x.name===n;}); return r? r.id : ''; };
@@ -637,11 +637,11 @@ const H2=[
     };
   }
   save();
-})();
+}
 function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toast('Could not save — storage unavailable'); } }
 
 /* v10: coach optimization — density shake, breathwork in routines, BCA re-scan */
-(function seedV10(){
+function seedV10(){
   if(S.seedV10) return; S.seedV10=true;
   if(!S.quick.some(function(x){return /mass shake/i.test(x.name);}))
     S.quick.push({id:uid(), name:'Mass shake (milk+oats+PB+banana+whey)', kcal:700, p:40, c:75, f:22});
@@ -653,9 +653,9 @@ function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toa
   if(!S.reminders.some(function(x){return /re-?scan/i.test(x.label);}))
     S.reminders.push({id:uid(), label:'Book BCA re-scan at Build & Trim (compare vs 16 Apr)', time:'10:00', date:'2026-10-18'});
   save();
-})();
+}
 /* v12: micronutrient stack with absorption-aware timing */
-(function seedV12(){
+function seedV12(){
   if(S.seedV12) return; S.seedV12=true;
   [
     ['D3 + K2 — morning, with food', /d3/i],
@@ -668,9 +668,9 @@ function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toa
       S.supps.push({id:uid(), name:sp[0], kcal:0, p:0, c:0, f:0, logFood:false});
   });
   save();
-})();
+}
 /* v13: omega-3 and L-theanine */
-(function seedV13(){
+function seedV13(){
   if(S.seedV13) return; S.seedV13=true;
   [
     ['Omega-3 — with lunch', /omega/i],
@@ -680,14 +680,33 @@ function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toa
       S.supps.push({id:uid(), name:sp[0], kcal:0, p:0, c:0, f:0, logFood:false});
   });
   save();
-})();
+}
 /* v11: wedding break around 24–25 Nov */
-(function seedV11(){
+function seedV11(){
   if(S.seedV11) return; S.seedV11=true;
   if(!S.breaks.some(function(b){return /wedding/i.test(b.label);}))
     S.breaks.push({id:uid(), from:'2026-11-20', to:'2026-11-27', label:'Wedding 💍'});
   save();
-})();
+}
+/* v14: repair food-log names that were HTML-escaped at write time */
+function seedV14(){
+  if(S.seedV14) return; S.seedV14=true;
+  const de=function(s){ return String(s||'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'"); };
+  Object.keys(S.food).forEach(function(d){
+    const day=S.food[d];
+    ['b','l','d','s'].forEach(function(m){ (day[m]||[]).forEach(function(e){ e.name=de(e.name); }); });
+  });
+  save();
+}
+
+/* ============ migration runner ============
+   Ordered and append-only — this list IS the execution order (it preserves
+   the historical file order the app shipped with). Each step stays
+   internally idempotent via its S.seedV* flag, so old and new installs
+   converge. To add a migration: define seedV<n> above, append it here. */
+[seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
+ seedV10, seedV12, seedV13, seedV11, seedV14].forEach(function(step){ step(); });
+S.schemaVersion=14;
 
 /* ============ utils ============ */
 function $(s){ return document.querySelector(s); }
@@ -704,6 +723,7 @@ function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on
   clearTimeout(toast._t); toast._t=setTimeout(function(){ t.classList.remove('on'); },2200); }
 function vib(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 function unit(){ return S.settings.unit; }
+function est1RM(w,r){ return (+w||0)*(1+(+r||0)/30); }
 
 /* beep via WebAudio */
 let AC=null;
@@ -1133,7 +1153,8 @@ function toggleSupp(id){
   } else {
     let fid=1;
     if(sp.logFood){
-      const e={id:uid(), name:esc(sp.name), kcal:+sp.kcal||0, p:+sp.p||0, c:+sp.c||0, f:+sp.f||0};
+      /* store raw — escaping happens at render, never at write */
+      const e={id:uid(), name:sp.name, kcal:+sp.kcal||0, p:+sp.p||0, c:+sp.c||0, f:+sp.f||0};
       const day=S.food[d]=S.food[d]||{};
       (day.s=day.s||[]).push(e); fid=e.id;
       toast(sp.p? '+'+sp.p+'g protein logged to snacks' : sp.name+' ✓');
@@ -1141,6 +1162,7 @@ function toggleSupp(id){
     S.suppLog[d][id]=fid;
   }
   save(); renderToday();
+  if($('#sheet').classList.contains('on') && $('#sheetIn').textContent.indexOf('Daily checklist')>-1) checklistSheet();
 }
 function suppEditor(){
   openSheet('<h3>Supplements</h3>'+
@@ -1221,7 +1243,7 @@ function weekStats(ws){
     S.sessions.forEach(function(s){
       const e=s.ex.find(function(x){return x.exId===ex.id;}); if(!e) return;
       e.sets.forEach(function(t){
-        const est=(+t.w||0)*(1+(+t.r||0)/30);
+        const est=est1RM(t.w,t.r);
         if(inR(s.date)){ if(est>inBest) inBest=est; }
         else if(s.date<ws && est>preBest) preBest=est;
       });
@@ -1405,7 +1427,7 @@ function renderToday(){
        '<button class="btn wide" onclick="go(\'workout\')">View</button>';
   } else if(planRt){
     h+='<b style="font-size:17px">'+esc(planRt.name)+'</b>'+
-       '<div class="tiny muted" style="margin:2px 0 10px">'+planRt.exIds.map(exName).slice(0,3).join(' · ')+(planRt.exIds.length>3?' +'+(planRt.exIds.length-3):'')+'</div>'+
+       '<div class="tiny muted" style="margin:2px 0 10px">'+planRt.exIds.map(function(id){return esc(exName(id));}).slice(0,3).join(' · ')+(planRt.exIds.length>3?' +'+(planRt.exIds.length-3):'')+'</div>'+
        '<button class="btn primary wide" onclick="startSession(\''+planRt.id+'\')">Start workout</button>';
   } else if(brk){
     h+='<b style="font-size:17px">🎉 '+esc(brk.label||'Planned break')+'</b><div class="tiny muted" style="margin:2px 0 10px">Until '+fmtD(brk.to)+' — walk, water, protein, sleep. Zero guilt.</div>'+
@@ -1451,7 +1473,7 @@ function renderToday(){
     h+='<button class="card" style="width:100%; text-align:left; display:block" onclick="checklistSheet()">'+
       '<div class="spread"><span class="small"><b>Daily checklist</b> <span class="muted num">'+suppDone+'/'+S.supps.length+'</span></span><span class="muted">›</span></div>'+
       (pend.length
-        ? '<div class="tiny muted" style="margin-top:4px">Pending: '+pend.slice(0,4).join(', ')+(pend.length>4?' +'+(pend.length-4):'')+'</div>'
+        ? '<div class="tiny muted" style="margin-top:4px">Pending: '+esc(pend.slice(0,4).join(', '))+(pend.length>4?' +'+(pend.length-4):'')+'</div>'
         : '<div class="tiny" style="margin-top:4px; color:var(--good)">All done ✓</div>')+
       '</button>';
   }
@@ -1583,7 +1605,7 @@ function bestFor(exId){
     if(e.exId!==exId) return;
     e.sets.forEach(function(t){
       if(t.wu) return;
-      const est=(+t.w||0)*(1+(+t.r||0)/30);
+      const est=est1RM(t.w,t.r);
       if(!best || est>best.est) best={w:+t.w||0, r:+t.r||0, est:est, date:s.date};
     });
   });});
@@ -1614,7 +1636,7 @@ function renderWorkout(){
   } else if(planRt){
     h+='<div class="tiny muted" style="font-weight:700; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px">Today’s plan</div>'+
        '<b style="font-size:18px">'+esc(planRt.name)+'</b>'+
-       '<div class="tiny muted" style="margin:3px 0 12px">'+planRt.exIds.map(exName).slice(0,4).join(' · ')+(planRt.exIds.length>4?' +'+(planRt.exIds.length-4):'')+'</div>'+
+       '<div class="tiny muted" style="margin:3px 0 12px">'+planRt.exIds.map(function(id){return esc(exName(id));}).slice(0,4).join(' · ')+(planRt.exIds.length>4?' +'+(planRt.exIds.length-4):'')+'</div>'+
        '<button class="btn primary wide" onclick="startSession(\''+planRt.id+'\')">Start today’s workout</button>'+
        '<button class="btn ghost wide" style="margin-top:8px" onclick="startSession()">Start empty instead</button>';
   } else {
@@ -1635,7 +1657,7 @@ function renderWorkout(){
   /* routines */
   h+='<div class="card"><h2><span class="dot" style="background:var(--wk)"></span>Routines</h2>';
   S.routines.forEach(function(r){
-    h+='<div class="listrow"><div><b>'+esc(r.name)+'</b><div class="tiny muted">'+r.exIds.map(exName).slice(0,4).join(' · ')+(r.exIds.length>4?' +'+(r.exIds.length-4):'')+'</div></div>'+
+    h+='<div class="listrow"><div><b>'+esc(r.name)+'</b><div class="tiny muted">'+r.exIds.map(function(id){return esc(exName(id));}).slice(0,4).join(' · ')+(r.exIds.length>4?' +'+(r.exIds.length-4):'')+'</div></div>'+
       '<div class="row"><button class="btn sm" onclick="editRoutine(\''+r.id+'\')">Edit</button>'+
       '<button class="btn primary sm" onclick="startSession(\''+r.id+'\')">Start</button></div></div>';
   });
@@ -1693,7 +1715,7 @@ function progressHTML(){
     S.sessions.forEach(function(s){
       const e=s.ex.find(function(x){return x.exId===id;}); if(!e) return;
       let best=0;
-      e.sets.forEach(function(t){ if(t.wu) return; const est=(+t.w||0)*(1+(+t.r||0)/30); if(est>best) best=est; });
+      e.sets.forEach(function(t){ if(t.wu) return; const est=est1RM(t.w,t.r); if(est>best) best=est; });
       if(best>0) series.push({d:s.date, y:Math.round(best)});
     });
     if(series.length<3) return;
@@ -1868,14 +1890,14 @@ function finishSession(){
     if(lift) S.sessions.forEach(function(s){
       const pe=s.ex.find(function(x){return x.exId===e.exId;}); if(!pe) return;
       pe.sets.forEach(function(t){ if(t.wu) return;
-        const w=+t.w||0, est=w*(1+(+t.r||0)/30);
+        const w=+t.w||0, est=est1RM(t.w,t.r);
         if(w>bw) bw=w; if(est>b1) b1=est; });
     });
     let exPR=null;
     e.sets.forEach(function(s){
       nSets++;
       if(g==='Cardio'||s.wu) return;
-      const w=+s.w||0, r=+s.r||0, est=w*(1+r/30);
+      const w=+s.w||0, r=+s.r||0, est=est1RM(w,r);
       vol+=w*r;
       if(!lift) return;
       if(bw>0 && w>bw){ exPR={ex:exName(e.exId), txt:w+'×'+r+' — heaviest ever'}; bw=w; }
@@ -1988,7 +2010,7 @@ function openExInfo(exId){
       let sv=0;
       e.sets.forEach(function(t){
         if(t.wu) return;
-        const w=+t.w||0, r=+t.r||0, est=w*(1+r/30); sv+=w*r;
+        const w=+t.w||0, r=+t.r||0, est=est1RM(w,r); sv+=w*r;
         if(!bw||w>bw.w) bw={w:w, r:r, date:s.date};
         if(!b1||est>b1.est) b1={w:w, r:r, est:est, date:s.date};
       });
@@ -2006,7 +2028,7 @@ function openExInfo(exId){
     S.sessions.forEach(function(s){
       const e=s.ex.find(function(x){return x.exId===exId;}); if(!e) return;
       let best=0;
-      e.sets.forEach(function(t){ if(t.wu) return; const est=(+t.w||0)*(1+(+t.r||0)/30); if(est>best) best=est; });
+      e.sets.forEach(function(t){ if(t.wu) return; const est=est1RM(t.w,t.r); if(est>best) best=est; });
       if(best>0) series.push({d:s.date, y:Math.round(best)});
     });
     if(series.length>=3){
@@ -2255,6 +2277,22 @@ const FOODDB=[
 ['Kathi roll / frankie (1)',300,8,40,12],['Grilled cheese sandwich (1)',300,10,30,15],['Cheese slice (1)',60,3,1,5],
 ['Nachos with cheese (plate)',350,7,38,18],['Mayo dip (1 tbsp)',90,0,1,10],
 ['Cold coffee with ice cream (glass)',250,6,35,9],['Milkshake (glass)',280,7,40,10],
+/* chocolates & sweet impulses */
+['Dairy Milk small (25g)',130,2,15,7],['5 Star (22g)',100,1,14,4.5],['KitKat 2-finger',105,1.5,13,5.5],
+['Ferrero Rocher (1)',73,1,6,5],['Chocolate spread (1 tbsp)',100,1,11,6],['Toffee / eclair (1)',25,0,5,0.5],
+['Chocolate pastry (1)',300,4,35,16],['Brownie (1)',330,4,40,17],['Donut (1)',250,3,30,13],
+/* juice-shop shakes */
+['Kaju shake (glass)',350,9,40,17],['Anjeer shake (glass)',320,8,45,12],['Badam shake (glass)',300,9,35,13],
+['Banana shake (glass)',280,8,45,7],['Mango shake (glass)',300,7,50,8],['Chikoo shake (glass)',290,7,48,8],
+['Sitafal shake (glass)',320,7,52,9],['Dry fruit special shake (glass)',380,10,45,17],
+['Oreo shake (glass)',400,7,55,16],['Cold cocoa (glass)',350,9,45,14],['Rooh Afza milk (glass)',220,6,35,6],
+['Sattu drink (glass)',180,8,30,3],
+/* ice cream & biscuits */
+['Softy cone (1)',160,3,25,5],['Choco bar (1)',180,2,18,11],['Cassata slice (1)',250,4,30,12],
+['Bourbon / Hide&Seek (2)',100,1,14,4.5],['Good Day (2)',90,1,12,4],['Cream biscuit (2)',130,1,18,6],
+/* random snacks */
+['Kurkure / chips small pack',160,2,17,10],['Popcorn (bowl)',120,3,20,4],['Frooti / Maaza (200ml)',90,0,22,0],
+['Meetha paan (1)',70,0.5,15,1],
 ['Green chutney (1 tbsp)',15,0.5,2,0.5],['Coconut chutney (2 tbsp)',60,1,3,5],['Achar / pickle (1 tsp)',25,0,1,2],
 ['Sugar (1 tsp)',20,0,5,0],['Jaggery / gud (10g)',38,0,10,0],['Honey (1 tsp)',20,0,6,0],
 /* drinks */
@@ -2267,38 +2305,73 @@ const FOODDB=[
 ['Papaya (bowl)',60,1,15,0.2],['Grapes (bowl)',100,1,26,0.2],['Watermelon (bowl)',45,1,11,0.2],
 ['Pomegranate / anaar (1)',105,2,26,1.5],['Guava (1)',60,2,14,1],['Chikoo (1)',80,0.5,20,1]
 ];
-let FDMEAL='s', FDSEL=-1;
+let FDMEAL='s', FDRES=[], FDITEM=null, FDQ='';
+function fdbAllFoods(){
+  return FOODDB.map(function(f){ return {name:f[0], kcal:f[1], p:f[2], c:f[3], f:f[4]}; })
+    .concat((S.myFoods||[]).map(function(m){ return {name:m.name, kcal:m.kcal, p:m.p, c:m.c, f:m.f, mine:true, id:m.id}; }));
+}
 function fdbSearch(q){
-  q=(q||'').trim().toLowerCase();
-  const box=$('#fdbRes'); FDSEL=-1; $('#fdbSel').innerHTML='';
-  if(!q){ box.innerHTML=''; return; }
-  const toks=q.split(/\s+/);
-  const hits=[];
-  FOODDB.forEach(function(f,i){
-    const n=f[0].toLowerCase();
-    if(toks.every(function(t){ return n.indexOf(t)>-1; })) hits.push(i);
-  });
-  box.innerHTML = hits.slice(0,8).map(function(i){
-    const f=FOODDB[i];
-    return '<div class="listrow" style="cursor:pointer" onclick="fdbPick('+i+')"><span class="small">'+f[0]+'</span><span class="tiny muted num">'+f[1]+' kcal · P'+f[2]+'</span></div>';
-  }).join('') || '<div class="tiny muted" style="padding:8px 2px">Nothing found — use the manual fields below.</div>';
+  FDQ=(q||'').trim();
+  const box=$('#fdbRes'); FDITEM=null; $('#fdbSel').innerHTML='';
+  if(!FDQ){ box.innerHTML=''; return; }
+  const toks=FDQ.toLowerCase().split(/\s+/);
+  FDRES=fdbAllFoods().filter(function(f){
+    const n=f.name.toLowerCase();
+    return toks.every(function(t){ return n.indexOf(t)>-1; });
+  }).slice(0,8);
+  box.innerHTML = FDRES.map(function(f,i){
+    return '<div class="listrow" style="cursor:pointer" onclick="fdbPick('+i+')"><span class="small">'+esc(f.name)+
+      (f.mine? ' <span class="tiny" style="color:var(--wk)">★ mine</span>':'')+'</span>'+
+      '<span class="row" style="gap:8px"><span class="tiny muted num">'+f.kcal+' kcal · P'+f.p+'</span>'+
+      (f.mine? '<button class="btn ghost sm danger" onclick="event.stopPropagation();delMyFood(\''+f.id+'\')">✕</button>':'')+'</span></div>';
+  }).join('')
+  + '<div class="tiny" style="padding:8px 2px"><a href="#" style="color:var(--wk)" onclick="myFoodForm();return false">＋ Not here? Save “'+esc(FDQ)+'” as my food</a></div>';
 }
 function fdbPick(i){
-  FDSEL=i; const f=FOODDB[i];
+  FDITEM=FDRES[i]; if(!FDITEM) return;
   $('#fdbRes').innerHTML='';
-  $('#fdbSel').innerHTML='<div class="card" style="background:var(--raised); margin:8px 0 4px"><b class="small">'+f[0]+'</b>'+
-    '<div class="tiny muted num" style="margin:2px 0 10px">'+f[1]+' kcal · P '+f[2]+' · C '+f[3]+' · F '+f[4]+' (per unit)</div>'+
+  $('#fdbSel').innerHTML='<div class="card" style="background:var(--raised); margin:8px 0 4px"><b class="small">'+esc(FDITEM.name)+'</b>'+
+    '<div class="tiny muted num" style="margin:2px 0 10px">'+FDITEM.kcal+' kcal · P '+FDITEM.p+' · C '+FDITEM.c+' · F '+FDITEM.f+' (per unit)</div>'+
     '<div class="row"><span class="small">Quantity</span><input id="fdbQty" type="number" inputmode="decimal" value="1" min="0.5" step="0.5" style="max-width:90px; text-align:center">'+
     '<button class="btn food grow" onclick="fdbAdd()">Add</button></div></div>';
 }
 function fdbAdd(){
-  if(FDSEL<0) return;
-  const f=FOODDB[FDSEL], n=Math.max(0.5, +$('#fdbQty').value||1);
-  const e={id:uid(), name:(n!==1? n+'× ':'')+f[0], kcal:Math.round(f[1]*n), p:Math.round(f[2]*n*10)/10, c:Math.round(f[3]*n*10)/10, f:Math.round(f[4]*n*10)/10};
+  const f=FDITEM; if(!f) return;
+  const n=Math.max(0.5, +$('#fdbQty').value||1);
+  const e={id:uid(), name:(n!==1? n+'× ':'')+f.name, kcal:Math.round(f.kcal*n), p:Math.round(f.p*n*10)/10, c:Math.round(f.c*n*10)/10, f:Math.round(f.f*n*10)/10};
   const day=S.food[foodDate]=S.food[foodDate]||{};
   (day[FDMEAL]=day[FDMEAL]||[]).push(e);
   save(); closeSheet(); renderFood();
   toast(e.name+' — '+e.kcal+' kcal logged');
+}
+function myFoodForm(){
+  openSheet('<h3>Save a “my food”</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">Saved permanently into your searchable database, and included in backups. Enter values per one unit (1 piece / 1 bowl / 1 glass).</p>'+
+    '<div class="field"><label for="mfName">Name (put the unit in it)</label><input id="mfName" value="'+esc(FDQ)+'" placeholder="e.g. Nani’s besan ladoo (1)"></div>'+
+    '<div class="fields2">'+
+    '<div class="field"><label for="mfK">Calories</label><input id="mfK" type="number" inputmode="numeric" placeholder="0"></div>'+
+    '<div class="field"><label for="mfP">Protein g</label><input id="mfP" type="number" inputmode="decimal" placeholder="0"></div></div>'+
+    '<div class="fields2">'+
+    '<div class="field"><label for="mfC">Carbs g</label><input id="mfC" type="number" inputmode="decimal" placeholder="0"></div>'+
+    '<div class="field"><label for="mfF">Fat g</label><input id="mfF" type="number" inputmode="decimal" placeholder="0"></div></div>'+
+    '<button class="btn food wide" onclick="saveMyFood()">Save &amp; use</button>');
+}
+function saveMyFood(){
+  const name=$('#mfName').value.trim(), k=+$('#mfK').value||0;
+  if(!name){ toast('Name it first'); return; }
+  if(!k){ toast('Calories needed — even a rough guess beats a blank'); return; }
+  const m={id:uid(), name:name, kcal:k, p:+$('#mfP').value||0, c:+$('#mfC').value||0, f:+$('#mfF').value||0};
+  S.myFoods.push(m); save();
+  addFoodForm(FDMEAL);
+  $('#fdbQ').value=name; fdbSearch(name);
+  const idx=FDRES.findIndex(function(f){return f.id===m.id;});
+  if(idx>-1) fdbPick(idx);
+  toast('Saved to My Foods ★');
+}
+function delMyFood(id){
+  if(!confirm('Remove this from My Foods? (Already-logged entries keep their data.)')) return;
+  S.myFoods=S.myFoods.filter(function(m){return m.id!==id;});
+  save(); fdbSearch(FDQ);
 }
 let foodDate=today();
 const MEALS=[['b','Breakfast'],['l','Lunch'],['d','Dinner'],['s','Snacks']];
@@ -2420,7 +2493,7 @@ function renderBody(){
     '<label class="btn body grow" style="cursor:pointer">Add photo<input type="file" accept="image/*" capture="user" style="display:none" onchange="addPhoto(this)"></label>'+
     (ph.length>1?'<button class="btn grow" onclick="comparePhotos()">Then vs now</button>':'')+'</div>';
   try{
-    const used=Math.round((localStorage.getItem(K)||'').length/1024/102.4)/10;
+    const used=Math.round((localStorage.getItem(K)||'').length*2/1024/104.8576)/10;
     if(ph.length) h+='<div class="tiny muted" style="margin-top:10px">Using ~'+used+' MB of ~5 MB app storage. Photos are compressed and never leave this phone (backups include them).</div>';
   }catch(e){}
   h+='</div>';
@@ -2625,6 +2698,8 @@ function importData(inp){
       const d=JSON.parse(rd.result);
       if(!d.settings || !d.exercises) throw 0;
       S=Object.assign(defaults(), d);
+      /* same normalization as boot: fill any settings keys the backup predates */
+      S.settings=Object.assign(defaults().settings, S.settings||{});
       save(); closeSheet(); render(); toast('Backup restored');
     }catch(e){ toast('That file is not a CoachZ backup'); }
   };

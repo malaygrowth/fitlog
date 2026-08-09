@@ -62,3 +62,10 @@ Any static host works; the repo is self-contained (no build step).
   the app's storage too.
 - Everything is in `index.html` (assembled from `core.html`); `sw.js` +
   `manifest.webmanifest` + `icon.svg` make it installable and offline-capable.
+
+## Development
+
+- **Source of truth:** `core.html` (app), `head.html` (shell), `eximg.html` (generated exercise-image map). `index.html` is generated — never edit it directly.
+- **Build:** `./build.sh`
+- **Test:** `NODE_PATH=/opt/node22/lib/node_modules node test/smoke.cjs` (30-check Playwright smoke suite: migrations, food DB, My Foods, PR detection, session editing, coach logic, charts, XSS escaping). Run before every ship.
+- **Migrations:** ordered, append-only list at the migration runner in `core.html` — define `seedV<n>`, append to the array, bump `S.schemaVersion`.
