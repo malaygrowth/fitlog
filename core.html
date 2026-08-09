@@ -15,6 +15,12 @@
     
     --grad-am:linear-gradient(135deg, #ffc76e, #f08a2b);
   }
+  body.light{
+    --bg:#f3f1ea; --surface:#ffffff; --raised:#eae7de; --line:#ddd8cc;
+    --ink:#20262b; --ink2:#5d6b73; --ink3:#9aa4ab;
+  }
+  body.light .card, body.light .tile{box-shadow:0 1px 3px #0000000f}
+  body.light #celebrate{background:radial-gradient(circle at 50% 38%, #2a2416e6, #14100af0)}
   *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent}
   html{background:var(--bg)}
   body{
@@ -42,7 +48,7 @@
   section.tab{display:none}
   section.tab.on{display:block}
 
-  .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:16px; margin-bottom:12px}
+  .card{background:var(--surface); border:0; border-radius:var(--r); padding:17px; margin-bottom:14px}
   .card h2{font-family:var(--fd-disp); font-size:11.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--ink2); margin-bottom:12px; display:flex; align-items:center; gap:8px}
   .card h2 .dot{width:8px;height:8px;border-radius:50%}
   .row{display:flex; align-items:center; gap:10px}
@@ -152,7 +158,7 @@
   #rest .clock{font-family:var(--fd-disp); font-size:76px; font-weight:700; color:var(--ink)}
   /* dashboard tiles */
   .tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px}
-  .tile{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:13px; text-align:left; display:block; width:100%}
+  .tile{background:var(--surface); border:0; border-radius:14px; padding:14px; text-align:left; display:block; width:100%}
   .tile:active{background:var(--raised)}
   .tile .tl{font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); display:flex; justify-content:space-between; align-items:center}
   .tile .tv{font-family:var(--fd-disp); font-size:22px; font-weight:800; letter-spacing:-.02em; margin-top:5px}
@@ -209,7 +215,12 @@
   .anim .tiles .tile:nth-child(2){animation-delay:.12s}
   .anim .tiles .tile:nth-child(3){animation-delay:.18s}
   .anim .tiles .tile:nth-child(4){animation-delay:.24s}
-  .di{animation:dotin .32s both}
+  .anim .wkrow .wc{animation:fadeup .4s both}
+  /* phase transition moment */
+  #phasemo{position:fixed; inset:0; z-index:150; background:var(--bg); display:none;
+    align-items:center; justify-content:center; text-align:center; padding:32px}
+  #phasemo.on{display:flex; animation:celein .4s}
+  #phasemo .pin{max-width:340px; animation:pop .55s cubic-bezier(.22,1.4,.36,1) both}
   /* PR celebration */
   #celebrate{position:fixed; inset:0; z-index:120; display:none; overflow:hidden;
     background:radial-gradient(circle at 50% 38%, #2a2416d9, #0b0e10f5)}
@@ -233,11 +244,6 @@
   .datebar{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px}
   .datebar b{font-size:15px}
   .datebar .btn{min-height:38px; padding:7px 13px}
-  .mini{display:flex; gap:4px; align-items:flex-end; height:36px; margin-top:10px}
-  .mini i{flex:1; background:var(--sl); border-radius:3px 3px 0 0; min-height:2px; opacity:.85}
-  .mini i.off{background:var(--raised)}
-  .mini.stp i{background:var(--stp)}
-  .mini.stp i.off{background:var(--raised)}
   .pgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px}
   .pgrid button{padding:0; border-radius:10px; overflow:hidden; position:relative}
   .pgrid img{display:block; width:100%; aspect-ratio:3/4; object-fit:cover}
@@ -419,7 +425,7 @@ function defaults(){
   return {
     settings:{name:'', unit:'kg', waterGoal:3000, calGoal:2600, proteinGoal:120, carbGoal:340, fatGoal:75,
       rest:90, height:'176', goalWeight:'68', waterRemind:true, waterEvery:75, workoutRemind:'',
-      sleepRemind:'22:30', sleepGoal:8, stepGoal:8000},
+      sleepRemind:'22:30', sleepGoal:8, stepGoal:8000, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
     water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[]
@@ -2815,6 +2821,9 @@ function openSettings(){
   const st=S.settings;
   const notifState = !('Notification' in window) ? 'unsupported' : Notification.permission;
   openSheet('<h3>Settings</h3>'+
+    '<div class="field"><label>Appearance</label><div class="seg">'+
+    '<button class="'+(st.theme!=='light'?'on':'')+'" onclick="setTheme(\'dark\')">Dark</button>'+
+    '<button class="'+(st.theme==='light'?'on':'')+'" onclick="setTheme(\'light\')">Light</button></div></div>'+
     '<div class="field"><label for="sName">Your name</label><input id="sName" value="'+esc(st.name)+'" placeholder="How should I greet you?"></div>'+
     '<div class="fields2">'+
     '<div class="field"><label for="sUnit">Weight unit</label><select id="sUnit"><option'+(st.unit==='kg'?' selected':'')+'>kg</option><option'+(st.unit==='lb'?' selected':'')+'>lb</option></select></div>'+
@@ -2959,10 +2968,43 @@ setInterval(function(){
   }
 }, 30000);
 
+/* ============ theme ============ */
+function applyTheme(){
+  document.body.classList.toggle('light', S.settings.theme==='light');
+  const m=document.querySelector('meta[name="theme-color"]');
+  if(m) m.content = S.settings.theme==='light' ? '#f3f1ea' : '#0e1214';
+}
+function setTheme(t){
+  S.settings.theme=t; save(); applyTheme(); openSettings();
+}
+
+/* ============ phase transition moment ============ */
+function phaseMoment(){
+  const ph=currentPhase();
+  if(!S.lastPhase){ S.lastPhase=ph.name; save(); return; }
+  if(S.lastPhase===ph.name) return;
+  let el=$('#phasemo');
+  if(!el){ el=document.createElement('div'); el.id='phasemo'; document.body.appendChild(el); }
+  el.innerHTML='<div class="pin">'+
+    '<div style="font-family:var(--fd-disp); font-weight:600; font-size:13px; letter-spacing:.18em; text-transform:uppercase; color:var(--wk)">Week '+programWeek()+' · New phase unlocked</div>'+
+    '<div class="serifacc" style="font-size:42px; display:block; margin:14px 0; line-height:1.15">'+ph.name.replace(/Phase \d+ — /,'')+'</div>'+
+    '<p class="small" style="color:var(--ink2); line-height:1.55">'+ph.desc+'</p>'+
+    '<button class="btn primary wide" style="margin-top:22px" onclick="phaseBegin()">Begin</button></div>';
+  el.classList.add('on');
+  beep(2); vib([100,60,160]);
+}
+function phaseBegin(){
+  S.lastPhase=currentPhase().name; save();
+  const el=$('#phasemo'); if(el) el.classList.remove('on');
+  render();
+}
+
 /* ============ boot ============ */
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSheet(); });
+applyTheme();
 setTimeout(function(){ const sp=$('#splash'); if(sp) sp.remove(); }, 1700);
 drawRestPresets();
+setTimeout(phaseMoment, 1900);
 if(S.settings.hiit){
   $('#hiWork').value=S.settings.hiit.w; $('#hiRest').value=S.settings.hiit.r; $('#hiRounds').value=S.settings.hiit.n;
 }

@@ -163,6 +163,24 @@ function check(name, cond, detail) {
   });
   check('no XSS from exercise/routine names', xss.fired === 0 && !xss.injected, xss);
 
+  console.log('theme + phase moment');
+  await page.evaluate(() => setTheme('light'));
+  const th1 = await page.evaluate(() => document.body.classList.contains('light'));
+  await page.reload(); await page.waitForTimeout(400);
+  const th2 = await page.evaluate(() => ({ light: document.body.classList.contains('light'), stored: S.settings.theme }));
+  check('light theme applies + persists', th1 && th2.light && th2.stored === 'light', th2);
+  await page.evaluate(() => setTheme('dark'));
+  const pm = await page.evaluate(() => {
+    S.lastPhase = 'Phase 0 — Rebuild';
+    const real = currentPhase().name;
+    S.lastPhase = 'Phase X — Fake old'; save();
+    phaseMoment();
+    const shown = !!document.querySelector('#phasemo.on');
+    phaseBegin();
+    return { shown, after: S.lastPhase === real, closed: !document.querySelector('#phasemo.on') };
+  });
+  check('phase transition moment fires + resolves', pm.shown && pm.after && pm.closed, pm);
+
   console.log('PR celebration (motion on)');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   const cel = await page.evaluate(() => {
