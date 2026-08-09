@@ -100,6 +100,10 @@
   .setrow.wu input{opacity:.45}
   .idx.wu{color:var(--wk)}
   button.idx{cursor:pointer; min-height:36px}
+  .exfig .fs{stroke:var(--ink3); fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round}
+  .exfig .fe{stroke:var(--wk); fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round}
+  .exfig .fa{stroke:var(--ink2); fill:none; stroke-width:2; stroke-dasharray:4 4}
+  .exfig .fg{stroke:var(--line); stroke-width:2}
 
   .exblock{border-top:1px solid var(--line); padding-top:14px; margin-top:14px}
   .exblock:first-of-type{border-top:0; padding-top:0; margin-top:0}
@@ -330,7 +334,7 @@ function defaults(){
       sleepRemind:'22:30', sleepGoal:8, stepGoal:8000},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}, photos:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}
   };
 }
 let S;
@@ -470,6 +474,18 @@ const HIST=[
     const ids=r.ex.map(function(n){ const e=S.exercises.find(function(x){return x.name===n;}); return e&&e.id; }).filter(Boolean);
     if(ids.length) S.routines.push({id:uid(), name:r.name, exIds:ids});
   });
+  save();
+})();
+/* v7: the user's actual supplement stack */
+(function seedV7(){
+  if(S.seedV7) return; S.seedV7=true;
+  if(!S.supps.length){
+    S.supps=[
+      {id:uid(), name:'Creatine 5g — GNC monohydrate', kcal:0, p:0, c:0, f:0, logFood:false},
+      {id:uid(), name:'Whey — Avatar Malay Kulfi (1 scoop)', kcal:150, p:27.5, c:4, f:2, logFood:true},
+      {id:uid(), name:'Casein — before bed', kcal:120, p:24, c:4, f:1, logFood:true}
+    ];
+  }
   save();
 })();
 /* v6: default weekly plan (injury-safe comeback schedule) */
@@ -646,6 +662,87 @@ const CUES={
   'Burpee broad jump':'Land soft with bent knees; step back instead of jumping back while the wrists heal.',
   'Farmer’s carry':'Tall posture, packed shoulders, quick small steps; tight grip, neutral wrists.'
 };
+/* movement-pattern diagrams: grey = start, amber = finish */
+const STAND_A='<circle cx="55" cy="22" r="6.5" class="fs"/><polyline points="55,29 55,62" class="fs"/><polyline points="55,36 63,54" class="fs"/><polyline points="55,62 52,86 53,110" class="fs"/><polyline points="55,62 59,86 58,110" class="fs"/>';
+const PATTERNS={
+  squat:{label:'Squat pattern — sit down between the heels', svg:STAND_A+
+    '<circle cx="145" cy="51" r="6.5" class="fe"/><polyline points="143,58 137,80" class="fe"/><polyline points="141,63 155,67" class="fe"/><polyline points="137,80 156,93 150,110" class="fe"/><polyline points="137,80 152,96 146,110" class="fe"/><path d="M85,55 Q100,82 118,74" class="fa"/>'},
+  hinge:{label:'Hip hinge — hips back, back flat', svg:STAND_A+
+    '<circle cx="165" cy="57" r="6.5" class="fe"/><polyline points="136,72 158,60" class="fe"/><polyline points="158,60 158,86" class="fe"/><circle cx="158" cy="91" r="5" class="fe"/><polyline points="136,72 144,92 140,110" class="fe"/><polyline points="136,72 140,94 136,110" class="fe"/><path d="M85,55 Q104,72 120,66" class="fa"/>'},
+  vpush:{label:'Vertical press — ribs down, finish by the ear', svg:
+    '<circle cx="55" cy="22" r="6.5" class="fs"/><polyline points="55,29 55,62" class="fs"/><polyline points="55,36 64,32" class="fs"/><circle cx="67" cy="30" r="4" class="fs"/><polyline points="55,62 52,86 53,110" class="fs"/><polyline points="55,62 59,86 58,110" class="fs"/>'+
+    '<circle cx="145" cy="26" r="6.5" class="fe"/><polyline points="145,33 145,64" class="fe"/><polyline points="145,38 150,14" class="fe"/><circle cx="151" cy="11" r="4" class="fe"/><polyline points="145,64 142,88 143,110" class="fe"/><polyline points="145,64 149,88 148,110" class="fe"/><path d="M85,40 Q110,30 128,22" class="fa"/>'},
+  vpull:{label:'Vertical pull — elbows drive to the ribs', svg:
+    '<line x1="100" y1="14" x2="192" y2="14" class="fg"/>'+
+    '<circle cx="125" cy="32" r="6.5" class="fs"/><polyline points="125,39 125,66" class="fs"/><polyline points="125,39 118,14" class="fs"/><polyline points="125,39 132,14" class="fs"/><polyline points="125,66 128,86 125,102" class="fs"/>'+
+    '<circle cx="168" cy="24" r="6.5" class="fe"/><polyline points="168,31 168,58" class="fe"/><polyline points="168,31 160,14" class="fe"/><polyline points="168,31 176,14" class="fe"/><polyline points="168,58 171,78 168,96" class="fe"/><path d="M138,50 Q150,38 158,32" class="fa"/>'},
+  hpush:{label:'Horizontal press — bar over the chest, wrists stacked', svg:
+    '<line x1="55" y1="86" x2="150" y2="86" class="fg"/><line x1="66" y1="86" x2="66" y2="102" class="fg"/><line x1="140" y1="86" x2="140" y2="102" class="fg"/>'+
+    '<circle cx="58" cy="78" r="6.5" class="fs"/><polyline points="67,80 112,80" class="fs"/><polyline points="112,80 128,92 128,110" class="fs"/>'+
+    '<polyline points="80,80 92,68" class="fs"/><circle cx="95" cy="65" r="4" class="fs"/>'+
+    '<polyline points="80,80 80,48" class="fe"/><circle cx="80" cy="44" r="4" class="fe"/><path d="M96,62 Q92,50 86,48" class="fa"/>'},
+  hpull:{label:'Row — pull to the lower ribs, back stays flat', svg:
+    '<polyline points="90,72 96,92 92,110" class="fs"/><polyline points="90,72 92,94 88,110" class="fs"/><polyline points="90,72 116,52" class="fs"/><circle cx="123" cy="48" r="6.5" class="fs"/>'+
+    '<polyline points="114,54 118,80" class="fs"/><circle cx="118" cy="85" r="4" class="fs"/>'+
+    '<polyline points="114,54 106,64" class="fe"/><circle cx="104" cy="68" r="4" class="fe"/><path d="M120,78 Q112,74 108,68" class="fa"/>'},
+  lunge:{label:'Lunge — both knees to 90°, torso tall', svg:STAND_A+
+    '<circle cx="140" cy="31" r="6.5" class="fe"/><polyline points="140,38 140,66" class="fe"/><polyline points="140,44 148,58" class="fe"/><polyline points="140,66 158,88 158,110" class="fe"/><polyline points="140,66 128,92 116,106" class="fe"/><path d="M85,55 Q100,78 116,72" class="fa"/>'},
+  carry:{label:'Loaded carry — tall, tight grip, small steps', svg:
+    '<circle cx="100" cy="22" r="6.5" class="fe"/><polyline points="100,29 100,62" class="fe"/><polyline points="100,36 94,64" class="fe"/><circle cx="94" cy="70" r="5" class="fe"/><polyline points="100,36 106,64" class="fe"/><circle cx="106" cy="70" r="5" class="fe"/><polyline points="100,62 92,88 86,110" class="fe"/><polyline points="100,62 108,86 114,108" class="fe"/><path d="M130,58 L162,58" class="fa"/>'},
+  core:{label:'Plank — one straight line, hips level', svg:
+    '<circle cx="54" cy="82" r="6.5" class="fe"/><polyline points="62,88 60,104" class="fe"/><polyline points="52,104 72,104" class="fe"/><polyline points="62,88 128,96" class="fe"/><polyline points="128,96 158,106 163,110" class="fe"/>'},
+  stretch:{label:'Stretch — ease in, breathe, no bouncing', svg:
+    '<polyline points="100,64 100,110" class="fe"/><polyline points="105,64 105,110" class="fe"/><polyline points="102,64 88,88" class="fe"/><circle cx="85" cy="95" r="6.5" class="fe"/><polyline points="88,88 90,106" class="fe"/>'},
+  curl:{label:'Elbow flexion — elbow pinned, no swinging', svg:
+    '<circle cx="90" cy="22" r="6.5" class="fe"/><polyline points="90,29 90,62" class="fe"/><polyline points="90,62 87,86 88,110" class="fe"/><polyline points="90,62 94,86 93,110" class="fe"/>'+
+    '<polyline points="90,36 96,62" class="fs"/><circle cx="97" cy="67" r="4" class="fs"/>'+
+    '<polyline points="90,36 98,52 88,44" class="fe"/><circle cx="85" cy="42" r="4" class="fe"/><path d="M102,62 Q106,50 96,44" class="fa"/>'},
+  raise:{label:'Raise — to shoulder height, lead with elbows', svg:
+    '<circle cx="90" cy="22" r="6.5" class="fe"/><polyline points="90,29 90,62" class="fe"/><polyline points="90,62 87,86 88,110" class="fe"/><polyline points="90,62 94,86 93,110" class="fe"/>'+
+    '<polyline points="90,36 94,62" class="fs"/><circle cx="95" cy="66" r="4" class="fs"/>'+
+    '<polyline points="90,36 116,34" class="fe"/><circle cx="121" cy="34" r="4" class="fe"/><path d="M100,60 Q116,52 118,40" class="fa"/>'},
+  cardio:{label:'Steady effort — a pace you could talk through', svg:
+    '<circle cx="92" cy="20" r="6.5" class="fe"/><polyline points="92,27 100,56" class="fe"/><polyline points="94,34 106,42 114,34" class="fe"/><polyline points="94,34 84,44" class="fe"/><polyline points="100,56 114,74 110,96" class="fe"/><polyline points="100,56 90,80 80,102" class="fe"/><path d="M50,40 L66,40" class="fa"/><path d="M44,52 L60,52" class="fa"/>'}
+};
+const PATTERN_STEPS={
+  squat:['Feet shoulder-width, toes slightly out.','Sit the hips down and back; knees track over the toes.','Drive through the whole foot to stand tall.'],
+  hinge:['Soft knees, chest proud.','Push the hips straight back until the hamstrings load.','Squeeze the glutes to stand — don’t lift with the lower back.'],
+  hpush:['Shoulder blades pinched, feet planted.','Lower under control to the chest.','Press up and slightly back, wrists stacked straight.'],
+  vpush:['Ribs down, glutes tight before the press.','Press until the arm finishes by your ear.','Lower under control back to the shoulders.'],
+  vpull:['Start from active shoulders, not a dead hang.','Drive the elbows down toward the ribs.','Lower slowly — the way down builds the back.'],
+  hpull:['Hinge and keep the back flat.','Pull the weight to the lower ribs.','Lower slowly without twisting.'],
+  lunge:['Take a long step, torso tall.','Lower until both knees reach ~90°.','Push through the front heel to return.'],
+  carry:['Stand tall, shoulders packed down.','Grip tight, wrists neutral.','Walk with quick, small steps.'],
+  core:['Elbows under the shoulders.','Squeeze glutes and abs into one straight line.','Keep breathing; never let the hips sag.'],
+  stretch:['Ease in — no bouncing.','Hold 45–60 seconds per side, breathing slowly.','Stretch to tension, never into sharp pain.'],
+  curl:['Elbows pinned to your sides.','Curl up without swinging the body.','Lower slowly on a 2–3 count.'],
+  raise:['Slight bend in the elbow throughout.','Raise to shoulder height, no higher.','Lead with the elbows, not the hands.'],
+  cardio:['Start easier than feels necessary.','Hold a pace where short sentences are possible.','Finish feeling able to do a little more.']
+};
+function patternOf(n,g){
+  n=n.toLowerCase();
+  if(g==='Mobility') return /hang/.test(n) ? 'vpull' : 'stretch';
+  if(g==='Cardio') return 'cardio';
+  if(/leg extension|leg curl|calf/.test(n)) return null;
+  if(/bench|push[- ]?up|fly|crossover|dip/.test(n)) return 'hpush';
+  if(/split|bulgarian|lunge|step[- ]?up/.test(n)) return 'lunge';
+  if(/squat|leg press|wall sit|wall ball|burpee|jump|climber|jack|knees|bear/.test(n)) return 'squat';
+  if(/deadlift|swing|thrust|bridge/.test(n)) return 'hinge';
+  if(/pulldown|pull[- ]?up|chin/.test(n)) return 'vpull';
+  if(/row|face pull|reverse fly/.test(n)) return 'hpull';
+  if(/carry/.test(n)) return 'carry';
+  if(/plank|crunch|leg raise|sit[- ]?up/.test(n)) return 'core';
+  if(/curl|pushdown|extension|skull/.test(n)) return 'curl';
+  if(/raise/.test(n)) return 'raise';
+  if(/press/.test(n)) return 'vpush';
+  return null;
+}
+function patternSVG(p){
+  const d=PATTERNS[p]; if(!d) return '';
+  return '<svg viewBox="0 0 200 124" class="exfig" style="width:100%; max-width:270px; display:block; margin:2px auto 2px" role="img" aria-label="'+d.label+'">'+
+    '<line x1="8" y1="112" x2="192" y2="112" class="fg"/>'+d.svg+'</svg>'+
+    '<div class="tiny muted" style="text-align:center; margin-bottom:12px">'+d.label+'</div>';
+}
 function todaysPlanRoutine(){
   const id=(S.plan||{})[new Date().getDay()];
   return id ? S.routines.find(function(r){return r.id===id;})||null : null;
@@ -679,6 +776,54 @@ function customWater(){
   const v=prompt('Millilitres to add (negative to correct):');
   const n=Math.round(+v||0);
   if(n) addWater(n);
+}
+/* ============ supplements ============ */
+function toggleSupp(id){
+  const d=today(); S.suppLog[d]=S.suppLog[d]||{};
+  const cur=S.suppLog[d][id];
+  const sp=S.supps.find(function(x){return x.id===id;}); if(!sp) return;
+  if(cur){
+    if(typeof cur==='string'){
+      const day=S.food[d]||{};
+      day.s=(day.s||[]).filter(function(e){return e.id!==cur;});
+    }
+    delete S.suppLog[d][id];
+  } else {
+    let fid=1;
+    if(sp.logFood){
+      const e={id:uid(), name:esc(sp.name), kcal:+sp.kcal||0, p:+sp.p||0, c:+sp.c||0, f:+sp.f||0};
+      const day=S.food[d]=S.food[d]||{};
+      (day.s=day.s||[]).push(e); fid=e.id;
+      toast(sp.p? '+'+sp.p+'g protein logged to snacks' : sp.name+' ✓');
+    }
+    S.suppLog[d][id]=fid;
+  }
+  save(); renderToday();
+}
+function suppEditor(){
+  openSheet('<h3>Supplements</h3>'+
+    (S.supps.length? S.supps.map(function(sp){
+      return '<div class="listrow"><span class="small">'+esc(sp.name)+
+        (sp.p?' <span class="tiny muted num">· '+sp.kcal+' kcal / '+sp.p+'g P</span>':'')+
+        (sp.logFood?' <span class="tiny muted">→ food log</span>':'')+'</span>'+
+        '<button class="btn ghost sm danger" onclick="delSupp(\''+sp.id+'\')">✕</button></div>';
+    }).join('') : '<p class="tiny muted">Nothing yet.</p>')+
+    '<div class="field" style="margin-top:14px"><label for="spName">New supplement</label><input id="spName" placeholder="e.g. Vitamin D, Omega-3, Whey"></div>'+
+    '<div class="fields3">'+
+    '<div class="field"><label for="spK">kcal</label><input id="spK" type="number" inputmode="numeric" placeholder="0"></div>'+
+    '<div class="field"><label for="spP">Protein g</label><input id="spP" type="number" inputmode="decimal" placeholder="0"></div>'+
+    '<div class="field"><label for="spC">Carbs g</label><input id="spC" type="number" inputmode="numeric" placeholder="0"></div></div>'+
+    '<label class="row small" style="gap:8px; cursor:pointer; margin:4px 0 12px"><input type="checkbox" id="spLog" checked style="width:20px; height:20px; accent-color:var(--fd)">Add to food log when ticked</label>'+
+    '<button class="btn food wide" onclick="addSupp()">Add supplement</button>');
+}
+function addSupp(){
+  const name=$('#spName').value.trim(); if(!name){ toast('Name it first'); return; }
+  S.supps.push({id:uid(), name:name, kcal:+$('#spK').value||0, p:+$('#spP').value||0, c:+$('#spC').value||0, f:0, logFood:$('#spLog').checked});
+  save(); suppEditor(); toast('Added');
+}
+function delSupp(id){
+  S.supps=S.supps.filter(function(s){return s.id!==id;});
+  save(); suppEditor();
 }
 function logSleepForm(){
   const cur=S.sleep[today()]||{};
@@ -956,6 +1101,18 @@ function renderToday(){
     '<div class="spread"><span class="small">Protein</span><span class="small num"><b>'+Math.round(ft.p)+'</b> / '+st.proteinGoal+' g</span></div>'+
     '<div class="bar" style="margin:6px 0 12px"><i style="width:'+(pp*100)+'%; background:var(--fd)"></i></div>'+
     '<button class="btn wide" onclick="go(\'food\')">Log food</button></div>';
+  /* supplements */
+  if(S.supps.length){
+    const slog=S.suppLog[today()]||{};
+    h+='<div class="card"><h2><span class="dot" style="background:var(--fd)"></span>Supplements</h2>'+
+      S.supps.map(function(sp){
+        const on=!!slog[sp.id];
+        return '<label class="listrow" style="cursor:pointer"><span class="small"'+(on?' style="opacity:.6"':'')+'>'+esc(sp.name)+
+          (sp.p?' <span class="tiny muted num">· '+sp.p+'g protein</span>':'')+'</span>'+
+          '<input type="checkbox" '+(on?'checked':'')+' onchange="toggleSupp(\''+sp.id+'\')" style="width:22px; height:22px; accent-color:var(--fd)"></label>';
+      }).join('')+
+      '<div class="row" style="margin-top:8px"><a href="#" class="tiny" style="color:var(--ink2)" onclick="suppEditor();return false">Edit supplements</a></div></div>';
+  }
   /* body */
   h+='<div class="card"><h2><span class="dot" style="background:var(--bd)"></span>Body</h2><div class="spread">';
   h+= lastW
@@ -1296,7 +1453,12 @@ function delExercise(id){ if(!confirm('Delete exercise? Past logs keep their dat
 function openExInfo(exId){
   const name=exName(exId), g=exGroupOf(exId);
   let h='<h3>'+esc(name)+'</h3><div class="tiny muted" style="margin:-8px 0 12px">'+esc(g)+'</div>';
-  if(CUES[name]) h+='<p class="small" style="margin-bottom:14px; color:var(--ink2)">💡 '+CUES[name]+'</p>';
+  const pat=patternOf(name,g);
+  if(pat && PATTERNS[pat]) h+=patternSVG(pat);
+  if(CUES[name]) h+='<p class="small" style="margin-bottom:12px; color:var(--ink2)">💡 '+CUES[name]+'</p>';
+  const steps=PATTERN_STEPS[pat];
+  if(steps) h+='<ol class="small" style="margin:0 0 12px 20px; color:var(--ink2)">'+steps.map(function(s){return '<li style="margin-bottom:4px">'+s+'</li>';}).join('')+'</ol>';
+  h+='<a class="btn wide" style="margin-bottom:14px; text-decoration:none" target="_blank" rel="noopener" href="https://www.youtube.com/results?search_query='+encodeURIComponent(name+' how to proper form')+'">▶ Watch form videos</a>';
   if(g==='Cardio'){
     const cb=cardioBest(exId);
     h+= cb
@@ -1813,7 +1975,7 @@ function resetAll(){
 }
 
 /* ============ reminders engine ============ */
-let lastDrinkTs=Date.now(), lastRemindTs=0, wkRemindedOn='', slRemindedOn='', remFiredOn={};
+let lastDrinkTs=Date.now(), lastRemindTs=0, wkRemindedOn='', slRemindedOn='', spRemindedOn='', remFiredOn={};
 setInterval(function(){
   const st=S.settings, now=new Date(), hr=now.getHours();
   const hm=pad(hr)+':'+pad(now.getMinutes());
@@ -1826,6 +1988,12 @@ setInterval(function(){
     remFiredOn[r.id]=today();
     notify('⏰ '+r.label,'', true);
   });
+  if(S.supps.length && spRemindedOn!==today() && hm==='21:00'){
+    spRemindedOn=today();
+    const missed=S.supps.filter(function(sp){ return !(S.suppLog[today()]||{})[sp.id]; })
+      .map(function(sp){ return sp.name.split(' — ')[0]; });
+    if(missed.length) notify('Supplements pending 💊', missed.join(', '), true);
+  }
   if(st.waterRemind && hr>=8 && hr<22){
     const since=Date.now()-Math.max(lastDrinkTs,lastRemindTs);
     if(since > st.waterEvery*60000){
