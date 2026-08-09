@@ -129,6 +129,18 @@
   .tpanel{display:none}
   .tpanel.on{display:block}
   #rest .clock{font-size:68px}
+  /* dashboard tiles */
+  .tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px}
+  .tile{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:13px; text-align:left; display:block; width:100%}
+  .tile:active{background:var(--raised)}
+  .tile .tl{font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); display:flex; justify-content:space-between; align-items:center}
+  .tile .tv{font-size:22px; font-weight:800; letter-spacing:-.02em; margin-top:5px}
+  .tile .ts{font-size:11.5px; color:var(--ink2); font-weight:500}
+  .pp{font-size:11px; font-weight:700; padding:4px 11px; border-radius:99px; background:var(--raised); color:var(--ink3); border:1px solid var(--line)}
+  .pp.on{background:#4fc98a1f; color:var(--good); border-color:#4fc98a44}
+  #liveBar{position:fixed; left:12px; right:12px; bottom:calc(78px + env(safe-area-inset-bottom)); z-index:44;
+    background:var(--wk); color:#191106; border-radius:14px; padding:13px 18px; display:none;
+    align-items:center; justify-content:space-between; font-weight:700; font-size:15px; box-shadow:0 8px 28px #000a}
   .laps{max-height:180px; overflow-y:auto; margin-top:10px}
   .laps .listrow{padding:8px 2px}
 
@@ -291,6 +303,8 @@
       <button class="btn primary" onclick="restSkip()">Skip</button>
     </div>
   </div></div>
+
+  <button id="liveBar" onclick="go('workout')"><span>🏋️ Workout in progress</span><b class="num" id="lbTime">0:00</b></button>
 
   <div id="toast" role="status"></div>
 </div>
@@ -751,6 +765,8 @@ function render(){
   else if(TAB==='workout') renderWorkout();
   else if(TAB==='food') renderFood();
   else if(TAB==='body') renderBody();
+  const lb=$('#liveBar');
+  if(lb) lb.style.display = (S.active && TAB!=='workout') ? 'flex' : 'none';
 }
 
 /* ============ sheet ============ */
@@ -998,6 +1014,35 @@ function customWater(){
   const v=prompt('Millilitres to add (negative to correct):');
   const n=Math.round(+v||0);
   if(n) addWater(n);
+}
+function waterSheet(){
+  const st=S.settings, w=waterToday();
+  const notifOK=('Notification' in window) && Notification.permission==='granted';
+  const trained=S.sessions.some(function(s){return s.date===today();});
+  openSheet('<h3>Water</h3><div class="row" style="gap:18px">'+
+    ring(w/st.waterGoal,'var(--wa)',118, Math.round(w/1000*10)/10+'L', 'of '+(st.waterGoal/1000)+'L')+
+    '<div class="grow"><div class="row wrap" style="gap:8px">'+
+      '<button class="btn water sm" onclick="addWater(250);waterSheet()">+250</button>'+
+      '<button class="btn water sm" onclick="addWater(500);waterSheet()">+500</button>'+
+      '<button class="btn sm" onclick="addWater(150);waterSheet()">+150</button>'+
+      '<button class="btn sm" onclick="addWater(1000);waterSheet()">+1L</button>'+
+      '<button class="btn sm" onclick="customWater();waterSheet()">custom</button>'+
+      '<button class="btn ghost sm" onclick="addWater(-250);waterSheet()">−250</button></div></div></div>'+
+    '<p class="tiny muted" style="margin-top:14px">'+waterPace(w,st.waterGoal)+
+      (trained? 'Training day — aim ~500ml extra. ':'')+
+      (st.waterRemind ? 'Reminders every '+st.waterEvery+' min (8:00–22:00).' : 'Reminders off — turn on in Settings.')+
+      (st.waterRemind && !notifOK ? ' <a href="#" onclick="askNotify();return false">Allow notifications</a>' : '')+'</p>');
+}
+function checklistSheet(){
+  const slog=S.suppLog[today()]||{};
+  openSheet('<h3>Daily checklist</h3>'+
+    S.supps.map(function(sp){
+      const on=!!slog[sp.id];
+      return '<label class="listrow" style="cursor:pointer"><span class="small"'+(on?' style="opacity:.55"':'')+'>'+esc(sp.name)+
+        (sp.p?' <span class="tiny muted num">· '+sp.p+'g protein</span>':'')+'</span>'+
+        '<input type="checkbox" '+(on?'checked':'')+' onchange="toggleSupp(\''+sp.id+'\')" style="width:23px; height:23px; accent-color:var(--fd)"></label>';
+    }).join('')+
+    '<div class="row" style="margin-top:12px"><a href="#" class="tiny" style="color:var(--ink2)" onclick="suppEditor();return false">Edit list</a></div>');
 }
 /* ============ supplements ============ */
 function toggleSupp(id){
@@ -1256,108 +1301,87 @@ function renderToday(){
         : 'One tap and your water, workout, sleep and custom reminders can ring properly. Reminders fire while the app is open.')+
       '</div></button>';
   }
-  /* program phase */
+  /* ===== hero: day ring + today's focus ===== */
   const pwk=programWeek(), pph=currentPhase();
-  h+='<button class="card" style="width:100%; text-align:left; display:block" onclick="phaseInfo()">'+
-    '<div class="spread"><span class="small"><b>Week '+pwk+'</b> · '+pph.name+'</span><span class="muted">›</span></div></button>';
-  /* water */
-  h+='<div class="card"><h2><span class="dot" style="background:var(--wa)"></span>Water</h2>'+
-    '<div class="row" style="gap:16px">'+
-    ring(w/st.waterGoal,'var(--wa)',118, Math.round(w/1000*10)/10+'L', 'of '+(st.waterGoal/1000)+'L')+
-    '<div class="grow"><div class="row wrap" style="gap:8px">'+
-      '<button class="btn water sm" onclick="addWater(250)">+250ml</button>'+
-      '<button class="btn water sm" onclick="addWater(500)">+500ml</button>'+
-      '<button class="btn sm" onclick="addWater(150)">+150</button>'+
-      '<button class="btn sm" onclick="addWater(1000)">+1L</button>'+
-      '<button class="btn sm" onclick="customWater()">custom</button>'+
-      '<button class="btn ghost sm" onclick="addWater(-250)">undo −250</button></div>'+
-    '<p class="tiny muted" style="margin-top:10px">'+waterPace(w,st.waterGoal)+
-      (sToday.length? 'Training day — aim ~500ml extra. ':'')+
-      (st.waterRemind ? 'Reminders every '+st.waterEvery+' min (8:00–22:00)' : 'Reminders off — turn on in Settings')+
-      (st.waterRemind && !notifOK ? ' · <a href="#" onclick="askNotify();return false">allow notifications</a>' : '')+
-    '</p></div></div></div>';
-  /* sleep */
+  const planRt=todaysPlanRoutine(), brk=activeBreak(today());
   const sl=S.sleep[today()], sg=+st.sleepGoal||8;
-  let bars='', sum=0, cnt=0;
-  for(let i=6;i>=0;i--){
-    const e=S.sleep[dShift(today(),-i)];
-    if(e){ sum+=e.hrs; cnt++; }
-    bars+='<i class="'+(e?'':'off')+'" style="height:'+(e?Math.max(6,Math.min(1,e.hrs/sg)*36):4)+'px'+(e&&e.q==='g'?'; opacity:.45':'')+'" title="'+(e?e.hrs+'h':'—')+'"></i>';
-  }
-  h+='<div class="card"><h2><span class="dot" style="background:var(--sl)"></span>Sleep</h2>'+
-    '<div class="spread"><div>'+
-    (sl ? '<span class="big num" style="font-size:26px">'+sl.hrs+'h</span>'+(sl.q?'<span class="tiny" style="color:var(--'+(sl.q==='r'?'good':'bad')+')"> · woke '+(sl.q==='r'?'rested':'groggy')+'</span>':'')+'<div class="tiny muted num">'+sl.bed+' → '+sl.wake+(cnt>1?' · 7-day avg '+(Math.round(sum/cnt*10)/10)+'h':'')+'</div>'
-        : '<b>Last night not logged</b><div class="tiny muted">Aim: in bed by 11pm, '+sg+'h goal'+(st.sleepRemind?' · wind-down ping at '+st.sleepRemind:'')+'</div>')+
-    '</div><button class="btn" style="background:var(--sl); border-color:var(--sl); color:#101526" onclick="logSleepForm()">Log sleep</button></div>'+
-    '<div class="mini" aria-label="last 7 nights">'+bars+'</div></div>';
-  /* steps */
   const stp=S.steps[today()]||0, sgoal=+st.stepGoal||8000;
-  let sbars='';
-  for(let i=6;i>=0;i--){
-    const v=S.steps[dShift(today(),-i)]||0;
-    sbars+='<i class="'+(v?'':'off')+'" style="height:'+(v?Math.max(6,Math.min(1,v/sgoal)*36):4)+'px" title="'+v.toLocaleString()+'"></i>';
-  }
-  h+='<div class="card"><h2><span class="dot" style="background:var(--stp)"></span>Steps</h2>'+
-    '<div class="spread"><div><span class="big num" style="font-size:26px">'+stp.toLocaleString()+'</span>'+
-    '<div class="tiny muted num">of '+sgoal.toLocaleString()+' · copy from your phone’s health app</div></div>'+
-    '<button class="btn" style="background:var(--stp); border-color:var(--stp); color:#0a1f19" onclick="stepsForm()">Enter steps</button></div>'+
-    '<div class="bar" style="margin-top:10px"><i style="width:'+(Math.min(1,stp/sgoal)*100)+'%; background:var(--stp)"></i></div>'+
-    '<div class="mini stp" aria-label="last 7 days of steps">'+sbars+'</div></div>';
-  /* workout — plan-driven */
-  const planRt=todaysPlanRoutine();
-  h+='<div class="card"><h2><span class="dot" style="background:var(--wk)"></span>Today’s workout</h2>';
+  const slog=S.suppLog[today()]||{};
+  const suppDone=S.supps.filter(function(sp){return !!slog[sp.id];}).length;
+  const pillars=[
+    {l:'Train', on: sToday.length>0 || (!planRt && !S.active)},
+    {l:'Water', on: w>=st.waterGoal},
+    {l:'Protein', on: ft.p>=(+st.proteinGoal||120)*0.8},
+    {l:'Steps', on: stp>=sgoal},
+    {l:'Sleep', on: !!sl}
+  ];
+  const pdone=pillars.filter(function(p){return p.on;}).length;
+  h+='<div class="card">'+
+    '<button class="tiny muted" style="display:block; margin-bottom:10px" onclick="phaseInfo()">Week '+pwk+' · '+pph.name+' ›</button>'+
+    '<div class="row" style="gap:16px">'+
+    ring(pdone/5,'var(--wk)',104, pdone+'/5', 'today')+
+    '<div class="grow">';
   if(S.active){
-    h+='<div class="spread"><div><b>Session in progress</b><div class="tiny muted">'+S.active.ex.length+' exercises</div></div>'+
-       '<button class="btn primary" onclick="go(\'workout\')">Resume</button></div>';
+    h+='<b style="font-size:17px">Session in progress</b><div class="tiny muted" style="margin:2px 0 10px">'+S.active.ex.length+' exercises</div>'+
+       '<button class="btn primary wide" onclick="go(\'workout\')">Resume workout</button>';
   } else if(sToday.length){
     const s=sToday[sToday.length-1];
-    h+='<div class="spread"><div><b>Done for today ✓</b><div class="tiny muted">'+esc(s.name)+' · '+s.ex.length+(s.ex.length===1?' exercise · ':' exercises · ')+Math.round(s.vol).toLocaleString()+' '+unit()+' volume</div></div>'+
-       '<div class="tiny muted num">'+wk7+'/wk</div></div>';
+    h+='<b style="font-size:17px">Done for today ✓</b><div class="tiny muted" style="margin:2px 0 10px">'+esc(s.name)+' · '+Math.round(s.vol).toLocaleString()+' '+unit()+'</div>'+
+       '<button class="btn wide" onclick="go(\'workout\')">View</button>';
   } else if(planRt){
     h+='<b style="font-size:17px">'+esc(planRt.name)+'</b>'+
-       '<div class="tiny muted" style="margin:3px 0 12px">'+planRt.exIds.map(exName).slice(0,4).join(' · ')+(planRt.exIds.length>4?' +'+(planRt.exIds.length-4):'')+'</div>'+
-       '<button class="btn primary wide" onclick="startSession(\''+planRt.id+'\')">Start today’s workout</button>';
-  } else if(activeBreak(today())){
-    const bk=activeBreak(today());
-    h+='<div class="spread"><div><b>🎉 '+esc(bk.label||'Planned break')+'</b><div class="tiny muted">Break until '+fmtD(bk.to)+'. Maintenance mode: walk, water, protein, sleep — zero guilt.</div></div>'+
-       '<button class="btn ghost" onclick="go(\'workout\')">Browse</button></div>';
+       '<div class="tiny muted" style="margin:2px 0 10px">'+planRt.exIds.map(exName).slice(0,3).join(' · ')+(planRt.exIds.length>3?' +'+(planRt.exIds.length-3):'')+'</div>'+
+       '<button class="btn primary wide" onclick="startSession(\''+planRt.id+'\')">Start workout</button>';
+  } else if(brk){
+    h+='<b style="font-size:17px">🎉 '+esc(brk.label||'Planned break')+'</b><div class="tiny muted" style="margin:2px 0 10px">Until '+fmtD(brk.to)+' — walk, water, protein, sleep. Zero guilt.</div>'+
+       '<button class="btn ghost wide" onclick="go(\'workout\')">Browse</button>';
   } else {
-    h+='<div class="spread"><div><b>Rest day 🛌</b><div class="tiny muted">Recovery is where the training sticks.'+(wk7>0?' '+wk7+' workout'+(wk7>1?'s':'')+' this week already.':'')+'</div></div>'+
-       '<button class="btn ghost" onclick="go(\'workout\')">Browse</button></div>';
+    h+='<b style="font-size:17px">Rest day 🛌</b><div class="tiny muted" style="margin:2px 0 10px">Recovery is where training sticks.'+(wk7>0?' '+wk7+'/wk done.':'')+'</div>'+
+       '<button class="btn ghost wide" onclick="go(\'workout\')">Browse</button>';
   }
-  h+='<div class="row" style="gap:14px; margin-top:10px"><a href="#" class="tiny" onclick="planEditor();return false" style="color:var(--ink2)">Edit weekly plan</a>'+
-     (planRt&&!sToday.length&&!S.active?'<a href="#" class="tiny" onclick="go(\'workout\');return false" style="color:var(--ink2)">Do something else</a>':'')+'</div>';
-  h+='</div>';
-  /* food */
-  const kp=Math.min(1, ft.kcal/st.calGoal), pp=Math.min(1, ft.p/st.proteinGoal);
-  h+='<div class="card"><h2><span class="dot" style="background:var(--fd)"></span>Food</h2>'+
-    '<div class="spread"><span class="small">Calories</span><span class="small num"><b>'+Math.round(ft.kcal)+'</b> / '+st.calGoal+' kcal</span></div>'+
-    '<div class="bar" style="margin:6px 0 12px"><i style="width:'+(kp*100)+'%; background:var(--fd)"></i></div>'+
-    '<div class="spread"><span class="small">Protein</span><span class="small num"><b>'+Math.round(ft.p)+'</b> / '+st.proteinGoal+' g</span></div>'+
-    '<div class="bar" style="margin:6px 0 12px"><i style="width:'+(pp*100)+'%; background:var(--fd)"></i></div>'+
-    '<button class="btn wide" onclick="go(\'food\')">Log food</button></div>';
-  /* supplements */
+  h+='</div></div>'+
+    '<div class="row wrap" style="gap:6px; margin-top:14px">'+
+    pillars.map(function(p){ return '<span class="pp'+(p.on?' on':'')+'">'+(p.on?'✓ ':'')+p.l+'</span>'; }).join('')+
+    '</div></div>';
+  /* ===== metric tiles ===== */
+  const kp=Math.min(1, ft.kcal/st.calGoal), ppr=Math.min(1, ft.p/st.proteinGoal);
+  h+='<div class="tiles">'+
+    '<button class="tile" onclick="waterSheet()"><span class="tl">Water <span style="color:var(--wa)">●</span></span>'+
+      '<div class="tv num">'+(Math.round(w/100)/10)+'<span class="ts"> / '+(st.waterGoal/1000)+' L</span></div>'+
+      '<div class="bar" style="margin-top:8px"><i style="width:'+Math.min(100,w/st.waterGoal*100)+'%; background:var(--wa)"></i></div>'+
+      '<div class="ts" style="margin-top:6px">+250 · custom → tap</div></button>'+
+    '<button class="tile" onclick="go(\'food\')"><span class="tl">Food <span style="color:var(--fd)">●</span></span>'+
+      '<div class="tv num">'+Math.round(ft.kcal)+'<span class="ts"> / '+st.calGoal+'</span></div>'+
+      '<div class="bar" style="margin-top:8px"><i style="width:'+(kp*100)+'%; background:var(--fd)"></i></div>'+
+      '<div class="ts num" style="margin-top:6px">P '+Math.round(ft.p)+'/'+st.proteinGoal+'g</div>'+
+      '<div class="bar" style="margin-top:3px"><i style="width:'+(ppr*100)+'%; background:var(--fd)"></i></div></button>'+
+    '<button class="tile" onclick="stepsForm()"><span class="tl">Steps <span style="color:var(--stp)">●</span></span>'+
+      '<div class="tv num">'+stp.toLocaleString()+'</div>'+
+      '<div class="bar" style="margin-top:8px"><i style="width:'+Math.min(100,stp/sgoal*100)+'%; background:var(--stp)"></i></div>'+
+      '<div class="ts num" style="margin-top:6px">goal '+sgoal.toLocaleString()+'</div></button>'+
+    '<button class="tile" onclick="logSleepForm()"><span class="tl">Sleep <span style="color:var(--sl)">●</span></span>'+
+      '<div class="tv num">'+(sl? sl.hrs+'h':'—')+'</div>'+
+      '<div class="bar" style="margin-top:8px"><i style="width:'+(sl?Math.min(100,sl.hrs/sg*100):0)+'%; background:var(--sl)"></i></div>'+
+      '<div class="ts" style="margin-top:6px">'+(sl? sl.bed+' → '+sl.wake+(sl.q? ' · '+(sl.q==='r'?'rested ✓':'groggy'):'') : 'log last night')+'</div></button>'+
+    '</div>';
+  /* ===== daily checklist (collapsed) ===== */
   if(S.supps.length){
-    const slog=S.suppLog[today()]||{};
-    h+='<div class="card"><h2><span class="dot" style="background:var(--fd)"></span>Supplements</h2>'+
-      S.supps.map(function(sp){
-        const on=!!slog[sp.id];
-        return '<label class="listrow" style="cursor:pointer"><span class="small"'+(on?' style="opacity:.6"':'')+'>'+esc(sp.name)+
-          (sp.p?' <span class="tiny muted num">· '+sp.p+'g protein</span>':'')+'</span>'+
-          '<input type="checkbox" '+(on?'checked':'')+' onchange="toggleSupp(\''+sp.id+'\')" style="width:22px; height:22px; accent-color:var(--fd)"></label>';
-      }).join('')+
-      '<div class="row" style="margin-top:8px"><a href="#" class="tiny" style="color:var(--ink2)" onclick="suppEditor();return false">Edit supplements</a></div></div>';
+    const pend=S.supps.filter(function(sp){return !slog[sp.id];})
+      .map(function(sp){ return sp.name.split(' — ')[0].split(' (')[0]; });
+    h+='<button class="card" style="width:100%; text-align:left; display:block" onclick="checklistSheet()">'+
+      '<div class="spread"><span class="small"><b>Daily checklist</b> <span class="muted num">'+suppDone+'/'+S.supps.length+'</span></span><span class="muted">›</span></div>'+
+      (pend.length
+        ? '<div class="tiny muted" style="margin-top:4px">Pending: '+pend.slice(0,4).join(', ')+(pend.length>4?' +'+(pend.length-4):'')+'</div>'
+        : '<div class="tiny" style="margin-top:4px; color:var(--good)">All done ✓</div>')+
+      '</button>';
   }
-  /* body */
-  h+='<div class="card"><h2><span class="dot" style="background:var(--bd)"></span>Body</h2><div class="spread">';
-  h+= lastW
-    ? '<div><span class="big num" style="font-size:26px">'+lastW.kg+' '+unit()+'</span><div class="tiny muted">last logged '+fmtD(lastW.date)+'</div></div>'
-    : '<div class="muted small">No weight logged yet</div>';
-  h+='<button class="btn body" onclick="go(\'body\')">Log weight</button></div></div>';
-  /* weekly report */
-  h+='<button class="card" style="width:100%; text-align:left; display:block" onclick="openReport()">'+
-    '<div class="spread"><b>Weekly report</b><span class="muted">›</span></div>'+
-    '<div class="tiny muted">Training, cardio, steps, sleep, food, water and weight — this week vs last</div></button>';
+  /* ===== quick links ===== */
+  h+='<div class="row wrap" style="gap:8px; margin-bottom:12px">'+
+    '<button class="chip" onclick="openReport()">📊 Report</button>'+
+    '<button class="chip num" onclick="go(\'body\')">⚖️ '+(lastW? lastW.kg+' '+unit() : 'Weight')+'</button>'+
+    '<button class="chip" onclick="planEditor()">📅 Plan</button>'+
+    '<button class="chip" onclick="go(\'body\')">📸 Photos</button>'+
+    '</div>';
   if(S.sessions.length>=3 && (!S.lastBackup || S.lastBackup<dShift(today(),-14))){
     h+='<button class="card" style="width:100%; text-align:left; display:block" onclick="openSettings()">'+
       '<span class="small muted">Your data lives only on this phone — export a backup from Settings (tap here). Last backup: '+(S.lastBackup?fmtD(S.lastBackup):'never')+'.</span></button>';
@@ -1808,9 +1832,11 @@ function delRoutine(id){ if(!confirm('Delete routine?')) return;
 
 /* session clock */
 setInterval(function(){
-  if(S.active && $('#sesTime')){
+  if(S.active){
     const s=Math.floor((Date.now()-S.active.start)/1000);
-    $('#sesTime').textContent = Math.floor(s/60)+':'+pad(s%60)+' elapsed';
+    const t=Math.floor(s/60)+':'+pad(s%60);
+    if($('#sesTime')) $('#sesTime').textContent = t+' elapsed';
+    if($('#lbTime')) $('#lbTime').textContent = t;
   }
 },1000);
 
