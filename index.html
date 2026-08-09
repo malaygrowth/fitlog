@@ -1249,6 +1249,7 @@ function renderToday(){
       '<button class="btn sm" onclick="customWater()">custom</button>'+
       '<button class="btn ghost sm" onclick="addWater(-250)">undo −250</button></div>'+
     '<p class="tiny muted" style="margin-top:10px">'+waterPace(w,st.waterGoal)+
+      (sToday.length? 'Training day — aim ~500ml extra. ':'')+
       (st.waterRemind ? 'Reminders every '+st.waterEvery+' min (8:00–22:00)' : 'Reminders off — turn on in Settings')+
       (st.waterRemind && !notifOK ? ' · <a href="#" onclick="askNotify();return false">allow notifications</a>' : '')+
     '</p></div></div></div>';
@@ -1601,7 +1602,9 @@ function finishSession(){
   });
   const dur=Math.round((Date.now()-a.start)/1000);
   const sess={id:a.id, name:a.name, date:a.date, dur:dur, vol:vol, ex:a.ex, prs:prs};
+  if(a.note) sess.note=a.note;
   S.sessions.push(sess);
+  S.sessions.sort(function(x,y){ return x.date<y.date?-1:1; });
   S.active=null; save(); WV='home'; renderWorkout();
   const total=S.sessions.length;
   if(total%10===0) setTimeout(function(){ toast('🏅 Workout #'+total+' all-time — consistency compounds'); }, 600);
@@ -1640,13 +1643,23 @@ function historyHTML(){
     });
     if(s.prs&&s.prs.length) s.prs.forEach(function(p){ h+='<div class="tiny" style="margin-top:6px; color:var(--good)">🏆 '+esc(p.ex)+' — '+p.txt+'</div>'; });
     if(s.note) h+='<div class="tiny muted" style="margin-top:8px">“'+esc(s.note)+'”</div>';
-    h+='<button class="btn sm danger" style="margin-top:10px" onclick="delSession(\''+s.id+'\')">Delete</button></details>';
+    h+='<div class="row" style="gap:8px; margin-top:10px"><button class="btn sm" onclick="editSession(\''+s.id+'\')">Edit</button>'+
+       '<button class="btn sm danger" onclick="delSession(\''+s.id+'\')">Delete</button></div></details>';
   });
   h+='</div>';
   return h;
 }
 function delSession(id){ if(!confirm('Delete this workout?')) return;
   S.sessions=S.sessions.filter(function(s){return s.id!==id;}); save(); renderWorkout(); }
+function editSession(id){
+  if(S.active){ toast('Finish or discard the current session first'); return; }
+  const i=S.sessions.findIndex(function(s){return s.id===id;});
+  if(i<0) return;
+  const s=S.sessions.splice(i,1)[0];
+  S.active={id:s.id, name:s.name, date:s.date, start:Date.now()-(s.dur||0)*1000, ex:s.ex, note:s.note};
+  save(); WV='session'; go('workout');
+  toast('Editing '+s.name+' — fix the sets, then press Finish');
+}
 function libraryHTML(){
   let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
   h+='<div class="card" style="margin-top:10px"><h2><span class="dot" style="background:var(--wk)"></span>Exercise library</h2>';
@@ -1832,7 +1845,10 @@ function swReset(){ swRun=false; clearInterval(swInt); swAcc=0; swLapsArr=[];
 let hi={run:false, phase:'ready', round:0, end:0, int:null};
 function hiToggle(){
   if(hi.run){ hi.pauseLeft=hi.end-Date.now(); hi.run=false; clearInterval(hi.int); $('#hiMain').textContent='Resume'; return; }
-  if(hi.phase==='ready'||hi.phase==='done'){ hi.phase='work'; hi.round=1; hi.end=Date.now()+(+$('#hiWork').value||30)*1000; beep(1); }
+  if(hi.phase==='ready'||hi.phase==='done'){
+    hi.phase='work'; hi.round=1; hi.end=Date.now()+(+$('#hiWork').value||30)*1000; beep(1);
+    S.settings.hiit={w:+$('#hiWork').value||40, r:+$('#hiRest').value||20, n:+$('#hiRounds').value||8}; save();
+  }
   else if(hi.pauseLeft){ hi.end=Date.now()+hi.pauseLeft; hi.pauseLeft=0; }
   hi.run=true; $('#hiMain').textContent='Pause';
   clearInterval(hi.int); hi.int=setInterval(hiTick,150); hiTick();
@@ -1916,6 +1932,20 @@ const FOODDB=[
 ['Jalebi (2 pieces, 40g)',150,1,25,5],['Ghewar (1 slice, 50g)',220,3,28,11],['Barfi (1 piece)',120,3,15,6],
 ['Rasgulla (1)',106,2,25,0.5],['Kheer (bowl)',250,7,35,9],['Sooji halwa (bowl)',300,4,40,14],
 ['Gajar halwa (bowl)',280,5,35,13],['Dark chocolate (2 squares)',110,1,10,7],
+['Gond ke laddu (1)',220,4,22,13],['Atte ka laddu / pinni (1)',180,3,20,10],['Til laddu (1)',120,3,12,7],
+['Moong dal halwa (bowl)',400,8,40,24],['Mawa kachori (1)',350,5,40,18],['Rabri (bowl)',300,8,30,17],
+['Malpua (1)',220,3,30,10],['Shrikhand (bowl)',250,6,35,9],['Imarti (1)',130,1,22,4],
+['Kulfi (1)',200,5,22,11],['Ice cream (1 scoop)',140,2,17,7],['Aam ras (bowl)',180,1,45,0.5],
+/* more local & street */
+['Panchmel dal (bowl)',180,10,25,4],['Bajre ki khichdi (bowl)',250,6,40,7],['Papad ki sabzi (bowl)',150,4,12,10],
+['Haldi ki sabzi (bowl)',200,4,10,17],['Gawar phali sabzi (bowl)',110,4,12,6],['Methi sabzi (bowl)',120,4,10,8],
+['Chana dal (bowl)',160,9,24,3],['Sambar (bowl)',130,6,20,3],['Raita (bowl)',90,3,8,5],
+['Boondi raita (bowl)',150,4,14,9],['Dahi vada (2)',220,7,25,10],['Poori (1)',120,2,15,6],
+['Chole bhature (plate)',650,14,75,30],['Bhutta / roasted corn (1)',120,4,25,2],
+['Maggi (1 pack, cooked)',350,7,50,14],['Veg fried rice (bowl)',300,6,45,10],['Veg noodles (bowl)',320,7,45,12],
+['Veg sandwich (2 slices)',250,8,35,8],['Pizza (1 slice)',250,9,30,10],['Veg burger (1)',350,9,45,14],
+['Green chutney (1 tbsp)',15,0.5,2,0.5],['Coconut chutney (2 tbsp)',60,1,3,5],['Achar / pickle (1 tsp)',25,0,1,2],
+['Sugar (1 tsp)',20,0,5,0],['Jaggery / gud (10g)',38,0,10,0],['Honey (1 tsp)',20,0,6,0],
 /* drinks */
 ['Chai with milk + sugar (1 cup)',90,2,12,3.5],['Chai no sugar (1 cup)',45,2,4,2.5],['Black coffee (1 cup)',5,0,0,0],
 ['Nimbu pani with sugar (glass)',60,0,15,0],['Chaas / buttermilk (glass)',40,2,3,1.5],['Sweet lassi (glass)',220,6,30,8],
@@ -2311,11 +2341,12 @@ setInterval(function(){
     notify('⏰ '+r.label,'', true);
     if(r.date){ S.reminders=S.reminders.filter(function(x){return x.id!==r.id;}); save(); }
   });
-  if(S.supps.length && spRemindedOn!==today() && hm==='21:00'){
+  if(spRemindedOn!==today() && hm==='21:00'){
     spRemindedOn=today();
     const missed=S.supps.filter(function(sp){ return !(S.suppLog[today()]||{})[sp.id]; })
       .map(function(sp){ return sp.name.split(' — ')[0]; });
-    if(missed.length) notify('Supplements pending 💊', missed.join(', '), true);
+    if(!S.steps[today()]) missed.push('today’s steps');
+    if(missed.length) notify('Evening check ✅', missed.join(', '), true);
   }
   if(st.waterRemind && hr>=8 && hr<22){
     const since=Date.now()-Math.max(lastDrinkTs,lastRemindTs);
@@ -2337,6 +2368,9 @@ setInterval(function(){
 /* ============ boot ============ */
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSheet(); });
 drawRestPresets();
+if(S.settings.hiit){
+  $('#hiWork').value=S.settings.hiit.w; $('#hiRest').value=S.settings.hiit.r; $('#hiRounds').value=S.settings.hiit.n;
+}
 hiReset();
 renderToday();
 </script>
