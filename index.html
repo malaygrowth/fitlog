@@ -648,6 +648,18 @@ function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toa
   });
   save();
 })();
+/* v13: omega-3 and L-theanine */
+(function seedV13(){
+  if(S.seedV13) return; S.seedV13=true;
+  [
+    ['Omega-3 — with lunch', /omega/i],
+    ['L-theanine — evening wind-down', /theanine/i]
+  ].forEach(function(sp){
+    if(!S.supps.some(function(x){return sp[1].test(x.name);}))
+      S.supps.push({id:uid(), name:sp[0], kcal:0, p:0, c:0, f:0, logFood:false});
+  });
+  save();
+})();
 /* v11: wedding break around 24–25 Nov */
 (function seedV11(){
   if(S.seedV11) return; S.seedV11=true;
