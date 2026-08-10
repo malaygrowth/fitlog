@@ -161,7 +161,7 @@
   .seg.seg4{grid-template-columns:repeat(4,1fr); margin-bottom:12px}
   .tpanel{display:none}
   .tpanel.on{display:block}
-  #rest .clock{font-family:var(--fd-disp); font-size:76px; font-weight:700; color:var(--ink)}
+  #rest .clock,#hold .clock{font-family:var(--fd-disp); font-size:76px; font-weight:700; color:var(--ink)}
   /* dashboard tiles */
   .tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px}
   .tile{background:var(--surface); border:0; border-radius:14px; padding:14px; text-align:left; display:block; width:100%}
@@ -194,15 +194,15 @@
   .fields3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px}
 
   /* rest overlay */
-  #rest{
+  #rest,#hold{
     position:fixed; left:0; right:0; bottom:0; z-index:70; display:none;
     background:linear-gradient(180deg, #1f2013 0%, #191d10 100%);
     background:var(--surface);
     border-top:2px solid var(--wk); border-radius:20px 20px 0 0;
   }
-  #rest.on{display:block}
-  #rest .in{max-width:480px; margin:0 auto; padding:16px 18px calc(22px + env(safe-area-inset-bottom)); text-align:center}
-  #rest .bar{margin:10px 0 14px}
+  #rest.on,#hold.on{display:block}
+  #rest .in,#hold .in{max-width:480px; margin:0 auto; padding:16px 18px calc(22px + env(safe-area-inset-bottom)); text-align:center}
+  #rest .bar,#hold .bar{margin:10px 0 14px}
 
   #toast{
     position:fixed; left:50%; transform:translateX(-50%); bottom:calc(96px + env(safe-area-inset-bottom));
@@ -364,6 +364,16 @@
       <button class="btn" onclick="restAdd(-15)">−15s</button>
       <button class="btn" onclick="restAdd(15)">+15s</button>
       <button class="btn primary" onclick="restSkip()">Skip</button>
+    </div>
+  </div></div>
+
+  <div id="hold"><div class="in">
+    <div class="tiny muted" style="letter-spacing:.09em; text-transform:uppercase; font-weight:700" id="holdLbl">Hold</div>
+    <div class="clock num" id="holdClock">0:00</div>
+    <div class="bar"><i id="holdBar" style="background:var(--wk); width:100%"></i></div>
+    <div class="row" style="justify-content:center; gap:10px">
+      <button class="btn" onclick="holdCancel()">Cancel</button>
+      <button class="btn primary" id="holdMain" onclick="holdStop()">Stop &amp; save</button>
     </div>
   </div></div>
 
@@ -774,14 +784,27 @@ function seedV14(){
   save();
 }
 
+/* v15: the daily post-workout shake as a one-tap My Food — whey scoop,
+   banana, almonds, walnuts, milk, creatine, Pintola HP peanut butter +
+   Pintola HP oats (macros = sum of the usual serves) */
+function seedV15(){
+  if(S.seedV15) return; S.seedV15=true;
+  if(PUB){ save(); return; }
+  if(!S.myFoods.some(function(m){ return /post-workout shake/i.test(m.name); })){
+    S.myFoods.push({id:'mf-pwshake', name:'Post-workout shake (whey, banana, PB, oats)',
+      kcal:690, p:51, c:66, f:29});
+  }
+  save();
+}
+
 /* ============ migration runner ============
    Ordered and append-only — this list IS the execution order (it preserves
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
- seedV10, seedV12, seedV13, seedV11, seedV14].forEach(function(step){ step(); });
-S.schemaVersion=14;
+ seedV10, seedV12, seedV13, seedV11, seedV14, seedV15].forEach(function(step){ step(); });
+S.schemaVersion=15;
 
 /* ============ utils ============ */
 function $(s){ return document.querySelector(s); }
@@ -995,6 +1018,15 @@ function lastDateFor(exId){
 }
 function targetFor(exId){
   const g=exGroupOf(exId);
+  if(isTimedEx(exId)){
+    const b=holdBest(exId); if(!b) return null;
+    const ld=lastDateFor(exId);
+    if(ld){
+      const gap=Math.round((new Date(today()+'T12:00:00')-new Date(ld+'T12:00:00'))/86400000);
+      if(gap>21) return 'comeback: ~'+Math.max(10,Math.round(b*0.6/5)*5)+'s — '+gap+' days since last time, rebuild the hold';
+    }
+    return 'target: '+(b+5)+'s — five seconds longer than last time';
+  }
   if(g==='Cardio'||g==='Mobility') return null;
   const pa=prevArr(exId); if(!pa) return null;
   const work=pa.filter(function(s){ return !s.wu && (+s.w||+s.r); });
@@ -1355,14 +1387,16 @@ function weekStats(ws){
     s.ex.forEach(function(e){ if(exGroupOf(e.exId)==='Cardio') e.sets.forEach(function(t){ km+=+t.w||0; }); }); });
   let pr=0;
   S.exercises.forEach(function(ex){
-    if(ex.group==='Cardio'||ex.group==='Mobility') return;
+    if(ex.group==='Cardio') return;
+    const tmd=isPRTimed(ex.id);
+    if(!tmd && (ex.group==='Mobility'||isTimedEx(ex.id))) return;
     let inBest=0, preBest=0;
     S.sessions.forEach(function(s){
       const e=s.ex.find(function(x){return x.exId===ex.id;}); if(!e) return;
       e.sets.forEach(function(t){
-        const est=est1RM(t.w,t.r);
-        if(inR(s.date)){ if(est>inBest) inBest=est; }
-        else if(s.date<ws && est>preBest) preBest=est;
+        const v = tmd ? (t.wu?0:(+t.r||0)) : est1RM(t.w,t.r);
+        if(inR(s.date)){ if(v>inBest) inBest=v; }
+        else if(s.date<ws && v>preBest) preBest=v;
       });
     });
     if(inBest>0 && preBest>0 && inBest>preBest) pr++;
@@ -1765,8 +1799,29 @@ let WV='home'; /* home | session | library | history | routine */
 let editRoutineId=null;
 function exName(id){ const e=S.exercises.find(function(x){return x.id===id;}); return e?e.name:'(deleted)'; }
 function exGroupOf(id){ const e=S.exercises.find(function(x){return x.id===id;}); return e?e.group:''; }
-function fmtSet(s, grp){
+function isTimedEx(id){
+  const e=S.exercises.find(function(x){return x.id===id;});
+  if(!e) return false;
+  return e.group==='Mobility' || e.timed===true || e.name==='Plank';
+}
+/* timed PRs: planks/hangs count, plain stretches don't — a longer calf
+   stretch is not a record */
+function isPRTimed(id){
+  const e=S.exercises.find(function(x){return x.id===id;});
+  if(!e || !isTimedEx(id)) return false;
+  return e.group!=='Mobility' || e.name==='Dead hang';
+}
+function holdBest(exId){
+  let best=0;
+  S.sessions.forEach(function(ss){ ss.ex.forEach(function(e){
+    if(e.exId!==exId) return;
+    e.sets.forEach(function(t){ if(!t.wu && (+t.r||0)>best) best=+t.r; });
+  });});
+  return best;
+}
+function fmtSet(s, grp, timed){
   if(grp==='Cardio') return s.w+'km/'+s.r+'min';
+  if(timed) return ((+s.w)? s.w+'kg · ':'')+(s.r||0)+'s';
   return s.w+'×'+s.r;
 }
 function prevArr(exId){
@@ -1777,8 +1832,8 @@ function prevArr(exId){
   return null;
 }
 function prevSets(exId){
-  const grp=exGroupOf(exId), pa=prevArr(exId);
-  return pa ? pa.map(function(s){ return fmtSet(s,grp); }).join('  ') : '';
+  const grp=exGroupOf(exId), tmd=isTimedEx(exId), pa=prevArr(exId);
+  return pa ? pa.map(function(s){ return fmtSet(s,grp,tmd); }).join('  ') : '';
 }
 function cardioBest(exId){
   let km=0, pace=null;
@@ -1862,10 +1917,14 @@ function renderWorkout(){
   /* PRs */
   const prs=[];
   S.exercises.forEach(function(e){
-    if(e.group==='Mobility') return;
+    const tmd=isPRTimed(e.id);
+    if(!tmd && (e.group==='Mobility'||isTimedEx(e.id))) return;
     if(e.group==='Cardio'){
       const cb=cardioBest(e.id);
       if(cb) prs.push({name:e.name, est:0, txt:'<b>'+cb.km+' km</b> <span class="muted">· best '+cb.pace+' /km</span>'});
+    } else if(tmd){
+      const b=holdBest(e.id);
+      if(b>0) prs.push({name:e.name, est:0, txt:'<b>'+b+'s</b> <span class="muted">· longest hold</span>'});
     } else {
       const b=bestFor(e.id);
       if(b && b.w>0) prs.push({name:e.name, est:b.est, txt:'<b>'+b.w+'×'+b.r+'</b> <span class="muted">· est 1RM '+Math.round(b.est)+' '+unit()+'</span>'});
@@ -1991,13 +2050,17 @@ function sessionHTML(){
       }
       h+='</div>';
     }
-    const c1=grp==='Cardio'?'km':unit(), c2=grp==='Cardio'?'min':(grp==='Mobility'?'secs':'reps');
+    const tmd=isTimedEx(e.exId);
+    const c1=tmd?'secs':(grp==='Cardio'?'km':unit()), c2=tmd?'timer':(grp==='Cardio'?'min':'reps');
     h+='<div class="sethead"><span>Set</span><span></span><span style="text-align:center">'+c1+'</span><span style="text-align:center">'+c2+'</span><span></span></div>';
     e.sets.forEach(function(st,si){
       const ph=pa && pa[si] ? pa[si] : null;
       h+='<div class="setrow'+(st.done?' done':'')+(st.wu?' wu':'')+'"><button class="idx'+(st.wu?' wu':'')+'" onclick="toggleWU('+ei+','+si+')" aria-label="toggle warm-up set">'+(st.wu?'W':(si+1))+'</button><span class="prev"></span>'+
-        '<input type="number" inputmode="decimal" step="'+(grp==='Cardio'?'0.1':'0.5')+'" value="'+esc(st.w)+'" placeholder="'+(ph?esc(ph.w):'0')+'" onchange="setVal('+ei+','+si+',\'w\',this.value)">'+
-        '<input type="number" inputmode="numeric" value="'+esc(st.r)+'" placeholder="'+(ph?esc(ph.r):'0')+'" onchange="setVal('+ei+','+si+',\'r\',this.value)">'+
+        (tmd
+        ? '<input type="number" inputmode="numeric" value="'+esc(st.r)+'" placeholder="'+(ph?esc(ph.r):'0')+'" onchange="setVal('+ei+','+si+',\'r\',this.value)">'+
+          '<button class="btn sm" style="min-height:46px; font-size:15px" onclick="holdStart('+ei+','+si+')" aria-label="start hold timer">▶</button>'
+        : '<input type="number" inputmode="decimal" step="'+(grp==='Cardio'?'0.1':'0.5')+'" value="'+esc(st.w)+'" placeholder="'+(ph?esc(ph.w):'0')+'" onchange="setVal('+ei+','+si+',\'w\',this.value)">'+
+          '<input type="number" inputmode="numeric" value="'+esc(st.r)+'" placeholder="'+(ph?esc(ph.r):'0')+'" onchange="setVal('+ei+','+si+',\'r\',this.value)">')+
         '<button class="check'+(st.done?' on':'')+'" onclick="toggleSet('+ei+','+si+')" aria-label="set done">'+
         '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 10 18 19.5 6.5"/></svg></button></div>';
     });
@@ -2089,11 +2152,13 @@ function newExerciseForm(intoSession){
     '<div class="field"><label for="nexGroup">Muscle group</label><select id="nexGroup">'+
     ['Chest','Back','Legs','Shoulders','Arms','Core','Cardio','Other'].map(function(g){return '<option>'+g+'</option>';}).join('')+
     '</select></div>'+
+    '<div class="field"><label style="display:flex; align-items:center; gap:8px; cursor:pointer"><input type="checkbox" id="nexTimed" style="width:auto; min-height:0"> Timed hold — measured in seconds (plank-style)</label></div>'+
     '<button class="btn primary wide" onclick="saveNewExercise('+(intoSession?'true':'false')+')">Save</button>');
 }
 function saveNewExercise(intoSession){
   const name=$('#nexName').value.trim(); if(!name){ toast('Give it a name'); return; }
   const e={id:uid(), name:name, group:$('#nexGroup').value};
+  if($('#nexTimed') && $('#nexTimed').checked) e.timed=true;
   S.exercises.push(e); save();
   if(intoSession && S.active){ addExToSession(e.id); } else { closeSheet(); renderWorkout(); }
 }
@@ -2105,21 +2170,26 @@ function finishSession(){
   const prs=[];
   a.ex.forEach(function(e){
     e.sets=e.sets.filter(function(s){return s.w||s.r;});
-    const g=exGroupOf(e.exId), lift=(g!=='Cardio'&&g!=='Mobility');
+    const g=exGroupOf(e.exId), tmd=isTimedEx(e.exId), lift=(g!=='Cardio'&&g!=='Mobility'&&!tmd);
     /* bests before this session (warm-ups never count) */
-    let bw=0, b1=0;
+    let bw=0, b1=0, bh=0;
     if(lift) S.sessions.forEach(function(s){
       const pe=s.ex.find(function(x){return x.exId===e.exId;}); if(!pe) return;
       pe.sets.forEach(function(t){ if(t.wu) return;
         const w=+t.w||0, est=est1RM(t.w,t.r);
         if(w>bw) bw=w; if(est>b1) b1=est; });
     });
+    if(tmd && isPRTimed(e.exId)) bh=holdBest(e.exId);
     let exPR=null;
     e.sets.forEach(function(s){
       nSets++;
       if(g==='Cardio'||s.wu) return;
       const w=+s.w||0, r=+s.r||0, est=est1RM(w,r);
       vol+=w*r;
+      if(tmd){
+        if(bh>0 && r>bh){ exPR={ex:exName(e.exId), txt:r+'s — longest hold'}; bh=r; }
+        return;
+      }
       if(!lift) return;
       if(bw>0 && w>bw){ exPR={ex:exName(e.exId), txt:w+'×'+r+' — heaviest ever'}; bw=w; }
       else if(b1>0 && est>b1 && !exPR){ exPR={ex:exName(e.exId), txt:w+'×'+r+' — est 1RM '+Math.round(est)+' '+unit()}; b1=est; }
@@ -2184,8 +2254,8 @@ function historyHTML(){
     h+='<details style="border-bottom:1px solid var(--line); padding:10px 0"><summary style="cursor:pointer; list-style:none"><div class="spread">'+
       '<div><b>'+esc(s.name)+'</b><div class="tiny muted">'+fmtD(s.date)+' · '+mins+' min · '+Math.round(s.vol).toLocaleString()+' '+unit()+prTag+'</div></div><span class="muted">›</span></div></summary>';
     s.ex.forEach(function(e){
-      const g=exGroupOf(e.exId);
-      h+='<div class="small" style="margin-top:8px"><b>'+esc(exName(e.exId))+'</b> <span class="muted num">'+e.sets.map(function(t){return (t.wu?'W ':'')+fmtSet(t,g);}).join('  ')+'</span></div>';
+      const g=exGroupOf(e.exId), tmd=isTimedEx(e.exId);
+      h+='<div class="small" style="margin-top:8px"><b>'+esc(exName(e.exId))+'</b> <span class="muted num">'+e.sets.map(function(t){return (t.wu?'W ':'')+fmtSet(t,g,tmd);}).join('  ')+'</span></div>';
     });
     if(s.prs&&s.prs.length) s.prs.forEach(function(p){ h+='<div class="tiny" style="margin-top:6px; color:var(--good)">🏆 '+esc(p.ex)+' — '+p.txt+'</div>'; });
     if(s.note) h+='<div class="tiny muted" style="margin-top:8px">“'+esc(s.note)+'”</div>';
@@ -2244,6 +2314,19 @@ function openExInfo(exId){
       ? '<div class="listrow"><span class="small">Longest distance</span><span class="small num"><b>'+cb.km+' km</b></span></div>'+
         '<div class="listrow"><span class="small">Best pace</span><span class="small num"><b>'+cb.pace+'</b> /km</span></div>'
       : '<div class="empty">No logs yet.</div>';
+  } else if(isTimedEx(exId)){
+    let bh=null;
+    S.sessions.forEach(function(s){ s.ex.forEach(function(e){
+      if(e.exId!==exId) return;
+      e.sets.forEach(function(t){
+        if(t.wu) return;
+        const r=+t.r||0;
+        if(r>0 && (!bh||r>bh.r)) bh={r:r, date:s.date};
+      });
+    });});
+    h+= bh
+      ? '<div class="listrow"><span class="small">Longest hold</span><span class="small num"><b>'+bh.r+'s</b> <span class="muted">'+fmtD(bh.date)+'</span></span></div>'
+      : '<div class="empty">No logs yet — records appear after your first sets.</div>';
   } else {
     let bw=null, b1=null, bv=0;
     S.sessions.forEach(function(s){ s.ex.forEach(function(e){
@@ -2263,25 +2346,28 @@ function openExInfo(exId){
         '<div class="listrow"><span class="small">Best session volume</span><span class="small num"><b>'+Math.round(bv).toLocaleString()+'</b> '+unit()+'</span></div>'
       : '<div class="empty">No logs yet — records appear after your first sets.</div>';
   }
-  /* strength trend */
-  if(g!=='Cardio' && g!=='Mobility'){
-    const series=[];
-    S.sessions.forEach(function(s){
-      const e=s.ex.find(function(x){return x.exId===exId;}); if(!e) return;
-      let best=0;
-      e.sets.forEach(function(t){ if(t.wu) return; const est=est1RM(t.w,t.r); if(est>best) best=est; });
-      if(best>0) series.push({d:s.date, y:Math.round(best)});
-    });
-    if(series.length>=3){
-      h+='<div class="tiny muted" style="margin:14px 0 4px; font-weight:700; letter-spacing:.07em; text-transform:uppercase">Est 1RM trend</div>'+
-         lineChartSVG(series.slice(-15),'var(--wk)');
+  /* strength / hold trend */
+  if(g!=='Cardio'){
+    const tmd=isTimedEx(exId);
+    if(tmd || g!=='Mobility'){
+      const series=[];
+      S.sessions.forEach(function(s){
+        const e=s.ex.find(function(x){return x.exId===exId;}); if(!e) return;
+        let best=0;
+        e.sets.forEach(function(t){ if(t.wu) return; const v=tmd?(+t.r||0):est1RM(t.w,t.r); if(v>best) best=v; });
+        if(best>0) series.push({d:s.date, y:Math.round(best)});
+      });
+      if(series.length>=3){
+        h+='<div class="tiny muted" style="margin:14px 0 4px; font-weight:700; letter-spacing:.07em; text-transform:uppercase">'+(tmd?'Hold trend (seconds)':'Est 1RM trend')+'</div>'+
+           lineChartSVG(series.slice(-15),'var(--wk)');
+      }
     }
   }
   /* recent appearances */
   const rec=[];
   for(let i=S.sessions.length-1; i>=0 && rec.length<5; i--){
     const s=S.sessions[i], e=s.ex.find(function(x){return x.exId===exId;});
-    if(e) rec.push({date:s.date, line:e.sets.map(function(t){return (t.wu?'W ':'')+fmtSet(t,g);}).join('  ')});
+    if(e) rec.push({date:s.date, line:e.sets.map(function(t){return (t.wu?'W ':'')+fmtSet(t,g,isTimedEx(exId));}).join('  ')});
   }
   if(rec.length){
     h+='<div class="tiny muted" style="margin:14px 0 2px; font-weight:700; letter-spacing:.07em; text-transform:uppercase">Recent</div>';
@@ -2382,6 +2468,56 @@ function restTick(){
   }
 }
 function restSkip(){ clearInterval(restInt); restInt=null; $('#rest').classList.remove('on'); }
+
+/* ============ HOLD TIMER (timed exercises: plank, hangs, stretches) ============ */
+let holdInt=null, holdT0=0, holdTarget=0, holdEi=-1, holdSi=-1, holdLastS=-1;
+function holdStart(ei,si){
+  const a=S.active; if(!a) return;
+  const e=a.ex[ei]; if(!e) return;
+  const st=e.sets[si]; if(!st) return;
+  holdEi=ei; holdSi=si; holdTarget=Math.max(0, Math.round(+st.r||0));
+  holdT0=Date.now(); holdLastS=-1;
+  $('#holdLbl').textContent = exName(e.exId)+(holdTarget? ' — hold '+holdTarget+'s' : ' — max hold');
+  $('#holdMain').textContent = holdTarget? 'Done early' : 'Stop & save';
+  $('#holdClock').style.color='';
+  $('#hold').classList.add('on');
+  clearInterval(holdInt); holdInt=setInterval(holdTick,150); holdTick();
+}
+function holdTick(){
+  const el=(Date.now()-holdT0)/1000;
+  if(holdTarget){
+    /* countdown to the entered seconds — same language as the rest timer */
+    const left=Math.max(0, holdTarget-el), s=Math.ceil(left);
+    $('#holdClock').textContent = Math.floor(s/60)+':'+pad(s%60);
+    $('#holdBar').style.width = (left/holdTarget*100)+'%';
+    if(s!==holdLastS){
+      holdLastS=s;
+      if(s<=5 && s>0){ vib(140); $('#holdClock').style.color='var(--wk)'; }
+      else $('#holdClock').style.color='';
+    }
+    if(left<=0){ beep(3); vib([300,100,300]); holdFinish(holdTarget); }
+  } else {
+    /* count-up stopwatch for max holds — gentle pulse every 15 s */
+    const s=Math.floor(el);
+    $('#holdClock').textContent = Math.floor(s/60)+':'+pad(s%60);
+    $('#holdBar').style.width='100%';
+    if(s!==holdLastS){ holdLastS=s; if(s>0 && s%15===0) vib(80); }
+  }
+}
+function holdStop(){
+  const el=(Date.now()-holdT0)/1000;
+  holdFinish(holdTarget? Math.min(holdTarget, Math.round(el)) : Math.round(el));
+}
+function holdFinish(secs){
+  clearInterval(holdInt); holdInt=null; $('#hold').classList.remove('on');
+  const a=S.active; if(!a) return;
+  const e=a.ex[holdEi]; if(!e) return;
+  const st=e.sets[holdSi]; if(!st) return;
+  st.r=String(Math.max(1, Math.round(secs))); st.done=true;
+  save(); renderWorkout();
+  if(exGroupOf(e.exId)!=='Mobility') startRest(exRest(e.exId));
+}
+function holdCancel(){ clearInterval(holdInt); holdInt=null; $('#hold').classList.remove('on'); }
 
 /* ============ STOPWATCH ============ */
 let swRun=false, swAcc=0, swT0=0, swInt=null, swLapsArr=[];

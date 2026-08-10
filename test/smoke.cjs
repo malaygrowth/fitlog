@@ -33,13 +33,15 @@ function check(name, cond, detail) {
     wedding: S.breaks.some((b) => /wedding/i.test(b.label)),
     schema: S.schemaVersion,
     weights: S.weights.length,
+    shake: S.myFoods.some((m) => /post-workout shake/i.test(m.name)),
   }));
   check('38 imported sessions', boot.sessions === 38, boot.sessions);
   check('11 supplements seeded', boot.supps === 11, boot.supps);
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 14, boot.schema);
+  check('schemaVersion stamped', boot.schema === 15, boot.schema);
+  check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
   console.log('idempotency (double reload)');
@@ -105,6 +107,56 @@ function check(name, cond, detail) {
   check('volume computed', wo.vol === 350, wo.vol);
   check('history stays sorted', wo.sorted);
   check('edit session round-trip', wo.editing && wo.editedRep === '6', wo.editedRep);
+
+  console.log('timed exercises (plank / holds)');
+  const plankRow = await page.evaluate(() => {
+    startSession(); closeSheet();
+    addExToSession(S.exercises.find((e) => e.name === 'Plank').id);
+    const html = document.querySelector('#tab-workout').innerHTML;
+    const row = document.querySelector('#tab-workout .setrow');
+    return {
+      timed: isTimedEx(S.exercises.find((e) => e.name === 'Plank').id),
+      holdBtn: /holdStart\(/.test(html),
+      inputs: row.querySelectorAll('input[type="number"]').length,
+      header: /secs/i.test(html) && /timer/i.test(html),
+      deadHangFmt: fmtSet({ w: 0, r: 20 }, 'Mobility', true),
+      benchStillReps: fmtSet({ w: 70, r: 5 }, 'Chest', false),
+    };
+  });
+  check('Plank is timed', plankRow.timed);
+  check('timed row: single secs input + ▶ hold button', plankRow.inputs === 1 && plankRow.holdBtn, plankRow);
+  check('secs/timer column headers', plankRow.header);
+  check('dead hang renders 20s (not 0×20)', plankRow.deadHangFmt === '20s' && plankRow.benchStillReps === '70×5', plankRow.deadHangFmt);
+
+  await page.evaluate(() => holdStart(0, 0));
+  await page.waitForTimeout(2300);
+  const hold = await page.evaluate(() => {
+    const open = document.querySelector('#hold').classList.contains('on');
+    holdStop();
+    const st = S.active.ex[0].sets[0];
+    const restOpen = document.querySelector('#rest').classList.contains('on');
+    restSkip();
+    return { open, r: +st.r, done: st.done, closed: !document.querySelector('#hold').classList.contains('on'), restOpen };
+  });
+  check('hold count-up: stop writes secs + done', hold.open && hold.r >= 2 && hold.r <= 4 && hold.done && hold.closed, hold);
+  check('hold on non-Mobility auto-starts rest', hold.restOpen);
+
+  const timedPR = await page.evaluate(() => {
+    finishSession(); closeSheet();
+    const plankId = S.exercises.find((e) => e.name === 'Plank').id;
+    const target = targetFor(plankId);
+    startSession(); closeSheet();
+    addExToSession(plankId);
+    setVal(0, 0, 'r', '300'); toggleSet(0, 0); restSkip();
+    finishSession(); closeSheet();
+    const s = S.sessions[S.sessions.length - 1];
+    const pr = (s.prs || []).find((p) => /longest hold/.test(p.txt));
+    S.sessions = S.sessions.filter((x) => !x.ex.some((e) => e.exId === plankId)); save();
+    WV = 'home'; renderWorkout();
+    return { target, pr: pr ? pr.txt : null };
+  });
+  check('timed target phrased in seconds', /s — five seconds longer/.test(timedPR.target || ''), timedPR.target);
+  check('longest-hold PR detected', /300s — longest hold/.test(timedPR.pr || ''), timedPR.pr);
 
   console.log('coach logic');
   const coach = await page.evaluate(() => ({
