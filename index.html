@@ -823,8 +823,15 @@ function seedV15(){
 function seedV16(){
   if(S.seedV16) return; S.seedV16=true;
   const g=+S.settings.breathGoal||15;
-  /* past checklist ticks become logged minutes so the streak survives */
-  const bw=S.supps.filter(function(x){ return /breathwork/i.test(x.name); });
+  /* only the item this app seeded — a user-created supp that merely mentions
+     breathwork (e.g. "Breathwork book") is theirs to keep */
+  const SEEDED='Breathwork (15–30 min)';
+  const isOld=function(x){ return x.name===SEEDED; };
+  /* Past ticks become logged minutes so the streak and history survive. The
+     old item recorded only that it happened, so minutes are unknown — every
+     ticked day is credited the goal, which does mean those days read as
+     goal-met in historical weekly reports. */
+  const bw=S.supps.filter(isOld);
   bw.forEach(function(sp){
     Object.keys(S.suppLog).forEach(function(d){
       if(S.suppLog[d] && S.suppLog[d][sp.id]){
@@ -833,7 +840,7 @@ function seedV16(){
       }
     });
   });
-  if(bw.length) S.supps=S.supps.filter(function(x){ return !/breathwork/i.test(x.name); });
+  if(bw.length) S.supps=S.supps.filter(function(x){ return !isOld(x); });
   delete S.steps; delete S.settings.stepGoal;
   if(!S.settings.breathGoal) S.settings.breathGoal=15;
   save();
@@ -1408,35 +1415,53 @@ function delSleep(){ delete S.sleep[today()]; save(); closeSheet(); renderToday(
    One number for the day: what you logged here plus anything you did as a
    timed Breathwork set inside a workout — so it never needs logging twice. */
 function breathGoalMins(){ return +S.settings.breathGoal||15; }
-function breathMins(d){
-  let m=+S.breath[d]||0;
-  S.sessions.forEach(function(s){
-    if(s.date!==d) return;
-    s.ex.forEach(function(e){
-      if(exName(e.exId)!=='Breathwork') return;
-      e.sets.forEach(function(t){ if(!t.wu) m+=(+t.r||0)/60; });
+/* the Breathwork exercise, only if it is a timed one — a user-made exercise of
+   the same name logs reps, and reps/60 would be nonsense minutes */
+function breathExId(){
+  const e=S.exercises.find(function(x){ return x.name==='Breathwork' && isTimedEx(x.id); });
+  return e? e.id : null;
+}
+/* minutes done in workouts that day. Reads finished sessions only, so an
+   in-progress or currently-edited session contributes nothing until it is saved. */
+function breathFromSessions(d, exId){
+  let s=0;
+  S.sessions.forEach(function(ss){
+    if(ss.date!==d) return;
+    ss.ex.forEach(function(e){
+      if(e.exId!==exId) return;
+      e.sets.forEach(function(t){ if(!t.wu) s+=(+t.r||0); });
     });
   });
-  return Math.round(m);
+  return Math.floor(s/60); /* floor: a stray 30-second set is not a day of practice */
+}
+function breathMins(d){
+  const id=breathExId();
+  return Math.round(+S.breath[d]||0) + (id? breathFromSessions(d,id) : 0);
 }
 function breathStreak(){
   let n=0, d=today();
   if(!breathMins(d)) d=dShift(d,-1); /* today still open — don't break the streak yet */
-  while(breathMins(d)>0){ n++; d=dShift(d,-1); }
+  for(let i=0; i<400 && breathMins(d)>0; i++){ n++; d=dShift(d,-1); }
   return n;
 }
 function breathForm(){
-  const g=breathGoalMins();
+  const g=breathGoalMins(), id=breathExId();
+  const fromSes=id? breathFromSessions(today(),id) : 0;
   openSheet('<h3>Breathwork today</h3>'+
     '<p class="tiny muted" style="margin:-6px 0 12px">Slow nasal inhale, longer exhale. Post-training or before bed.</p>'+
+    /* the tile counts workout breathwork too — say so, or the empty field below
+       invites logging the same minutes a second time */
+    (fromSes? '<div class="tiny" style="color:var(--br); margin-bottom:10px">'+fromSes+' min already counted from today’s workout</div>' : '')+
     '<div class="row wrap">'+[10,15,20,30].map(function(m){
-      return '<button class="chip" onclick="saveBreath('+m+')">'+m+' min</button>';
+      return '<button class="chip" onclick="addBreath('+m+')">+'+m+' min</button>';
     }).join('')+'</div>'+
-    '<div class="field" style="margin-top:12px"><label for="brN">Minutes</label>'+
+    '<div class="field" style="margin-top:12px"><label for="brN">Minutes logged here</label>'+
     '<input id="brN" type="number" inputmode="numeric" value="'+(S.breath[today()]||'')+'" placeholder="e.g. '+g+'"></div>'+
     '<button class="btn wide" style="background:var(--br); border-color:var(--br); color:#0a1f19" onclick="saveBreath()">Save</button>'+
     barStrip(function(d){return breathMins(d);}, g, 'var(--br)'));
 }
+/* chips add — breathwork often happens in two sittings (post-training and pre-bed) */
+function addBreath(m){ saveBreath((+S.breath[today()]||0) + (+m||0)); }
 function saveBreath(mins){
   const n=Math.round(mins!==undefined ? +mins : (+$('#brN').value||0));
   if(n<=0){ delete S.breath[today()]; } else S.breath[today()]=n;
@@ -1484,7 +1509,7 @@ function weekStats(ws){
   return {ses:ses.length, vol:vol, dur:dur, km:Math.round(km*10)/10, pr:pr,
     sleep: slN? Math.round(slS/slN*10)/10 :0, slN:slN, slG7:slG7,
     water: waN? Math.round(waS/waN) :0, waHit:waHit,
-    breath: brN? Math.round(brS/brN) :0, brDays:brN, brHit:brHit,
+    breath: brS, brDays:brN, brHit:brHit,
     kcal: fdN? Math.round(kcS/fdN) :0, prot: fdN? Math.round(ptS/fdN) :0, fdN:fdN,
     wDelta: wts.length>1? Math.round((wts[wts.length-1].kg-wts[0].kg)*10)/10 : null,
     wLast: wts.length? wts[wts.length-1].kg : null};
@@ -1548,8 +1573,11 @@ function openReport(ws){
     (gtxt? '<div class="tiny muted num" style="padding:8px 2px">Working sets: '+gtxt+'</div>' : '');
   h+=sect('Cardio & breathwork')+
     row('Distance', cur.km+' km', dif(cur.km,prv.km,' km'))+
-    row('Breathwork average', cur.brDays? cur.breath+' min':'—', dif(cur.breath,prv.breath,' min'))+
-    row('Days practised', cur.brDays+' / 7','');
+    /* total, not an average over practised days — an average makes one long
+       session look better than a consistent week and flips the delta arrow */
+    row('Breathwork', cur.breath+' min', dif(cur.breath,prv.breath,' min'))+
+    row('Days practised', cur.brDays+' / 7','')+
+    row('Goal days', cur.brHit+' / 7','');
   h+=sect('Sleep')+
     row('Average', cur.slN? cur.sleep+' h':'—', dif(cur.sleep,prv.sleep,' h'))+
     row('Nights logged', cur.slN+' / 7','');
@@ -1840,7 +1868,8 @@ function achievements(){
   const vol=S.sessions.reduce(function(a,s){return a+(s.vol||0);},0);
   const prs=S.sessions.reduce(function(a,s){return a+((s.prs||[]).length);},0);
   const waterDays=Object.keys(S.water).filter(function(d){return S.water[d]>=S.settings.waterGoal;}).length;
-  const breathDays=Object.keys(S.breath).filter(function(d){return S.breath[d]>0;}).length;
+  /* same source as the tile and the report — workout breathwork counts too */
+  const breathDays=breathStreak();
   return [
     {i:'🎯', t:'First workout', ok:n>=1},
     {i:'🔟', t:'10 workouts', ok:n>=10},
@@ -1854,7 +1883,7 @@ function achievements(){
     {i:'🚀', t:'250 tonnes lifted', ok:vol>=250000},
     {i:'💧', t:'Water goal ×7 days', ok:waterDays>=7},
     {i:'🌙', t:'Sleep logged ×7', ok:Object.keys(S.sleep).length>=7},
-    {i:'🌬️', t:'Breathwork ×7 days', ok:breathDays>=7},
+    {i:'🌬️', t:'7-day breathwork streak', ok:breathDays>=7},
     {i:'📸', t:'First progress photo', ok:S.photos.length>=1},
     {i:'📏', t:'First measurements', ok:S.measures.length>=1}
   ];
@@ -3172,6 +3201,9 @@ function importData(inp){
       S=Object.assign(defaults(), d);
       /* same normalization as boot: fill any settings keys the backup predates */
       S.settings=Object.assign(defaults().settings, S.settings||{});
+      /* a pre-v16 backup carries steps and the retired breathwork checkbox;
+         migrations only run at boot, so apply the current one here too */
+      delete S.seedV16; seedV16();
       save(); closeSheet(); render(); toast('Backup restored');
     }catch(e){ toast('That file is not a CoachZ backup'); }
   };

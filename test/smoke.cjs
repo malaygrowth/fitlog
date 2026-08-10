@@ -190,6 +190,8 @@ function check(name, cond, detail) {
 
   console.log('breathwork tracking');
   const breath = await page.evaluate(() => {
+    S.breath = {}; save();
+    saveBreath(20); closeSheet();
     const out = { manual: breathMins(today()) };
     // a timed Breathwork set inside a workout counts toward the same number
     startSession(); closeSheet();
@@ -197,18 +199,57 @@ function check(name, cond, detail) {
     setVal(0, 0, 'r', '600'); toggleSet(0, 0); restSkip();
     finishSession(); closeSheet();
     out.withSession = breathMins(today());
+    // a stray 30s set must not manufacture a day of practice
+    out.strayFloored = (function () {
+      const d = dShift(today(), -4);
+      S.sessions.push({ id: 'brstray', name: 'x', date: d, dur: 60, vol: 0,
+        ex: [{ exId: S.exercises.find((e) => e.name === 'Breathwork').id, sets: [{ w: '', r: '30', done: true }] }] });
+      const m = breathMins(d);
+      S.sessions = S.sessions.filter((s) => s.id !== 'brstray');
+      return m === 0;
+    })();
     out.streak = breathStreak();
     S.breath[dShift(today(), -1)] = 15;
     out.streak2 = breathStreak();
-    out.noSteps = S.steps === undefined && S.settings.stepGoal === undefined;
-    out.noSupp = !S.supps.some((s) => /breathwork/i.test(s.name));
+    // chips add rather than replace — breathwork happens in two sittings
+    addBreath(10); closeSheet();
+    out.added = S.breath[today()];
+    // cleanup: leave no breathwork session or log behind for later blocks
+    S.sessions = S.sessions.filter((s) => !s.ex.some((e) => exName(e.exId) === 'Breathwork'));
+    S.breath = {}; save(); go('today');
     return out;
   });
   check('manual breathwork logged (20 min)', breath.manual === 20, breath.manual);
   check('session-logged breathwork adds 10 min', breath.withSession === 30, breath.withSession);
+  check('stray 30s set floors to 0 min', breath.strayFloored);
   check('streak counts today', breath.streak === 1 && breath.streak2 === 2, breath);
-  check('steps state removed by migration', breath.noSteps, breath.noSteps);
-  check('breathwork supp item retired', breath.noSupp);
+  check('quick chips add to the day', breath.added === 30, breath.added);
+
+  console.log('v16 migration (planted pre-upgrade store)');
+  const mig = await page.evaluate(() => {
+    // rewind to a pre-v16 store so the migration body actually runs
+    delete S.seedV16;
+    S.steps = { [today()]: 9000 };
+    S.settings.stepGoal = 8000;
+    S.supps.push({ id: 'bwold', name: 'Breathwork (15–30 min)', kcal: 0, p: 0, c: 0, f: 0, logFood: false });
+    S.suppLog[dShift(today(), -2)] = Object.assign(S.suppLog[dShift(today(), -2)] || {}, { bwold: 1 });
+    S.breath = {};
+    save();
+    return { supps: S.supps.length };
+  });
+  await page.reload(); await page.waitForTimeout(900);
+  const migAfter = await page.evaluate(() => ({
+    steps: S.steps === undefined && S.settings.stepGoal === undefined,
+    ticksConverted: S.breath[dShift(today(), -2)] === 15,
+    suppGone: !S.supps.some((s) => s.name === 'Breathwork (15–30 min)'),
+    supps: S.supps.length,
+    checklistClean: (function () { checklistSheet(); const t = document.querySelector('#sheetIn').textContent; closeSheet(); return !/Breathwork/i.test(t); })(),
+    schema: S.schemaVersion,
+  }));
+  check('steps state deleted by migration', migAfter.steps, migAfter);
+  check('past ticks converted to logged minutes', migAfter.ticksConverted, migAfter.ticksConverted);
+  check('breathwork supp retired from list + checklist', migAfter.suppGone && migAfter.checklistClean && migAfter.supps === mig.supps - 1, migAfter);
+  check('migration stamps schema 16', migAfter.schema === 16, migAfter.schema);
 
   console.log('charts + report');
   const charts = await page.evaluate(() => {
