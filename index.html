@@ -27,7 +27,7 @@
     --wa:#56b8e8; --wa-dim:#56b8e833;
     --fd:#8fd068; --fd-dim:#8fd06833;
     --bd:#b48ee0; --bd-dim:#b48ee033;
-    --sl:#8ea0e8; --stp:#5ecfb5;
+    --sl:#8ea0e8; --br:#5ecfb5;
     --bad:#e8695e; --good:#4fc98a;
     --r:16px;
     --fd-disp:'Oswald', 'Arial Narrow', -apple-system, Roboto, system-ui, sans-serif;
@@ -463,10 +463,10 @@ function defaults(){
   return {
     settings:{name:'', unit:'kg', waterGoal:3000, calGoal:2600, proteinGoal:120, carbGoal:340, fatGoal:75,
       rest:90, height:(PUB?'':'176'), goalWeight:(PUB?'':'68'), waterRemind:true, waterEvery:75, workoutRemind:'',
-      sleepRemind:'22:30', sleepGoal:8, stepGoal:8000, theme:'dark'},
+      sleepRemind:'22:30', sleepGoal:8, breathGoal:15, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, steps:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[]
   };
 }
 let S;
@@ -688,8 +688,8 @@ function seedV9(){
   if(!S.weights.some(function(x){return x.date==='2026-04-16';}))
     S.weights.push({date:'2026-04-16', kg:65.6});
   S.weights.sort(function(a,b){ return a.date<b.date?-1:1; });
-  if(!S.supps.some(function(x){return /breathwork/i.test(x.name);}))
-    S.supps.push({id:uid(), name:'Breathwork (15–30 min)', kcal:0, p:0, c:0, f:0, logFood:false});
+  /* breathwork used to live here as a checklist item — it now has its own
+     dashboard tile with minutes and a streak (see seedV16) */
   save();
 }
 /* v5: Hyrox station exercises + routine */
@@ -817,14 +817,36 @@ function seedV15(){
   save();
 }
 
+/* v16: step counter removed (no pedometer to feed it) and breathwork promoted
+   from a checklist tick to its own tracked habit. Runs in BOTH builds — steps
+   were never personal-only, so public stores can hold step data too. */
+function seedV16(){
+  if(S.seedV16) return; S.seedV16=true;
+  const g=+S.settings.breathGoal||15;
+  /* past checklist ticks become logged minutes so the streak survives */
+  const bw=S.supps.filter(function(x){ return /breathwork/i.test(x.name); });
+  bw.forEach(function(sp){
+    Object.keys(S.suppLog).forEach(function(d){
+      if(S.suppLog[d] && S.suppLog[d][sp.id]){
+        if(!S.breath[d]) S.breath[d]=g;
+        delete S.suppLog[d][sp.id];
+      }
+    });
+  });
+  if(bw.length) S.supps=S.supps.filter(function(x){ return !/breathwork/i.test(x.name); });
+  delete S.steps; delete S.settings.stepGoal;
+  if(!S.settings.breathGoal) S.settings.breathGoal=15;
+  save();
+}
+
 /* ============ migration runner ============
    Ordered and append-only — this list IS the execution order (it preserves
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
- seedV10, seedV12, seedV13, seedV11, seedV14, seedV15].forEach(function(step){ step(); });
-S.schemaVersion=15;
+ seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16].forEach(function(step){ step(); });
+S.schemaVersion=16;
 
 /* ============ utils ============ */
 function $(s){ return document.querySelector(s); }
@@ -959,7 +981,7 @@ const TIPS=[
 'Fibre from dal and sabzi keeps protein absorption steady — thali wisdom is real.',
 'Late screens delay melatonin ~30 minutes — the 22:30 wind-down is physiology.',
 'A planned deload every 6–8 weeks makes you stronger, not weaker.',
-'8,000 steps burns roughly a samosa a day.',
+'Make the exhale longer than the inhale — that ratio, not the length, is what flips you into recovery.',
 'Wall balls test breathing more than muscles — that’s why Hyrox loves them.',
 'Magnesium at night improves sleep quality — watch your “woke rested” count.',
 'Volume drives muscle; intensity drives strength; consistency drives both.'];
@@ -1001,7 +1023,7 @@ const PROGRAM= PUB ? {start:null, phases:[
   {w:16,  name:'Phase 2 — Build', desc:'Progressive overload — chase the amber targets, grow your cardio base, hit protein daily. Exit test: visibly stronger across twelve weeks.'},
   {w:999, name:'Phase 3 — Perform', desc:'Train for something: a race, a number, a photo. PRs, a deload every 6–8 weeks, and a streak that never dies.'}
 ]} : {start:'2026-08-09', phases:[
-  {w:4,  name:'Phase 0 — Rebuild', desc:'Daily rehab block, the three return routines, 8k steps, sleep by 11. Exit test: one fully pain-free week + a brisk 30-minute walk feeling easy.'},
+  {w:4,  name:'Phase 0 — Rebuild', desc:'Daily rehab block, the three return routines, daily breathwork, sleep by 11. Exit test: one fully pain-free week + a brisk 30-minute walk feeling easy.'},
   {w:12, name:'Phase 1 — Base', desc:'Run/walk intervals 3×/week, strength rebuilt to ~80% of May weights, full Push/Pull/Legs returns. Exit test: 5 km continuous run and squat 50×8, both pain-free.'},
   {w:20, name:'Phase 2 — Hyrox strength', desc:'Runs grow to 6–8 km with one weekly tempo. Hyrox stations once a week — wall balls light, burpee broad jumps low volume. Exit test: 8 km easy run, 50 unbroken wall balls.'},
   {w:32, name:'Phase 3 — Simulation', desc:'Weekly bricks (1 km run + station + 1 km run), half-simulation ~week 26, full simulation ~week 30 — then enter the race.'}
@@ -1382,18 +1404,47 @@ function saveSleep(){
   toast(hrs+'h logged'+(hrs<(+S.settings.sleepGoal||8)-1?' — try for an earlier night today':''));
 }
 function delSleep(){ delete S.sleep[today()]; save(); closeSheet(); renderToday(); }
-function stepsForm(){
-  openSheet('<h3>Today’s steps</h3>'+
-    '<div class="field"><label for="stpN">Total steps (from your phone’s counter)</label>'+
-    '<input id="stpN" type="number" inputmode="numeric" value="'+(S.steps[today()]||'')+'" placeholder="e.g. 7500"></div>'+
-    '<button class="btn wide" style="background:var(--stp); border-color:var(--stp); color:#0a1f19" onclick="saveSteps()">Save</button>'+
-    barStrip(function(d){return S.steps[d];}, +S.settings.stepGoal||8000, 'var(--stp)'));
+/* ============ breathwork ============
+   One number for the day: what you logged here plus anything you did as a
+   timed Breathwork set inside a workout — so it never needs logging twice. */
+function breathGoalMins(){ return +S.settings.breathGoal||15; }
+function breathMins(d){
+  let m=+S.breath[d]||0;
+  S.sessions.forEach(function(s){
+    if(s.date!==d) return;
+    s.ex.forEach(function(e){
+      if(exName(e.exId)!=='Breathwork') return;
+      e.sets.forEach(function(t){ if(!t.wu) m+=(+t.r||0)/60; });
+    });
+  });
+  return Math.round(m);
 }
-function saveSteps(){
-  const n=Math.round(+$('#stpN').value||0);
-  if(n<=0){ delete S.steps[today()]; } else S.steps[today()]=n;
+function breathStreak(){
+  let n=0, d=today();
+  if(!breathMins(d)) d=dShift(d,-1); /* today still open — don't break the streak yet */
+  while(breathMins(d)>0){ n++; d=dShift(d,-1); }
+  return n;
+}
+function breathForm(){
+  const g=breathGoalMins();
+  openSheet('<h3>Breathwork today</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">Slow nasal inhale, longer exhale. Post-training or before bed.</p>'+
+    '<div class="row wrap">'+[10,15,20,30].map(function(m){
+      return '<button class="chip" onclick="saveBreath('+m+')">'+m+' min</button>';
+    }).join('')+'</div>'+
+    '<div class="field" style="margin-top:12px"><label for="brN">Minutes</label>'+
+    '<input id="brN" type="number" inputmode="numeric" value="'+(S.breath[today()]||'')+'" placeholder="e.g. '+g+'"></div>'+
+    '<button class="btn wide" style="background:var(--br); border-color:var(--br); color:#0a1f19" onclick="saveBreath()">Save</button>'+
+    barStrip(function(d){return breathMins(d);}, g, 'var(--br)'));
+}
+function saveBreath(mins){
+  const n=Math.round(mins!==undefined ? +mins : (+$('#brN').value||0));
+  if(n<=0){ delete S.breath[today()]; } else S.breath[today()]=n;
   save(); closeSheet(); renderToday();
-  if(n>=(+S.settings.stepGoal||8000)) toast('Step goal hit 🎯');
+  if(n>0){
+    const st=breathStreak();
+    toast(n+' min logged'+(st>1? ' · '+st+'-day streak 🌬️' : ''));
+  }
 }
 
 /* ============ weekly report ============ */
@@ -1421,19 +1472,19 @@ function weekStats(ws){
     });
     if(inBest>0 && preBest>0 && inBest>preBest) pr++;
   });
-  let slS=0,slN=0,slG7=0, waS=0,waN=0,waHit=0, stS=0,stN=0,stHit=0, kcS=0,ptS=0,fdN=0;
+  let slS=0,slN=0,slG7=0, waS=0,waN=0,waHit=0, brS=0,brN=0,brHit=0, kcS=0,ptS=0,fdN=0;
   for(let i=0;i<7;i++){
     const d=dShift(ws,i);
     const sl=S.sleep[d]; if(sl){ slS+=sl.hrs; slN++; if(sl.q==='g'&&sl.hrs>=7) slG7++; }
     const w=S.water[d]||0; if(w>0){ waS+=w; waN++; if(w>=S.settings.waterGoal) waHit++; }
-    const sp=S.steps[d]||0; if(sp>0){ stS+=sp; stN++; if(sp>=(+S.settings.stepGoal||8000)) stHit++; }
+    const bm=breathMins(d); if(bm>0){ brS+=bm; brN++; if(bm>=breathGoalMins()) brHit++; }
     const ft=foodTotals(d); if(ft.kcal>0){ kcS+=ft.kcal; ptS+=ft.p; fdN++; }
   }
   const wts=S.weights.filter(function(x){return inR(x.date);}).sort(function(a,b){return a.date<b.date?-1:1;});
   return {ses:ses.length, vol:vol, dur:dur, km:Math.round(km*10)/10, pr:pr,
     sleep: slN? Math.round(slS/slN*10)/10 :0, slN:slN, slG7:slG7,
     water: waN? Math.round(waS/waN) :0, waHit:waHit,
-    steps: stS, stHit:stHit,
+    breath: brN? Math.round(brS/brN) :0, brDays:brN, brHit:brHit,
     kcal: fdN? Math.round(kcS/fdN) :0, prot: fdN? Math.round(ptS/fdN) :0, fdN:fdN,
     wDelta: wts.length>1? Math.round((wts[wts.length-1].kg-wts[0].kg)*10)/10 : null,
     wLast: wts.length? wts[wts.length-1].kg : null};
@@ -1495,10 +1546,10 @@ function openReport(ws){
     row('Time training', Math.round(cur.dur/60)+' min','')+
     row('New PRs', cur.pr,'')+
     (gtxt? '<div class="tiny muted num" style="padding:8px 2px">Working sets: '+gtxt+'</div>' : '');
-  h+=sect('Cardio & steps')+
+  h+=sect('Cardio & breathwork')+
     row('Distance', cur.km+' km', dif(cur.km,prv.km,' km'))+
-    row('Steps', cur.steps.toLocaleString(), dif(cur.steps,prv.steps,''))+
-    row('Step-goal days', cur.stHit+' / 7','');
+    row('Breathwork average', cur.brDays? cur.breath+' min':'—', dif(cur.breath,prv.breath,' min'))+
+    row('Days practised', cur.brDays+' / 7','');
   h+=sect('Sleep')+
     row('Average', cur.slN? cur.sleep+' h':'—', dif(cur.sleep,prv.sleep,' h'))+
     row('Nights logged', cur.slN+' / 7','');
@@ -1559,7 +1610,7 @@ function shareWeek(ws){
     x.fillStyle='#93a6b0'; x.font='500 38px Oswald';
     const bits=[];
     if(cur.slN) bits.push('SLEEP '+cur.sleep+'H AVG');
-    if(cur.steps) bits.push((Math.round(cur.steps/100)/10)+'K STEPS');
+    if(cur.brDays) bits.push('BREATHWORK ×'+cur.brDays);
     if(cur.waHit) bits.push('WATER GOAL ×'+cur.waHit);
     if(cur.km) bits.push(cur.km+' KM');
     x.fillText(bits.join('   ·   ')||'THE WORK CONTINUES', 72, 790);
@@ -1650,14 +1701,14 @@ function renderToday(){
   const pwk=programWeek(), pph=currentPhase();
   const planRt=todaysPlanRoutine(), brk=activeBreak(today());
   const sl=S.sleep[today()], sg=+st.sleepGoal||8;
-  const stp=S.steps[today()]||0, sgoal=+st.stepGoal||8000;
+  const brm=breathMins(today()), bgoal=breathGoalMins(), bstreak=breathStreak();
   const slog=S.suppLog[today()]||{};
   const suppDone=S.supps.filter(function(sp){return !!slog[sp.id];}).length;
   const pillars=[
     {l:'Train', on: sToday.length>0 || (!planRt && !S.active)},
     {l:'Water', on: w>=st.waterGoal},
     {l:'Protein', on: ft.p>=(+st.proteinGoal||120)*0.8},
-    {l:'Steps', on: stp>=sgoal},
+    {l:'Breath', on: brm>=bgoal},
     {l:'Sleep', on: !!sl}
   ];
   const pdone=pillars.filter(function(p){return p.on;}).length;
@@ -1704,10 +1755,10 @@ function renderToday(){
       '<div class="bar" style="margin-top:8px"><i style="width:'+(kp*100)+'%; background:var(--fd)"></i></div>'+
       '<div class="ts num" style="margin-top:6px">P '+Math.round(ft.p)+'/'+st.proteinGoal+'g</div>'+
       '<div class="bar" style="margin-top:3px"><i style="width:'+(ppr*100)+'%; background:var(--fd)"></i></div></button>'+
-    '<button class="tile" onclick="stepsForm()"><span class="tl">Steps <span style="color:var(--stp)">●</span></span>'+
-      '<div class="tv num">'+stp.toLocaleString()+'</div>'+
-      '<div class="bar" style="margin-top:8px"><i style="width:'+Math.min(100,stp/sgoal*100)+'%; background:var(--stp)"></i></div>'+
-      '<div class="ts num" style="margin-top:6px">goal '+sgoal.toLocaleString()+'</div></button>'+
+    '<button class="tile" onclick="breathForm()"><span class="tl">Breathwork <span style="color:var(--br)">●</span></span>'+
+      '<div class="tv num">'+brm+'<span class="ts"> / '+bgoal+' min</span></div>'+
+      '<div class="bar" style="margin-top:8px"><i style="width:'+Math.min(100,brm/bgoal*100)+'%; background:var(--br)"></i></div>'+
+      '<div class="ts" style="margin-top:6px">'+(bstreak>1? bstreak+'-day streak' : 'tap to log')+'</div></button>'+
     '<button class="tile" onclick="logSleepForm()"><span class="tl">Sleep <span style="color:var(--sl)">●</span></span>'+
       '<div class="tv num">'+(sl? sl.hrs+'h':'—')+'</div>'+
       '<div class="bar" style="margin-top:8px"><i style="width:'+(sl?Math.min(100,sl.hrs/sg*100):0)+'%; background:var(--sl)"></i></div>'+
@@ -1789,6 +1840,7 @@ function achievements(){
   const vol=S.sessions.reduce(function(a,s){return a+(s.vol||0);},0);
   const prs=S.sessions.reduce(function(a,s){return a+((s.prs||[]).length);},0);
   const waterDays=Object.keys(S.water).filter(function(d){return S.water[d]>=S.settings.waterGoal;}).length;
+  const breathDays=Object.keys(S.breath).filter(function(d){return S.breath[d]>0;}).length;
   return [
     {i:'🎯', t:'First workout', ok:n>=1},
     {i:'🔟', t:'10 workouts', ok:n>=10},
@@ -1802,6 +1854,7 @@ function achievements(){
     {i:'🚀', t:'250 tonnes lifted', ok:vol>=250000},
     {i:'💧', t:'Water goal ×7 days', ok:waterDays>=7},
     {i:'🌙', t:'Sleep logged ×7', ok:Object.keys(S.sleep).length>=7},
+    {i:'🌬️', t:'Breathwork ×7 days', ok:breathDays>=7},
     {i:'📸', t:'First progress photo', ok:S.photos.length>=1},
     {i:'📏', t:'First measurements', ok:S.measures.length>=1}
   ];
@@ -3038,7 +3091,7 @@ function openSettings(){
     '<div class="fields2">'+
     '<div class="field"><label for="sSlRemind">Sleep wind-down time</label><input id="sSlRemind" type="time" value="'+esc(st.sleepRemind)+'"></div>'+
     '<div class="field"><label for="sSlGoal">Sleep goal (hours)</label><input id="sSlGoal" type="number" inputmode="decimal" step="0.5" value="'+(+st.sleepGoal||8)+'"></div></div>'+
-    '<div class="field"><label for="sStpGoal">Step goal (per day)</label><input id="sStpGoal" type="number" inputmode="numeric" value="'+(+st.stepGoal||8000)+'"></div>'+
+    '<div class="field"><label for="sBrGoal">Breathwork goal (minutes per day)</label><input id="sBrGoal" type="number" inputmode="numeric" value="'+(+st.breathGoal||15)+'"></div>'+
     '<div class="tiny muted" style="font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin:14px 0 8px">Custom daily reminders</div>'+
     ((S.reminders&&S.reminders.length)
       ? S.reminders.map(function(r){ return '<div class="listrow"><span class="small">'+esc(r.label)+' <span class="muted num">· '+r.time+(r.date?' · once on '+fmtD(r.date):' daily')+'</span></span><button class="btn ghost sm danger" onclick="delReminder(\''+r.id+'\')">✕</button></div>'; }).join('')
@@ -3098,7 +3151,7 @@ function collectSettings(){
   st.waterRemind=$('#sWaterRemind').checked; st.waterEvery=Math.max(10,+$('#sWaterEvery').value||60);
   st.workoutRemind=$('#sWkRemind').value;
   st.sleepRemind=$('#sSlRemind').value; st.sleepGoal=+$('#sSlGoal').value||8;
-  st.stepGoal=+$('#sStpGoal').value||8000;
+  st.breathGoal=+$('#sBrGoal').value||15;
 }
 function exportData(){
   const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
@@ -3150,7 +3203,7 @@ setInterval(function(){
     spRemindedOn=today();
     const missed=S.supps.filter(function(sp){ return !(S.suppLog[today()]||{})[sp.id]; })
       .map(function(sp){ return sp.name.split(' — ')[0]; });
-    if(!S.steps[today()]) missed.push('today’s steps');
+    if(!breathMins(today())) missed.push('breathwork');
     if(missed.length) notify('Evening check ✅', missed.join(', '), true);
   }
   if(st.waterRemind && hr>=8 && hr<22){
