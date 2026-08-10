@@ -440,11 +440,11 @@ const SEED_RT=[
   {name:'Push day', ex:['Bench press','Overhead press','Incline dumbbell press','Chest fly (dumbbell)','Lateral raise','Triceps pushdown']},
   {name:'Pull day', ex:['Deadlift','Pull-ups','Seated cable row','Face pull','Barbell curl','Hammer curl']},
   {name:'Legs day', ex:['Squat','Romanian deadlift','Leg press','Leg curl','Bulgarian split squat','Calf raise']},
-  {name:'Push — wrist-safe return', ex:['Incline dumbbell press','Chest fly (dumbbell)','Lateral raise','Overhead triceps extension','Triceps pushdown','Plank']},
-  {name:'Pull — wrist-safe return', ex:['Lat pulldown','Seated cable row','One-arm dumbbell row','Face pull','Reverse fly','Hammer curl']},
-  {name:'Legs — knee-safe return', ex:['Glute bridge','Romanian deadlift','Hip thrust','Leg curl','Calf raise','Wall sit (pain-free)']},
+  {name:'Push: wrist-safe return', ex:['Incline dumbbell press','Chest fly (dumbbell)','Lateral raise','Overhead triceps extension','Triceps pushdown','Plank']},
+  {name:'Pull: wrist-safe return', ex:['Lat pulldown','Seated cable row','One-arm dumbbell row','Face pull','Reverse fly','Hammer curl']},
+  {name:'Legs: knee-safe return', ex:['Glute bridge','Romanian deadlift','Hip thrust','Leg curl','Calf raise','Wall sit (pain-free)']},
   {name:'Rehab: knee & wrist (~15 min)', ex:['Wrist circles & prayer stretch','Straight-leg raise','Wall sit (pain-free)','Glute bridge','Ankle rocks','Deep squat hold']},
-  {name:'Conditioning — joint-friendly', ex:['Cycling','Kettlebell swing','Farmer’s carry','Glute bridge','Plank']},
+  {name:'Conditioning: joint-friendly', ex:['Cycling','Kettlebell swing','Farmer’s carry','Glute bridge','Plank']},
   {name:'Hyrox stations', ex:['Rowing (erg)','Wall balls','Burpee broad jump','Farmer’s carry','Sandbag lunges','Kettlebell swing']},
   {name:'Mobility & flexibility (~20 min)', ex:['Cat-cow','Downward dog to cobra',"World's greatest stretch",'90/90 hip switch','Deep squat hold','Couch stretch','Standing hamstring fold','Shoulder dislocates (stick)','Cossack squat','Dead hang']},
   {name:'Agility & conditioning', ex:['Jumping jacks','High knees','Mountain climbers','Cossack squat','Bear crawl','Burpees','Kettlebell swing']}
@@ -654,7 +654,7 @@ function seedV8(){
      (reps on the DB presses and reverse flys estimated) */
   if(!S.sessions.some(function(s){return s.date==='2026-08-09';})){
     function E(n,sets){ return {exId:exId(n), sets:sets.map(function(p){return {w:p[0], r:p[1], done:true};})}; }
-    S.sessions.push({id:uid(), name:'Return — full body (light)', date:'2026-08-09', dur:52*60, vol:1270,
+    S.sessions.push({id:uid(), name:'Return: full body (light)', date:'2026-08-09', dur:52*60, vol:1270,
       ex:[E('Walking',[[1.2,15]]), E('Treadmill run',[[1,7]]), E('Jumping jacks',[[0,20]]),
           E('Goblet squat',[[5,12],[5,12],[5,12]]),
           E('Dumbbell bench press',[[5,12],[7.5,12],[10,10]]),
@@ -678,7 +678,7 @@ function seedV9(){
     if(!S.exercises.some(function(x){return x.name===e[0];}))
       S.exercises.push({id:uid(), name:e[0], group:e[1]});
   });
-  const ret=S.sessions.find(function(s){return s.date==='2026-08-09' && s.name==='Return — full body (light)';});
+  const ret=S.sessions.find(function(s){return s.date==='2026-08-09' && s.name==='Return: full body (light)';});
   const pu=S.exercises.find(function(x){return x.name==='Push-ups';});
   if(ret && pu && !ret.ex.some(function(e){return e.exId===pu.id;})){
     ret.ex.push({exId:pu.id, sets:[{w:0,r:15,done:true},{w:0,r:15,done:true},{w:0,r:15,done:true}]});
@@ -710,12 +710,12 @@ function seedV5(){
 function seedV7(){
   if(S.seedV7) return; S.seedV7=true;
   (PUB ? [
-    {name:'Creatine 5g — daily', kcal:0, p:0, c:0, f:0, logFood:false},
+    {name:'Creatine 5g: daily', kcal:0, p:0, c:0, f:0, logFood:false},
     {name:'Whey protein (1 scoop)', kcal:130, p:24, c:4, f:2, logFood:true}
   ] : [
-    {name:'Creatine 5g — GNC monohydrate', kcal:0, p:0, c:0, f:0, logFood:false},
-    {name:'Whey — Avatar Malay Kulfi (1 scoop)', kcal:150, p:27.5, c:4, f:2, logFood:true},
-    {name:'Casein — before bed', kcal:120, p:24, c:4, f:1, logFood:true}
+    {name:'Creatine 5g: GNC monohydrate', kcal:0, p:0, c:0, f:0, logFood:false},
+    {name:'Whey: Avatar Malay Kulfi (1 scoop)', kcal:150, p:27.5, c:4, f:2, logFood:true},
+    {name:'Casein: before bed', kcal:120, p:24, c:4, f:1, logFood:true}
   ]).forEach(function(sp){
     if(!S.supps.some(function(x){return x.name===sp.name;}))
       S.supps.push(Object.assign({id:uid()}, sp));
@@ -729,18 +729,18 @@ function seedV6(){
   if(!S.plan || !Object.keys(S.plan).some(function(k){return S.plan[k];})){
     const byName=function(n){ const r=S.routines.find(function(x){return x.name===n;}); return r? r.id : ''; };
     S.plan={
-      1: byName('Push — wrist-safe return'),
+      1: byName('Push: wrist-safe return'),
       2: byName('Rehab: knee & wrist (~15 min)'),
-      3: byName('Pull — wrist-safe return'),
-      4: byName('Conditioning — joint-friendly'),
-      5: byName('Legs — knee-safe return'),
+      3: byName('Pull: wrist-safe return'),
+      4: byName('Conditioning: joint-friendly'),
+      5: byName('Legs: knee-safe return'),
       6: byName('Mobility & flexibility (~20 min)'),
       0: ''
     };
   }
   save();
 }
-function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toast('Could not save — storage unavailable'); } }
+function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toast('Could not save, storage unavailable'); } }
 
 /* v10: coach optimization — density shake, breathwork in routines, BCA re-scan */
 function seedV10(){
@@ -761,11 +761,11 @@ function seedV12(){
   if(PUB){ S.seedV12=true; return; }
   if(S.seedV12) return; S.seedV12=true;
   [
-    ['D3 + K2 — morning, with food', /d3/i],
-    ['B12 — morning', /b12/i],
-    ['Calcium — with lunch', /calcium/i],
-    ['Magnesium — before bed', /magnesium/i],
-    ['Zinc — before bed', /zinc/i]
+    ['D3 + K2: morning, with food', /d3/i],
+    ['B12: morning', /b12/i],
+    ['Calcium: with lunch', /calcium/i],
+    ['Magnesium: before bed', /magnesium/i],
+    ['Zinc: before bed', /zinc/i]
   ].forEach(function(sp){
     if(!S.supps.some(function(x){return sp[1].test(x.name);}))
       S.supps.push({id:uid(), name:sp[0], kcal:0, p:0, c:0, f:0, logFood:false});
@@ -777,8 +777,8 @@ function seedV13(){
   if(PUB){ S.seedV13=true; return; }
   if(S.seedV13) return; S.seedV13=true;
   [
-    ['Omega-3 — with lunch', /omega/i],
-    ['L-theanine — evening wind-down', /theanine/i]
+    ['Omega-3: with lunch', /omega/i],
+    ['L-theanine: evening wind-down', /theanine/i]
   ].forEach(function(sp){
     if(!S.supps.some(function(x){return sp[1].test(x.name);}))
       S.supps.push({id:uid(), name:sp[0], kcal:0, p:0, c:0, f:0, logFood:false});
@@ -846,14 +846,43 @@ function seedV16(){
   save();
 }
 
+/* v17: em dashes removed from app copy. Seeded names changed with it, so the
+   copies already written to this store are rewritten to match. Runs in both
+   builds; both seeded em-dashed names. */
+function seedV17(){
+  if(S.seedV17) return; S.seedV17=true;
+  const fix=function(n){
+    if(typeof n!=='string' || n.indexOf('—')<0) return n;
+    return n.replace(/\s—\s/g,': ').replace(/—/g,',');
+  };
+  ['supps','routines','sessions','myFoods','exercises','reminders','breaks','quick'].forEach(function(k){
+    (S[k]||[]).forEach(function(o){
+      if(o.name) o.name=fix(o.name);
+      if(o.label) o.label=fix(o.label);
+    });
+  });
+  /* PR lines are stored text too ("70×5 — heaviest ever") */
+  (S.sessions||[]).forEach(function(s){
+    (s.prs||[]).forEach(function(p){ if(p.txt) p.txt=fix(p.txt); if(p.ex) p.ex=fix(p.ex); });
+  });
+  /* logged food entries keep a copy of the name they were logged under */
+  Object.keys(S.food||{}).forEach(function(d){
+    ['b','l','d','s'].forEach(function(m){ ((S.food[d]||{})[m]||[]).forEach(function(e){ e.name=fix(e.name); }); });
+  });
+  /* phase names are persisted here and compared by equality: without this the
+     app would think a new phase just unlocked and fire the celebration */
+  if(S.lastPhase) S.lastPhase=fix(S.lastPhase);
+  save();
+}
+
 /* ============ migration runner ============
    Ordered and append-only — this list IS the execution order (it preserves
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
- seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16].forEach(function(step){ step(); });
-S.schemaVersion=16;
+ seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17].forEach(function(step){ step(); });
+S.schemaVersion=17;
 
 /* ============ utils ============ */
 function $(s){ return document.querySelector(s); }
@@ -905,7 +934,7 @@ function notify(title, body, sound){
       } else fallback();
     }
   }catch(e){}
-  toast(title + (body ? ' — '+body : ''));
+  toast(title + (body ? ': '+body : ''));
   vib([200,80,200]);
   if(sound) beep(2);
 }
@@ -950,12 +979,12 @@ const QUOTES=[
 'Little by little, a little becomes a lot.',
 'You are one workout away from a better mood.',
 'Motivation gets you started. Habit keeps you going.',
-'Take care of your body — it’s the only place you have to live.',
+'Take care of your body. It’s the only place you have to live.',
 'Slow progress is still progress.',
 'The best project you’ll ever work on is you.',
 'Fall in love with the process and the results will come.',
 'What seems impossible today will one day be your warm-up.',
-'Don’t count the days — make the days count.',
+'Don’t count the days. Make the days count.',
 'Showing up is the whole battle.',
 'Rest days build muscle. Guilt builds nothing.',
 'Compare only with yesterday’s you.',
@@ -964,33 +993,33 @@ const QUOTES=[
 'Strength is built in the reps you didn’t feel like doing.',
 'Energy creates energy. Start moving.',
 'The wedding photos are being taken now, in the gym.',
-'Trust the boring weeks — they’re the ones that work.',
+'Trust the boring weeks. They’re the ones that work.',
 'Your future self is watching through your memories.',
 'Champions train. Everyone else waits for motivation.'];
 const TIPS=[
-'Creatine works by saturation, not timing — the daily tick matters more than the clock.',
+'Creatine works by saturation, not timing. The daily tick matters more than the clock.',
 'Protein within ~2 hours after training gives a small but real edge.',
-'In Jaipur’s dry heat you dehydrate without visible sweat — sip before you feel thirsty.',
-'Muscle is built during sleep — the gym only sends the signal.',
+'In Jaipur’s dry heat you dehydrate without visible sweat. Sip before you feel thirsty.',
+'Muscle is built during sleep. The gym only sends the signal.',
 'A 10-minute walk after meals blunts the blood-sugar spike from rice and rotis.',
-'Chai without sugar saves ~45 kcal a cup — three cups a day is a laddu a week.',
-'Grip fails before the back on deadlifts — dead hangs fix both.',
-'Warm muscles stretch, cold muscles tear — never stretch hard before warming up.',
-'Soreness is not the measure of a good workout — progressive load is.',
+'Chai without sugar saves ~45 kcal a cup, so three cups a day is a laddu a week.',
+'Grip fails before the back on deadlifts. Dead hangs fix both.',
+'Warm muscles stretch, cold muscles tear, so never stretch hard before warming up.',
+'Soreness is not the measure of a good workout. Progressive load is.',
 'Paneer or curd at dinner drip-feeds protein all night, like natural casein.',
 'Nasal breathing on easy runs builds your engine faster than harder mouth-breathing.',
 'Even 2% dehydration measurably costs you reps.',
 'The knee heals with pain-free motion, not rest alone.',
-'Three average workouts beat one heroic one — every single week.',
+'Three average workouts beat one heroic one, every single week.',
 'Caffeine within 8 hours of bed steals deep sleep even if you fall asleep fine.',
 'Photos every 2 weeks catch what the daily mirror hides.',
 'Goblet squats build the same legs as front squats without loading the wrists.',
-'Fibre from dal and sabzi keeps protein absorption steady — thali wisdom is real.',
-'Late screens delay melatonin ~30 minutes — the 22:30 wind-down is physiology.',
+'Fibre from dal and sabzi keeps protein absorption steady. Thali wisdom is real.',
+'Late screens delay melatonin ~30 minutes. The 22:30 wind-down is physiology.',
 'A planned deload every 6–8 weeks makes you stronger, not weaker.',
-'Make the exhale longer than the inhale — that ratio, not the length, is what flips you into recovery.',
-'Wall balls test breathing more than muscles — that’s why Hyrox loves them.',
-'Magnesium at night improves sleep quality — watch your “woke rested” count.',
+'Make the exhale longer than the inhale. That ratio, not the length, is what flips you into recovery.',
+'Wall balls test breathing more than muscles. That’s why Hyrox loves them.',
+'Magnesium at night improves sleep quality. Watch your “woke rested” count.',
 'Volume drives muscle; intensity drives strength; consistency drives both.'];
 function dayIdx(){ return Math.floor(new Date(today()+'T12:00:00').getTime()/86400000); }
 
@@ -1010,7 +1039,7 @@ const CD_BY_GROUP={
   Back:'Lat stretch on the rack 40s/side · child’s pose 45s',
   Legs:'Quad, hamstring and couch stretch 45s each',
   Shoulders:'Cross-body stretch 30s/side',
-  Arms:'Wrist flexor stretch 30s/side — protect that wrist',
+  Arms:'Wrist flexor stretch 30s/side, protect that wrist',
   Core:'Cobra hold 30s',
   Conditioning:'3 min walk, breathing slowing down',
   Cardio:'3–5 min walk with nasal breathing'
@@ -1025,15 +1054,17 @@ function foodTotals(date){
   return {kcal:kcal,p:p,c:c,f:f};
 }
 /* ============ coach ============ */
+/* tolerant of the old em-dash phase names still sitting in S.lastPhase */
+const PHASE_PREFIX=/^Phase \d+\s*[—:-]\s*/;
 const PROGRAM= PUB ? {start:null, phases:[
-  {w:4,   name:'Phase 1 — Foundation', desc:'Habits first: three sessions a week at easy loads, full range of motion, water and sleep dialled in. Exit test: four consistent weeks.'},
-  {w:16,  name:'Phase 2 — Build', desc:'Progressive overload — chase the amber targets, grow your cardio base, hit protein daily. Exit test: visibly stronger across twelve weeks.'},
-  {w:999, name:'Phase 3 — Perform', desc:'Train for something: a race, a number, a photo. PRs, a deload every 6–8 weeks, and a streak that never dies.'}
+  {w:4,   name:'Phase 1: Foundation', desc:'Habits first: three sessions a week at easy loads, full range of motion, water and sleep dialled in. Exit test: four consistent weeks.'},
+  {w:16,  name:'Phase 2: Build', desc:'Progressive overload. Chase the amber targets, grow your cardio base, hit protein daily. Exit test: visibly stronger across twelve weeks.'},
+  {w:999, name:'Phase 3: Perform', desc:'Train for something: a race, a number, a photo. PRs, a deload every 6–8 weeks, and a streak that never dies.'}
 ]} : {start:'2026-08-09', phases:[
-  {w:4,  name:'Phase 0 — Rebuild', desc:'Daily rehab block, the three return routines, daily breathwork, sleep by 11. Exit test: one fully pain-free week + a brisk 30-minute walk feeling easy.'},
-  {w:12, name:'Phase 1 — Base', desc:'Run/walk intervals 3×/week, strength rebuilt to ~80% of May weights, full Push/Pull/Legs returns. Exit test: 5 km continuous run and squat 50×8, both pain-free.'},
-  {w:20, name:'Phase 2 — Hyrox strength', desc:'Runs grow to 6–8 km with one weekly tempo. Hyrox stations once a week — wall balls light, burpee broad jumps low volume. Exit test: 8 km easy run, 50 unbroken wall balls.'},
-  {w:32, name:'Phase 3 — Simulation', desc:'Weekly bricks (1 km run + station + 1 km run), half-simulation ~week 26, full simulation ~week 30 — then enter the race.'}
+  {w:4,  name:'Phase 0: Rebuild', desc:'Daily rehab block, the three return routines, daily breathwork, sleep by 11. Exit test: one fully pain-free week + a brisk 30-minute walk feeling easy.'},
+  {w:12, name:'Phase 1: Base', desc:'Run/walk intervals 3×/week, strength rebuilt to ~80% of May weights, full Push/Pull/Legs returns. Exit test: 5 km continuous run and squat 50×8, both pain-free.'},
+  {w:20, name:'Phase 2: Hyrox strength', desc:'Runs grow to 6–8 km with one weekly tempo. Hyrox stations once a week: wall balls light, burpee broad jumps low volume. Exit test: 8 km easy run, 50 unbroken wall balls.'},
+  {w:32, name:'Phase 3: Simulation', desc:'Weekly bricks (1 km run + station + 1 km run), half-simulation ~week 26, full simulation ~week 30, then enter the race.'}
 ]};
 function programWeek(){
   const startD = PUB ? (S.programStart||today()) : PROGRAM.start;
@@ -1043,7 +1074,7 @@ function programWeek(){
 function currentPhase(){
   const wk=programWeek();
   for(let i=0;i<PROGRAM.phases.length;i++){ if(wk<=PROGRAM.phases[i].w) return PROGRAM.phases[i]; }
-  return {w:99, name:'Race ready', desc:'The build is done — maintain, simulate, compete.'};
+  return {w:99, name:'Race ready', desc:'The build is done. Maintain, simulate, compete.'};
 }
 function phaseInfo(){
   const wk=programWeek(), cur=currentPhase();
@@ -1072,9 +1103,9 @@ function targetFor(exId){
     const ld=lastDateFor(exId);
     if(ld){
       const gap=Math.round((new Date(today()+'T12:00:00')-new Date(ld+'T12:00:00'))/86400000);
-      if(gap>21) return 'comeback: ~'+Math.max(10,Math.round(b*0.6/5)*5)+'s — '+gap+' days since last time, rebuild the hold';
+      if(gap>21) return 'comeback: ~'+Math.max(10,Math.round(b*0.6/5)*5)+'s, '+gap+' days since last time, rebuild the hold';
     }
-    return 'target: '+(b+5)+'s — five seconds longer than last time';
+    return 'target: '+(b+5)+'s, five seconds longer than last time';
   }
   if(g==='Cardio'||g==='Mobility') return null;
   const pa=prevArr(exId); if(!pa) return null;
@@ -1088,12 +1119,12 @@ function targetFor(exId){
   if(ld){
     const gap=Math.round((new Date(today()+'T12:00:00')-new Date(ld+'T12:00:00'))/86400000);
     if(gap>21 && w>0){
-      return 'comeback: ~'+Math.max(2.5,round25(w*0.6))+'×10–12 light — '+gap+' days since last time, rebuild first';
+      return 'comeback: ~'+Math.max(2.5,round25(w*0.6))+'×10–12 light, '+gap+' days since last time, rebuild first';
     }
   }
   if(!w) return r ? 'target: '+(r+1)+' reps' : null;
-  if(r>=12) return 'target: '+round25(w+2.5)+'×8 — add weight, reset reps';
-  return 'target: '+w+'×'+(r+1)+' — one more rep than last time';
+  if(r>=12) return 'target: '+round25(w+2.5)+'×8, add weight, reset reps';
+  return 'target: '+w+'×'+(r+1)+', one more rep than last time';
 }
 function warmupFor(exId){
   const pa=prevArr(exId); if(!pa) return null;
@@ -1115,68 +1146,68 @@ const CUES={
   'Lunges':'Long step, tall torso; back knee kisses the floor; drive through the front heel.',
   'Leg press':'Feet mid-platform; stay in the pain-free knee range; never slam into lockout.',
   'Wall balls':'It is a squat plus a push, not an arm throw; hit the same spot every rep.',
-  'Kettlebell swing':'A hip hinge, not a squat; arms are ropes — the hips snap, the glutes finish.',
+  'Kettlebell swing':'A hip hinge, not a squat; arms are ropes; the hips snap, the glutes finish.',
   'Burpee broad jump':'Land soft with bent knees; step back instead of jumping back while the wrists heal.',
   'Farmer’s carry':'Tall posture, packed shoulders, quick small steps; tight grip, neutral wrists.',
-  'Walking':'Nasal breathing only — recovery and aerobic engine in one.',
+  'Walking':'Nasal breathing only: recovery and aerobic engine in one.',
   'Treadmill run':'Easy pace, nasal breathing where possible; land soft, feet under the hips.',
   'Running (outdoor)':'Conversational pace; short quick steps, land under your hips, breathe through the nose on easy runs.',
-  'Cycling':'Smooth circles, easy gear — zone 2 is where the engine grows.',
+  'Cycling':'Smooth circles, easy gear. Zone 2 is where the engine grows.',
   'Breathwork':'Post-training or pre-sleep. Slow nasal inhale, longer exhale; 15–30 min daily.'
 };
 /* movement-pattern diagrams: grey = start, amber = finish */
 const STAND_A='<circle cx="55" cy="22" r="6.5" class="fs"/><polyline points="55,29 55,62" class="fs"/><polyline points="55,36 63,54" class="fs"/><polyline points="55,62 52,86 53,110" class="fs"/><polyline points="55,62 59,86 58,110" class="fs"/>';
 const PATTERNS={
-  squat:{label:'Squat pattern — sit down between the heels', svg:STAND_A+
+  squat:{label:'Squat pattern: sit down between the heels', svg:STAND_A+
     '<circle cx="145" cy="51" r="6.5" class="fe"/><polyline points="143,58 137,80" class="fe"/><polyline points="141,63 155,67" class="fe"/><polyline points="137,80 156,93 150,110" class="fe"/><polyline points="137,80 152,96 146,110" class="fe"/><path d="M85,55 Q100,82 118,74" class="fa"/>'},
-  hinge:{label:'Hip hinge — hips back, back flat', svg:STAND_A+
+  hinge:{label:'Hip hinge: hips back, back flat', svg:STAND_A+
     '<circle cx="165" cy="57" r="6.5" class="fe"/><polyline points="136,72 158,60" class="fe"/><polyline points="158,60 158,86" class="fe"/><circle cx="158" cy="91" r="5" class="fe"/><polyline points="136,72 144,92 140,110" class="fe"/><polyline points="136,72 140,94 136,110" class="fe"/><path d="M85,55 Q104,72 120,66" class="fa"/>'},
-  vpush:{label:'Vertical press — ribs down, finish by the ear', svg:
+  vpush:{label:'Vertical press: ribs down, finish by the ear', svg:
     '<circle cx="55" cy="22" r="6.5" class="fs"/><polyline points="55,29 55,62" class="fs"/><polyline points="55,36 64,32" class="fs"/><circle cx="67" cy="30" r="4" class="fs"/><polyline points="55,62 52,86 53,110" class="fs"/><polyline points="55,62 59,86 58,110" class="fs"/>'+
     '<circle cx="145" cy="26" r="6.5" class="fe"/><polyline points="145,33 145,64" class="fe"/><polyline points="145,38 150,14" class="fe"/><circle cx="151" cy="11" r="4" class="fe"/><polyline points="145,64 142,88 143,110" class="fe"/><polyline points="145,64 149,88 148,110" class="fe"/><path d="M85,40 Q110,30 128,22" class="fa"/>'},
-  vpull:{label:'Vertical pull — elbows drive to the ribs', svg:
+  vpull:{label:'Vertical pull: elbows drive to the ribs', svg:
     '<line x1="100" y1="14" x2="192" y2="14" class="fg"/>'+
     '<circle cx="125" cy="32" r="6.5" class="fs"/><polyline points="125,39 125,66" class="fs"/><polyline points="125,39 118,14" class="fs"/><polyline points="125,39 132,14" class="fs"/><polyline points="125,66 128,86 125,102" class="fs"/>'+
     '<circle cx="168" cy="24" r="6.5" class="fe"/><polyline points="168,31 168,58" class="fe"/><polyline points="168,31 160,14" class="fe"/><polyline points="168,31 176,14" class="fe"/><polyline points="168,58 171,78 168,96" class="fe"/><path d="M138,50 Q150,38 158,32" class="fa"/>'},
-  hpush:{label:'Horizontal press — bar over the chest, wrists stacked', svg:
+  hpush:{label:'Horizontal press: bar over the chest, wrists stacked', svg:
     '<line x1="55" y1="86" x2="150" y2="86" class="fg"/><line x1="66" y1="86" x2="66" y2="102" class="fg"/><line x1="140" y1="86" x2="140" y2="102" class="fg"/>'+
     '<circle cx="58" cy="78" r="6.5" class="fs"/><polyline points="67,80 112,80" class="fs"/><polyline points="112,80 128,92 128,110" class="fs"/>'+
     '<polyline points="80,80 92,68" class="fs"/><circle cx="95" cy="65" r="4" class="fs"/>'+
     '<polyline points="80,80 80,48" class="fe"/><circle cx="80" cy="44" r="4" class="fe"/><path d="M96,62 Q92,50 86,48" class="fa"/>'},
-  hpull:{label:'Row — pull to the lower ribs, back stays flat', svg:
+  hpull:{label:'Row: pull to the lower ribs, back stays flat', svg:
     '<polyline points="90,72 96,92 92,110" class="fs"/><polyline points="90,72 92,94 88,110" class="fs"/><polyline points="90,72 116,52" class="fs"/><circle cx="123" cy="48" r="6.5" class="fs"/>'+
     '<polyline points="114,54 118,80" class="fs"/><circle cx="118" cy="85" r="4" class="fs"/>'+
     '<polyline points="114,54 106,64" class="fe"/><circle cx="104" cy="68" r="4" class="fe"/><path d="M120,78 Q112,74 108,68" class="fa"/>'},
-  lunge:{label:'Lunge — both knees to 90°, torso tall', svg:STAND_A+
+  lunge:{label:'Lunge: both knees to 90°, torso tall', svg:STAND_A+
     '<circle cx="140" cy="31" r="6.5" class="fe"/><polyline points="140,38 140,66" class="fe"/><polyline points="140,44 148,58" class="fe"/><polyline points="140,66 158,88 158,110" class="fe"/><polyline points="140,66 128,92 116,106" class="fe"/><path d="M85,55 Q100,78 116,72" class="fa"/>'},
-  carry:{label:'Loaded carry — tall, tight grip, small steps', svg:
+  carry:{label:'Loaded carry: tall, tight grip, small steps', svg:
     '<circle cx="100" cy="22" r="6.5" class="fe"/><polyline points="100,29 100,62" class="fe"/><polyline points="100,36 94,64" class="fe"/><circle cx="94" cy="70" r="5" class="fe"/><polyline points="100,36 106,64" class="fe"/><circle cx="106" cy="70" r="5" class="fe"/><polyline points="100,62 92,88 86,110" class="fe"/><polyline points="100,62 108,86 114,108" class="fe"/><path d="M130,58 L162,58" class="fa"/>'},
-  core:{label:'Plank — one straight line, hips level', svg:
+  core:{label:'Plank: one straight line, hips level', svg:
     '<circle cx="54" cy="82" r="6.5" class="fe"/><polyline points="62,88 60,104" class="fe"/><polyline points="52,104 72,104" class="fe"/><polyline points="62,88 128,96" class="fe"/><polyline points="128,96 158,106 163,110" class="fe"/>'},
-  stretch:{label:'Stretch — ease in, breathe, no bouncing', svg:
+  stretch:{label:'Stretch: ease in, breathe, no bouncing', svg:
     '<polyline points="100,64 100,110" class="fe"/><polyline points="105,64 105,110" class="fe"/><polyline points="102,64 88,88" class="fe"/><circle cx="85" cy="95" r="6.5" class="fe"/><polyline points="88,88 90,106" class="fe"/>'},
-  curl:{label:'Elbow flexion — elbow pinned, no swinging', svg:
+  curl:{label:'Elbow flexion: elbow pinned, no swinging', svg:
     '<circle cx="90" cy="22" r="6.5" class="fe"/><polyline points="90,29 90,62" class="fe"/><polyline points="90,62 87,86 88,110" class="fe"/><polyline points="90,62 94,86 93,110" class="fe"/>'+
     '<polyline points="90,36 96,62" class="fs"/><circle cx="97" cy="67" r="4" class="fs"/>'+
     '<polyline points="90,36 98,52 88,44" class="fe"/><circle cx="85" cy="42" r="4" class="fe"/><path d="M102,62 Q106,50 96,44" class="fa"/>'},
-  raise:{label:'Raise — to shoulder height, lead with elbows', svg:
+  raise:{label:'Raise: to shoulder height, lead with elbows', svg:
     '<circle cx="90" cy="22" r="6.5" class="fe"/><polyline points="90,29 90,62" class="fe"/><polyline points="90,62 87,86 88,110" class="fe"/><polyline points="90,62 94,86 93,110" class="fe"/>'+
     '<polyline points="90,36 94,62" class="fs"/><circle cx="95" cy="66" r="4" class="fs"/>'+
     '<polyline points="90,36 116,34" class="fe"/><circle cx="121" cy="34" r="4" class="fe"/><path d="M100,60 Q116,52 118,40" class="fa"/>'},
-  cardio:{label:'Steady effort — a pace you could talk through', svg:
+  cardio:{label:'Steady effort: a pace you could talk through', svg:
     '<circle cx="92" cy="20" r="6.5" class="fe"/><polyline points="92,27 100,56" class="fe"/><polyline points="94,34 106,42 114,34" class="fe"/><polyline points="94,34 84,44" class="fe"/><polyline points="100,56 114,74 110,96" class="fe"/><polyline points="100,56 90,80 80,102" class="fe"/><path d="M50,40 L66,40" class="fa"/><path d="M44,52 L60,52" class="fa"/>'}
 };
 const PATTERN_STEPS={
   squat:['Feet shoulder-width, toes slightly out.','Sit the hips down and back; knees track over the toes.','Drive through the whole foot to stand tall.'],
-  hinge:['Soft knees, chest proud.','Push the hips straight back until the hamstrings load.','Squeeze the glutes to stand — don’t lift with the lower back.'],
+  hinge:['Soft knees, chest proud.','Push the hips straight back until the hamstrings load.','Squeeze the glutes to stand, don’t lift with the lower back.'],
   hpush:['Shoulder blades pinched, feet planted.','Lower under control to the chest.','Press up and slightly back, wrists stacked straight.'],
   vpush:['Ribs down, glutes tight before the press.','Press until the arm finishes by your ear.','Lower under control back to the shoulders.'],
-  vpull:['Start from active shoulders, not a dead hang.','Drive the elbows down toward the ribs.','Lower slowly — the way down builds the back.'],
+  vpull:['Start from active shoulders, not a dead hang.','Drive the elbows down toward the ribs.','Lower slowly; the way down builds the back.'],
   hpull:['Hinge and keep the back flat.','Pull the weight to the lower ribs.','Lower slowly without twisting.'],
   lunge:['Take a long step, torso tall.','Lower until both knees reach ~90°.','Push through the front heel to return.'],
   carry:['Stand tall, shoulders packed down.','Grip tight, wrists neutral.','Walk with quick, small steps.'],
   core:['Elbows under the shoulders.','Squeeze glutes and abs into one straight line.','Keep breathing; never let the hips sag.'],
-  stretch:['Ease in — no bouncing.','Hold 45–60 seconds per side, breathing slowly.','Stretch to tension, never into sharp pain.'],
+  stretch:['Ease in, no bouncing.','Hold 45–60 seconds per side, breathing slowly.','Stretch to tension, never into sharp pain.'],
   curl:['Elbows pinned to your sides.','Curl up without swinging the body.','Lower slowly on a 2–3 count.'],
   raise:['Slight bend in the elbow throughout.','Raise to shoulder height, no higher.','Lead with the elbows, not the hands.'],
   cardio:['Start easier than feels necessary.','Hold a pace where short sentences are possible.','Finish feeling able to do a little more.']
@@ -1234,7 +1265,7 @@ function planEditor(){
     '<div class="tiny muted" style="font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin-bottom:8px">Planned breaks (trips, wedding, exams)</div>'+
     ((S.breaks&&S.breaks.length)
       ? S.breaks.map(function(b){ return '<div class="listrow"><span class="small">'+esc(b.label||'Break')+' <span class="tiny muted num">'+fmtD(b.from)+' – '+fmtD(b.to)+'</span></span><button class="btn ghost sm danger" onclick="delBreak(\''+b.id+'\')">✕</button></div>'; }).join('')
-      : '<p class="tiny muted" style="margin-bottom:6px">Days inside a break count as planned rest — no missed-day marks, no guilt-tripping coach notes.</p>')+
+      : '<p class="tiny muted" style="margin-bottom:6px">Days inside a break count as planned rest: no missed-day marks, no guilt-tripping coach notes.</p>')+
     '<div class="field" style="margin-top:8px"><input id="bkLabel" placeholder="e.g. Wedding week 💍"></div>'+
     '<div class="row" style="gap:8px; margin-bottom:4px"><input id="bkFrom" type="date"><input id="bkTo" type="date"><button class="btn sm" onclick="addBreak()">Add</button></div>');
 }
@@ -1253,7 +1284,7 @@ function addBreak(){
   if(!from||!to||to<from){ toast('Pick a valid date range'); return; }
   collectPlan();
   S.breaks.push({id:uid(), from:from, to:to, label:label||'Break'});
-  save(); planEditor(); toast('Break added — those days are guilt-free');
+  save(); planEditor(); toast('Break added, those days are guilt-free');
 }
 function delBreak(id){
   collectPlan();
@@ -1319,8 +1350,8 @@ function waterSheet(){
       '<button class="btn ghost sm" onclick="addWater(-250);waterSheet()">−250</button></div></div></div>'+
     barStrip(function(d){return S.water[d];}, st.waterGoal, 'var(--wa)')+
     '<p class="tiny muted" style="margin-top:14px">'+waterPace(w,st.waterGoal)+
-      (trained? 'Training day — aim ~500ml extra. ':'')+
-      (st.waterRemind ? 'Reminders every '+st.waterEvery+' min (8:00–22:00).' : 'Reminders off — turn on in Settings.')+
+      (trained? 'Training day: aim ~500ml extra. ':'')+
+      (st.waterRemind ? 'Reminders every '+st.waterEvery+' min (8:00–22:00).' : 'Reminders off. Turn on in Settings.')+
       (st.waterRemind && !notifOK ? ' <a href="#" onclick="askNotify();return false">Allow notifications</a>' : '')+'</p>');
   armRings();
 }
@@ -1336,6 +1367,9 @@ function checklistSheet(){
     '<div class="row" style="margin-top:12px"><a href="#" class="tiny" style="color:var(--ink2)" onclick="suppEditor();return false">Edit list</a></div>');
 }
 /* ============ supplements ============ */
+/* "Casein: before bed" -> "Casein". Punctuation-agnostic on purpose: stores
+   written before the em dashes were removed still hold the old separator. */
+function shortSuppName(n){ return String(n||'').split(/\s*[:—]\s/)[0]; }
 function toggleSupp(id){
   const d=today(); S.suppLog[d]=S.suppLog[d]||{};
   const cur=S.suppLog[d][id];
@@ -1408,7 +1442,7 @@ function saveSleep(){
   const q=(document.querySelector('input[name=slQ]:checked')||{}).value||'';
   S.sleep[today()]={bed:bed, wake:wake, hrs:hrs, q:q};
   save(); closeSheet(); renderToday();
-  toast(hrs+'h logged'+(hrs<(+S.settings.sleepGoal||8)-1?' — try for an earlier night today':''));
+  toast(hrs+'h logged'+(hrs<(+S.settings.sleepGoal||8)-1?', try for an earlier night today':''));
 }
 function delSleep(){ delete S.sleep[today()]; save(); closeSheet(); renderToday(); }
 /* ============ breathwork ============
@@ -1523,15 +1557,15 @@ function dif(c,p,unitTxt,goodUp){
 }
 function coachNotes(cur,prv,adh){
   const n=[];
-  if(adh.brk>0) n.push('Planned break covered '+adh.brk+' day'+(adh.brk>1?'s':'')+' this week — that was the plan, so it counts as following the plan. Walks, protein and sleep keep everything you built.');
-  if(cur.ses===0 && !(adh.brk>=4)) n.push('No workouts this week. Restart small — one 15-minute rehab session tonight beats a perfect plan tomorrow.');
-  if(cur.slG7>=3) n.push('You got the hours but woke groggy '+cur.slG7+' mornings — that is quality, not quantity. Late screens and late smoke fragment deep sleep; move both earlier in the evening.');
+  if(adh.brk>0) n.push('Planned break covered '+adh.brk+' day'+(adh.brk>1?'s':'')+' this week. That was the plan, so it counts as following the plan. Walks, protein and sleep keep everything you built.');
+  if(cur.ses===0 && !(adh.brk>=4)) n.push('No workouts this week. Restart small: one 15-minute rehab session tonight beats a perfect plan tomorrow.');
+  if(cur.slG7>=3) n.push('You got the hours but woke groggy '+cur.slG7+' mornings. That is quality, not quantity. Late screens and late smoke fragment deep sleep; move both earlier in the evening.');
   else if(adh.planned>0 && adh.done>=adh.planned) n.push('You followed the plan '+adh.done+'/'+adh.planned+' days. This is the consistency that changes bodies.');
-  else if(adh.planned>0) n.push('Plan adherence '+adh.done+'/'+adh.planned+'. Missed days happen — the rule is: never miss twice in a row.');
-  if(cur.slN>=3 && cur.sleep<7) n.push('Sleep averaged '+cur.sleep+'h. Under 7 hours, strength and recovery stall — protect the 22:30 wind-down.');
-  if(prv.vol>0 && cur.vol>prv.vol*1.25) n.push('Training volume jumped '+Math.round((cur.vol/prv.vol-1)*100)+'% vs last week. Keep increases near 10% — your knee and wrist are watching.');
-  if(cur.fdN>=3 && cur.prot<(+S.settings.proteinGoal||120)*0.8) n.push('Protein averaged '+cur.prot+'g against your '+S.settings.proteinGoal+'g goal — one more whey scoop or 100g paneer daily closes it.');
-  if(cur.wLast && prv.wLast && cur.wLast<prv.wLast-0.3 && cur.vol>=prv.vol) n.push('Body weight fell while training rose — you are under-eating for a muscle-building goal. Add ~200 kcal/day.');
+  else if(adh.planned>0) n.push('Plan adherence '+adh.done+'/'+adh.planned+'. Missed days happen. The rule is: never miss twice in a row.');
+  if(cur.slN>=3 && cur.sleep<7) n.push('Sleep averaged '+cur.sleep+'h. Under 7 hours, strength and recovery stall. Protect the 22:30 wind-down.');
+  if(prv.vol>0 && cur.vol>prv.vol*1.25) n.push('Training volume jumped '+Math.round((cur.vol/prv.vol-1)*100)+'% vs last week. Keep increases near 10%. Your knee and wrist are watching.');
+  if(cur.fdN>=3 && cur.prot<(+S.settings.proteinGoal||120)*0.8) n.push('Protein averaged '+cur.prot+'g against your '+S.settings.proteinGoal+'g goal. One more whey scoop or 100g paneer daily closes it.');
+  if(cur.wLast && prv.wLast && cur.wLast<prv.wLast-0.3 && cur.vol>=prv.vol) n.push('Body weight fell while training rose. You are under-eating for a muscle-building goal. Add ~200 kcal/day.');
   return n.slice(0,3);
 }
 function openReport(ws){
@@ -1579,20 +1613,20 @@ function openReport(ws){
     row('Days practised', cur.brDays+' / 7','')+
     row('Goal days', cur.brHit+' / 7','');
   h+=sect('Sleep')+
-    row('Average', cur.slN? cur.sleep+' h':'—', dif(cur.sleep,prv.sleep,' h'))+
+    row('Average', cur.slN? cur.sleep+' h':'-', dif(cur.sleep,prv.sleep,' h'))+
     row('Nights logged', cur.slN+' / 7','');
   h+=sect('Nutrition & water')+
-    row('Avg calories', cur.fdN? cur.kcal+' kcal':'—', dif(cur.kcal,prv.kcal,''))+
-    row('Avg protein', cur.fdN? cur.prot+' g':'—', dif(cur.prot,prv.prot,' g'))+
+    row('Avg calories', cur.fdN? cur.kcal+' kcal':'-', dif(cur.kcal,prv.kcal,''))+
+    row('Avg protein', cur.fdN? cur.prot+' g':'-', dif(cur.prot,prv.prot,' g'))+
     row('Water goal days', cur.waHit+' / 7','')+
-    row('Avg water', cur.water? Math.round(cur.water/100)/10+' L':'—','');
+    row('Avg water', cur.water? Math.round(cur.water/100)/10+' L':'-','');
   h+=sect('Body')+
-    row('Weight', cur.wLast? cur.wLast+' '+unit():'—',
+    row('Weight', cur.wLast? cur.wLast+' '+unit():'-',
         cur.wDelta!==null? '<span class="muted">'+(cur.wDelta>0?'+':'')+cur.wDelta+' '+unit()+' within week</span>':'');
   const notes=coachNotes(cur,prv,adh);
   if(notes.length){
     h+=sect('Coach’s notes');
-    notes.forEach(function(x){ h+='<p class="small" style="margin:6px 0; color:var(--ink2)">— '+x+'</p>'; });
+    notes.forEach(function(x){ h+='<p class="small" style="margin:6px 0; color:var(--ink2)">· '+x+'</p>'; });
   }
   h+='<button class="btn primary wide" style="margin-top:14px" onclick="shareWeek(\''+ws+'\')">Share this week</button>';
   h+='<p class="tiny muted" style="margin-top:12px">Deltas compare with the previous week. Green = moving the right way for your goals.</p>';
@@ -1673,7 +1707,7 @@ function measForm(){
   let h='<h3>Body measurements (cm)</h3><div class="fields3">';
   MEAS.forEach(function(k){
     h+='<div class="field"><label for="ms_'+k[0]+'">'+k[1]+'</label>'+
-      '<input id="ms_'+k[0]+'" type="number" inputmode="decimal" step="0.5" value="'+(last.m[k[0]]||'')+'" placeholder="—"></div>';
+      '<input id="ms_'+k[0]+'" type="number" inputmode="decimal" step="0.5" value="'+(last.m[k[0]]||'')+'" placeholder="-"></div>';
   });
   h+='</div><button class="btn body wide" onclick="saveMeas()">Save measurements</button>'+
     '<p class="tiny muted" style="margin-top:12px">Measure relaxed, same time of day, tape snug not tight. Every 2 weeks is plenty.</p>';
@@ -1714,14 +1748,14 @@ function renderToday(){
   let h='';
   if(PUB && !S.settings.onboarded){
     h+='<button class="card" style="width:100%; text-align:left; display:block; border:1px solid var(--wk)" onclick="obStart()">'+
-      '<b>👋 Finish your 2-minute setup</b><div class="tiny muted" style="margin-top:4px">Goals, targets and your training week — tap to continue.</div></button>';
+      '<b>👋 Finish your 2-minute setup</b><div class="tiny muted" style="margin-top:4px">Goals, targets and your training week. Tap to continue.</div></button>';
   }
   /* notifications enable card */
   if('Notification' in window && Notification.permission!=='granted'){
     h+='<button class="card" style="width:100%; text-align:left; display:block; border-color:#f2a03d66" onclick="askNotify()">'+
       '<b>🔔 Turn on notifications</b><div class="tiny muted" style="margin-top:4px">'+
       (Notification.permission==='denied'
-        ? 'Blocked by the browser — allow notifications for this site in your browser settings. Until then, reminders still ring inside the app with sound and vibration.'
+        ? 'Blocked by the browser. Allow notifications for this site in your browser settings. Until then, reminders still ring inside the app with sound and vibration.'
         : 'One tap and your water, workout, sleep and custom reminders can ring properly. Reminders fire while the app is open.')+
       '</div></button>';
   }
@@ -1741,7 +1775,7 @@ function renderToday(){
   ];
   const pdone=pillars.filter(function(p){return p.on;}).length;
   h+='<div class="card">'+
-    '<button class="tiny muted" style="display:block; margin-bottom:10px" onclick="phaseInfo()">Week '+pwk+' · <span class="serifacc" style="color:var(--ink)">'+pph.name.replace(/Phase \d+ — /,'')+'</span> ›</button>'+
+    '<button class="tiny muted" style="display:block; margin-bottom:10px" onclick="phaseInfo()">Week '+pwk+' · <span class="serifacc" style="color:var(--ink)">'+pph.name.replace(PHASE_PREFIX,'')+'</span> ›</button>'+
     '<div class="row" style="gap:16px">'+
     ring(pdone/5,'var(--wk)',104, pdone+'/5', 'today')+
     '<div class="grow">';
@@ -1757,7 +1791,7 @@ function renderToday(){
        '<div class="tiny muted" style="margin:2px 0 10px">'+planRt.exIds.map(function(id){return esc(exName(id));}).slice(0,3).join(' · ')+(planRt.exIds.length>3?' +'+(planRt.exIds.length-3):'')+'</div>'+
        '<button class="btn primary wide" onclick="startSession(\''+planRt.id+'\')">Start workout</button>';
   } else if(brk){
-    h+='<b style="font-size:17px">🎉 '+esc(brk.label||'Planned break')+'</b><div class="tiny muted" style="margin:2px 0 10px">Until '+fmtD(brk.to)+' — walk, water, protein, sleep. Zero guilt.</div>'+
+    h+='<b style="font-size:17px">🎉 '+esc(brk.label||'Planned break')+'</b><div class="tiny muted" style="margin:2px 0 10px">Until '+fmtD(brk.to)+': walk, water, protein, sleep. Zero guilt.</div>'+
        '<button class="btn ghost wide" onclick="go(\'workout\')">Browse</button>';
   } else {
     h+='<b style="font-size:17px">Rest day 🛌</b><div class="tiny muted" style="margin:2px 0 10px">Recovery is where training sticks.'+(wk7>0?' '+wk7+'/wk done.':'')+'</div>'+
@@ -1788,14 +1822,14 @@ function renderToday(){
       '<div class="bar" style="margin-top:8px"><i style="width:'+Math.min(100,brm/bgoal*100)+'%; background:var(--br)"></i></div>'+
       '<div class="ts" style="margin-top:6px">'+(bstreak>1? bstreak+'-day streak' : 'tap to log')+'</div></button>'+
     '<button class="tile" onclick="logSleepForm()"><span class="tl">Sleep <span style="color:var(--sl)">●</span></span>'+
-      '<div class="tv num">'+(sl? sl.hrs+'h':'—')+'</div>'+
+      '<div class="tv num">'+(sl? sl.hrs+'h':'-')+'</div>'+
       '<div class="bar" style="margin-top:8px"><i style="width:'+(sl?Math.min(100,sl.hrs/sg*100):0)+'%; background:var(--sl)"></i></div>'+
       '<div class="ts" style="margin-top:6px">'+(sl? sl.bed+' → '+sl.wake+(sl.q? ' · '+(sl.q==='r'?'rested ✓':'groggy'):'') : 'log last night')+'</div></button>'+
     '</div>';
   /* ===== daily checklist (collapsed) ===== */
   if(S.supps.length){
     const pend=S.supps.filter(function(sp){return !slog[sp.id];})
-      .map(function(sp){ return sp.name.split(' — ')[0].split(' (')[0]; });
+      .map(function(sp){ return shortSuppName(sp.name).split(' (')[0]; });
     h+='<button class="card" style="width:100%; text-align:left; display:block" onclick="checklistSheet()">'+
       '<div class="spread"><span class="small"><b>Daily checklist</b> <span class="muted num">'+suppDone+'/'+S.supps.length+'</span></span><span class="muted">›</span></div>'+
       (pend.length
@@ -1812,7 +1846,7 @@ function renderToday(){
     '</div>';
   if(S.sessions.length>=3 && (!S.lastBackup || S.lastBackup<dShift(today(),-14))){
     h+='<button class="card" style="width:100%; text-align:left; display:block" onclick="openSettings()">'+
-      '<span class="small muted">Your data lives only on this phone — export a backup from Settings (tap here). Last backup: '+(S.lastBackup?fmtD(S.lastBackup):'never')+'.</span></button>';
+      '<span class="small muted">Your data lives only on this phone. Export a backup from Settings (tap here). Last backup: '+(S.lastBackup?fmtD(S.lastBackup):'never')+'.</span></button>';
   }
   const tt=$('#tab-today');
   tt.classList.toggle('anim', !!window.__ANIM); window.__ANIM=false;
@@ -1948,7 +1982,7 @@ function cardioBest(exId){
     });
   });});
   if(!km) return null;
-  let ptxt='—';
+  let ptxt='-';
   if(pace!==null){ const pm=Math.floor(pace); ptxt=pm+':'+pad(Math.round((pace-pm)*60)); }
   return {km:km, pace:ptxt};
 }
@@ -1993,7 +2027,7 @@ function renderWorkout(){
        '<button class="btn primary wide" onclick="startSession(\''+planRt.id+'\')">Start today’s workout</button>'+
        '<button class="btn ghost wide" style="margin-top:8px" onclick="startSession()">Start empty instead</button>';
   } else {
-    h+='<b style="font-size:18px">Rest day 🛌</b><div class="tiny muted" style="margin:3px 0 12px">Planned recovery — train anyway only if you genuinely feel fresh.</div>'+
+    h+='<b style="font-size:18px">Rest day 🛌</b><div class="tiny muted" style="margin:3px 0 12px">Planned recovery. Train anyway only if you genuinely feel fresh.</div>'+
        '<button class="btn wide" onclick="startSession()">Start empty workout</button>';
   }
   h+='</div>';
@@ -2070,7 +2104,7 @@ function heatCalHTML(){
 function progressHTML(){
   let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
   /* consistency heat map */
-  h+='<div class="osec" style="margin-top:12px"><h2><span class="dot" style="background:var(--wk)"></span>Consistency — 16 weeks</h2>'+heatCalHTML()+'</div>';
+  h+='<div class="osec" style="margin-top:12px"><h2><span class="dot" style="background:var(--wk)"></span>Consistency: 16 weeks</h2>'+heatCalHTML()+'</div>';
   /* weekly volume — last 10 weeks */
   const wkStart=wkMonday(today());
   const bars=[];
@@ -2082,7 +2116,7 @@ function progressHTML(){
     bars.push({l:dd.getDate()+'/'+(dd.getMonth()+1), y:Math.round(v)});
   }
   h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Weekly volume ('+unit()+')</h2>'+barChartSVG(bars,'var(--wk)')+
-     '<p class="tiny muted" style="margin-top:6px">The gap is the injury break — watch it climb back. Keep increases near 10%.</p></div>';
+     '<p class="tiny muted" style="margin-top:6px">The gap is the injury break. Watch it climb back. Keep increases near 10%.</p></div>';
   /* strength trends for the most-trained lifts */
   const counts={};
   S.sessions.forEach(function(s){ s.ex.forEach(function(e){
@@ -2101,7 +2135,7 @@ function progressHTML(){
       if(best>0) series.push({d:s.date, y:Math.round(best)});
     });
     if(series.length<3) return;
-    h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>'+esc(exName(id))+' — est 1RM</h2>'+
+    h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>'+esc(exName(id))+': est 1RM</h2>'+
        lineChartSVG(series.slice(-15),'var(--wk)')+
        '<div class="tiny muted num" style="margin-top:4px">best '+Math.max.apply(null,series.map(function(p){return p.y;}))+' '+unit()+' · '+series.length+' sessions</div></div>';
   });
@@ -2130,7 +2164,7 @@ function sessionHTML(){
   if(sesGrps.length){
     h+='<details class="card" style="padding:13px 16px"><summary class="small" style="cursor:pointer; list-style:none"><b>🔥 Warm-up</b> <span class="tiny muted">~5 min · tap to open</span></summary>'+
       '<ul class="small" style="margin:10px 0 2px 18px; color:var(--ink2)">'+
-      '<li style="margin-bottom:4px">2 min easy cardio — jacks, brisk walk or bike</li>'+
+      '<li style="margin-bottom:4px">2 min easy cardio: jacks, brisk walk or bike</li>'+
       sesGrps.map(function(g){ return WU_BY_GROUP[g]? '<li style="margin-bottom:4px">'+WU_BY_GROUP[g]+'</li>' : ''; }).join('')+
       '<li>First set of each lift = the warm-up ramp shown on its card</li></ul></details>';
   }
@@ -2173,7 +2207,7 @@ function sessionHTML(){
     h+='<details class="card" style="padding:13px 16px; margin-top:10px"><summary class="small" style="cursor:pointer; list-style:none"><b>🧊 Cool-down</b> <span class="tiny muted">~4 min · tap to open</span></summary>'+
       '<ul class="small" style="margin:10px 0 2px 18px; color:var(--ink2)">'+
       sesGrps.map(function(g){ return CD_BY_GROUP[g]? '<li style="margin-bottom:4px">'+CD_BY_GROUP[g]+'</li>' : ''; }).join('')+
-      '<li>Finish: 5 slow nasal breaths — recovery starts now</li></ul></details>';
+      '<li>Finish: 5 slow nasal breaths, recovery starts now</li></ul></details>';
   }
   h+='<button class="btn primary wide" style="margin-top:10px" onclick="finishSession()">Finish workout</button>'+
      '<div class="tiny muted" style="text-align:center; margin-top:10px">Tick an empty set to auto-fill last time’s numbers · tap the set number for warm-up (W)</div>';
@@ -2201,7 +2235,7 @@ function fmtRest(s){ return s<60 ? s+'s' : (s%60===0 ? (s/60)+'m' : Math.floor(s
 function restPicker(exId){
   const ex=S.exercises.find(function(x){return x.id===exId;}); if(!ex) return;
   const cur=ex.rest||0;
-  openSheet('<h3>Rest after each set — '+esc(ex.name)+'</h3>'+
+  openSheet('<h3>Rest after each set: '+esc(ex.name)+'</h3>'+
     '<div class="row wrap">'+[30,60,90,120,150,180,240].map(function(s){
       return '<button class="chip'+(cur===s?' on':'')+'" onclick="setExRest(\''+exId+'\','+s+')">'+fmtRest(s)+'</button>';
     }).join('')+'</div>'+
@@ -2254,7 +2288,7 @@ function newExerciseForm(intoSession){
     '<div class="field"><label for="nexGroup">Muscle group</label><select id="nexGroup">'+
     ['Chest','Back','Legs','Shoulders','Arms','Core','Cardio','Other'].map(function(g){return '<option>'+g+'</option>';}).join('')+
     '</select></div>'+
-    '<div class="field"><label style="display:flex; align-items:center; gap:8px; cursor:pointer"><input type="checkbox" id="nexTimed" style="width:auto; min-height:0"> Timed hold — measured in seconds (plank-style)</label></div>'+
+    '<div class="field"><label style="display:flex; align-items:center; gap:8px; cursor:pointer"><input type="checkbox" id="nexTimed" style="width:auto; min-height:0"> Timed hold: measured in seconds (plank-style)</label></div>'+
     '<button class="btn primary wide" onclick="saveNewExercise('+(intoSession?'true':'false')+')">Save</button>');
 }
 function saveNewExercise(intoSession){
@@ -2267,7 +2301,7 @@ function saveNewExercise(intoSession){
 function finishSession(){
   const a=S.active;
   a.ex=a.ex.filter(function(e){ return e.sets.some(function(s){ return s.done||s.w||s.r; }); });
-  if(!a.ex.length){ toast('Nothing logged — discarding'); S.active=null; save(); WV='home'; renderWorkout(); return; }
+  if(!a.ex.length){ toast('Nothing logged, discarding'); S.active=null; save(); WV='home'; renderWorkout(); return; }
   let vol=0, nSets=0;
   const prs=[];
   a.ex.forEach(function(e){
@@ -2289,12 +2323,12 @@ function finishSession(){
       const w=+s.w||0, r=+s.r||0, est=est1RM(w,r);
       vol+=w*r;
       if(tmd){
-        if(bh>0 && r>bh){ exPR={ex:exName(e.exId), txt:r+'s — longest hold'}; bh=r; }
+        if(bh>0 && r>bh){ exPR={ex:exName(e.exId), txt:r+'s: longest hold'}; bh=r; }
         return;
       }
       if(!lift) return;
-      if(bw>0 && w>bw){ exPR={ex:exName(e.exId), txt:w+'×'+r+' — heaviest ever'}; bw=w; }
-      else if(b1>0 && est>b1 && !exPR){ exPR={ex:exName(e.exId), txt:w+'×'+r+' — est 1RM '+Math.round(est)+' '+unit()}; b1=est; }
+      if(bw>0 && w>bw){ exPR={ex:exName(e.exId), txt:w+'×'+r+': heaviest ever'}; bw=w; }
+      else if(b1>0 && est>b1 && !exPR){ exPR={ex:exName(e.exId), txt:w+'×'+r+': est 1RM '+Math.round(est)+' '+unit()}; b1=est; }
     });
     if(exPR) prs.push(exPR);
   });
@@ -2305,17 +2339,17 @@ function finishSession(){
   S.sessions.sort(function(x,y){ return x.date<y.date?-1:1; });
   S.active=null; save(); WV='home'; renderWorkout();
   const total=S.sessions.length;
-  if(total%10===0) setTimeout(function(){ toast('🏅 Workout #'+total+' all-time — consistency compounds'); }, 600);
+  if(total%10===0) setTimeout(function(){ toast('🏅 Workout #'+total+' all-time: consistency compounds'); }, 600);
   const showSummary=function(){ openSheet(summaryHTML); };
   const summaryHTML='<h3>Workout complete 💪</h3>'+
     '<div class="row" style="gap:18px; margin-bottom:8px">'+
     '<div><div class="big num" style="font-size:24px">'+Math.round(dur/60)+'m</div><div class="tiny muted">duration</div></div>'+
     '<div><div class="big num" style="font-size:24px">'+Math.round(vol).toLocaleString()+'</div><div class="tiny muted">'+unit()+' volume</div></div>'+
     '<div><div class="big num" style="font-size:24px">'+nSets+'</div><div class="tiny muted">sets</div></div>'+
-    '<div><div class="big num" style="font-size:24px">'+(prs.length||'—')+'</div><div class="tiny muted">PRs</div></div></div>'+
+    '<div><div class="big num" style="font-size:24px">'+(prs.length||'-')+'</div><div class="tiny muted">PRs</div></div></div>'+
     (prs.length
       ? prs.map(function(p){ return '<div class="listrow"><span class="small">🏆 '+esc(p.ex)+'</span><span class="small num muted">'+p.txt+'</span></div>'; }).join('')
-      : '<p class="small muted">No records today — showing up is the base of every PR.</p>')+
+      : '<p class="small muted">No records today. Showing up is the base of every PR.</p>')+
     '<div class="field" style="margin-top:14px"><label for="sesNote">Note (optional)</label>'+
     '<textarea id="sesNote" rows="2" placeholder="'+(PUB?'How did it feel?':'How did it feel? Knee/wrist okay?')+'"></textarea></div>'+
     '<button class="btn primary wide" onclick="saveSesNote(\''+sess.id+'\')">Done</button>';
@@ -2359,7 +2393,7 @@ function historyHTML(){
       const g=exGroupOf(e.exId), tmd=isTimedEx(e.exId);
       h+='<div class="small" style="margin-top:8px"><b>'+esc(exName(e.exId))+'</b> <span class="muted num">'+e.sets.map(function(t){return (t.wu?'W ':'')+fmtSet(t,g,tmd);}).join('  ')+'</span></div>';
     });
-    if(s.prs&&s.prs.length) s.prs.forEach(function(p){ h+='<div class="tiny" style="margin-top:6px; color:var(--good)">🏆 '+esc(p.ex)+' — '+p.txt+'</div>'; });
+    if(s.prs&&s.prs.length) s.prs.forEach(function(p){ h+='<div class="tiny" style="margin-top:6px; color:var(--good)">🏆 '+esc(p.ex)+' · '+p.txt+'</div>'; });
     if(s.note) h+='<div class="tiny muted" style="margin-top:8px">“'+esc(s.note)+'”</div>';
     h+='<div class="row" style="gap:8px; margin-top:10px"><button class="btn sm" onclick="editSession(\''+s.id+'\')">Edit</button>'+
        '<button class="btn sm danger" onclick="delSession(\''+s.id+'\')">Delete</button></div></details>';
@@ -2376,7 +2410,7 @@ function editSession(id){
   const s=S.sessions.splice(i,1)[0];
   S.active={id:s.id, name:s.name, date:s.date, start:Date.now()-(s.dur||0)*1000, ex:s.ex, note:s.note};
   save(); WV='session'; go('workout');
-  toast('Editing '+s.name+' — fix the sets, then press Finish');
+  toast('Editing '+s.name+'. Fix the sets, then press Finish');
 }
 function libraryHTML(){
   let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
@@ -2428,7 +2462,7 @@ function openExInfo(exId){
     });});
     h+= bh
       ? '<div class="listrow"><span class="small">Longest hold</span><span class="small num"><b>'+bh.r+'s</b> <span class="muted">'+fmtD(bh.date)+'</span></span></div>'
-      : '<div class="empty">No logs yet — records appear after your first sets.</div>';
+      : '<div class="empty">No logs yet. Records appear after your first sets.</div>';
   } else {
     let bw=null, b1=null, bv=0;
     S.sessions.forEach(function(s){ s.ex.forEach(function(e){
@@ -2446,7 +2480,7 @@ function openExInfo(exId){
       ? '<div class="listrow"><span class="small">Heaviest weight</span><span class="small num"><b>'+bw.w+' '+unit()+'</b> × '+bw.r+' <span class="muted">'+fmtD(bw.date)+'</span></span></div>'+
         '<div class="listrow"><span class="small">Best est 1RM</span><span class="small num"><b>'+Math.round(b1.est)+' '+unit()+'</b> <span class="muted">('+b1.w+'×'+b1.r+')</span></span></div>'+
         '<div class="listrow"><span class="small">Best session volume</span><span class="small num"><b>'+Math.round(bv).toLocaleString()+'</b> '+unit()+'</span></div>'
-      : '<div class="empty">No logs yet — records appear after your first sets.</div>';
+      : '<div class="empty">No logs yet. Records appear after your first sets.</div>';
   }
   /* strength / hold trend */
   if(g!=='Cardio'){
@@ -2489,7 +2523,7 @@ function plates(){
   out.innerHTML = picked.length
     ? '<b>Per side:</b> '+picked.join(' + ')+' kg'+
       (side>0.001? '<div class="tiny muted" style="margin-top:4px">Closest loadable: '+loaded+' kg (off by '+Math.round(side*2*100)/100+')</div>':'')
-    : '<b>Empty bar</b> — '+bar+' kg total.';
+    : '<b>Empty bar</b>: '+bar+' kg total.';
 }
 function editRoutine(id){ editRoutineId=id; WV='routine'; renderWorkout(); }
 function routineHTML(){
@@ -2579,7 +2613,7 @@ function holdStart(ei,si){
   const st=e.sets[si]; if(!st) return;
   holdEi=ei; holdSi=si; holdTarget=Math.max(0, Math.round(+st.r||0));
   holdT0=Date.now(); holdLastS=-1;
-  $('#holdLbl').textContent = exName(e.exId)+(holdTarget? ' — hold '+holdTarget+'s' : ' — max hold');
+  $('#holdLbl').textContent = exName(e.exId)+(holdTarget? ': hold '+holdTarget+'s' : ': max hold');
   $('#holdMain').textContent = holdTarget? 'Done early' : 'Stop & save';
   $('#holdClock').style.color='';
   $('#hold').classList.add('on');
@@ -2702,7 +2736,7 @@ const FOODDB=[
 ['Bread slice (1)',70,2.5,13,1],['Bread + butter (1 slice)',115,2.5,13,6],['Daliya (bowl)',180,5,30,4],
 ['Cornflakes + milk (bowl)',200,6,35,4],['Sprouts chaat (bowl)',130,9,18,1.5],['Sabudana khichdi (bowl)',300,3,50,10],
 /* rotis & rice */
-['Atta roti / chapati with ghee (1)',100,3,15,3],['Atta roti / phulka — no ghee (1)',80,3,15,0.5],
+['Atta roti / chapati with ghee (1)',100,3,15,3],['Atta roti / phulka, no ghee (1)',80,3,15,0.5],
 ['Bajra roti (1)',120,3.5,22,1.5],['Missi roti (1)',130,5,20,3],
 ['Tandoori roti (1)',120,4,24,1],['Butter naan (1)',260,6,40,8],
 ['Steamed rice (bowl)',200,4,44,1],['Jeera rice (bowl)',250,4,45,6],
@@ -2722,7 +2756,7 @@ const FOODDB=[
 ['Malai kofta (bowl)',400,9,25,30],['Aloo gobi (bowl)',150,3,18,7],['Aloo matar (bowl)',160,5,20,7],
 ['Jeera aloo (bowl)',160,3,20,8],['Dum aloo (bowl)',220,4,25,12],['Lauki sabzi (bowl)',90,2,10,5],
 ['Karela sabzi (bowl)',110,2,10,7],['Tinda sabzi (bowl)',90,2,10,5],['Mushroom matar (bowl)',180,6,12,12],['Dal baati with ghee (1 baati)',250,6,35,10],['Churma (small bowl)',350,5,45,17],
-['Papad roasted (1)',40,2,7,0.3],['Papad fried (1)',80,2,7,4.5],['Salad — kheera/tamatar/pyaaz (plate)',40,2,8,0],
+['Papad roasted (1)',40,2,7,0.3],['Papad fried (1)',80,2,7,4.5],['Salad: kheera/tamatar/pyaaz (plate)',40,2,8,0],
 ['Ghee (1 tsp)',45,0,0,5],['Butter (1 tsp)',35,0,0,4],['Boiled potato (1 medium)',90,2,21,0],
 /* snacks — Jaipur specials included */
 ['Samosa (1)',260,4,30,14],['Pyaaz kachori (1)',300,5,30,18],['Dal kachori (1)',250,4,25,15],
@@ -2821,7 +2855,7 @@ function fdbAdd(){
   const day=S.food[foodDate]=S.food[foodDate]||{};
   (day[FDMEAL]=day[FDMEAL]||[]).push(e);
   save(); closeSheet(); renderFood();
-  toast(e.name+' — '+e.kcal+' kcal logged');
+  toast(e.name+': '+e.kcal+' kcal logged');
 }
 function myFoodForm(){
   openSheet('<h3>Save a “my food”</h3>'+
@@ -2838,7 +2872,7 @@ function myFoodForm(){
 function saveMyFood(){
   const name=$('#mfName').value.trim(), k=+$('#mfK').value||0;
   if(!name){ toast('Name it first'); return; }
-  if(!k){ toast('Calories needed — even a rough guess beats a blank'); return; }
+  if(!k){ toast('Calories needed, even a rough guess beats a blank'); return; }
   const m={id:uid(), name:name, kcal:k, p:+$('#mfP').value||0, c:+$('#mfC').value||0, f:+$('#mfF').value||0};
   S.myFoods.push(m); save();
   addFoodForm(FDMEAL);
@@ -2931,13 +2965,13 @@ function renderBody(){
   let h='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Body weight</h2>';
   if(last){
     const d=prev? Math.round((last.kg-prev.kg)*10)/10 : 0;
-    let bmi='—';
+    let bmi='-';
     if(st.height){ const mt=+st.height/100; bmi=Math.round(last.kg/(mt*mt)*10)/10; }
     h+='<div class="statrow" style="margin-bottom:10px">'+
       '<div class="stat"><span class="tl">Current</span><div class="tv num">'+last.kg+'<span style="font-size:15px; color:var(--ink3)"> '+unit()+'</span></div></div>'+
       '<div class="stat"><span class="tl">Change</span><div class="tv num" style="color:'+(d>0?'var(--wk)':d<0?'var(--good)':'var(--ink2)')+'">'+(d>0?'+':'')+d+'</div></div>'+
       '<div class="stat"><span class="tl">BMI</span><div class="tv num">'+bmi+'</div></div></div>'+
-      '<div class="tiny muted" style="margin-bottom:6px">Last logged '+fmtD(last.date)+(prev?' · change since '+fmtD(prev.date):'')+' · goal '+(st.goalWeight||'—')+' '+unit()+'</div>';
+      '<div class="tiny muted" style="margin-bottom:6px">Last logged '+fmtD(last.date)+(prev?' · change since '+fmtD(prev.date):'')+' · goal '+(st.goalWeight||'-')+' '+unit()+'</div>';
   } else h+='<div class="empty">Log your first weigh-in.</div>';
   if(ws.length>1) h+=weightChart(ws);
   h+='<button class="btn body wide" style="margin-top:14px" onclick="weightForm()">Log weight</button></div>';
@@ -2951,10 +2985,10 @@ function renderBody(){
       let d='';
       if(v!=null && pv!=null){ const dd=Math.round((v-pv)*10)/10;
         if(dd) d=' <span class="tiny muted num">'+(dd>0?'+':'')+dd+'</span>'; }
-      h+='<div><span class="tl" style="margin-bottom:2px">'+k[1]+'</span><div class="small num">'+(v!=null? '<b>'+v+'</b> cm'+d : '<span class="muted">—</span>')+'</div></div>';
+      h+='<div><span class="tl" style="margin-bottom:2px">'+k[1]+'</span><div class="small num">'+(v!=null? '<b>'+v+'</b> cm'+d : '<span class="muted">-</span>')+'</div></div>';
     });
     h+='</div><div class="tiny muted" style="margin-top:10px">Updated '+fmtD(mLast.date)+'</div>';
-  } else h+='<div class="empty">Chest, waist, arms and more — the scale misses what the tape sees.</div>';
+  } else h+='<div class="empty">Chest, waist, arms and more. The scale misses what the tape sees.</div>';
   h+='<button class="btn wide" style="margin-top:12px" onclick="measForm()">Update measurements</button></div>';
   /* progress photos */
   const ph=S.photos||[];
@@ -2965,7 +2999,7 @@ function renderBody(){
     }).join('')+'</div>';
     if(ph.length>9) h+='<div class="tiny muted" style="margin-bottom:10px">Showing latest 9 of '+ph.length+'</div>';
   } else {
-    h+='<div class="empty">Same pose, same light, same mirror — every 2 weeks. In 3 months these photos will say more than the scale ever will.</div>';
+    h+='<div class="empty">Same pose, same light, same mirror, every 2 weeks. In 3 months these photos will say more than the scale ever will.</div>';
   }
   h+='<div class="row" style="gap:10px">'+
     '<label class="btn body grow" style="cursor:pointer">Add photo<input type="file" accept="image/*" capture="user" style="display:none" onchange="addPhoto(this)"></label>'+
@@ -2993,7 +3027,7 @@ function weightForm(){
     '<div class="field"><label for="wKg">'+unit()+'</label><input id="wKg" type="number" inputmode="decimal" step="0.1" placeholder="'+(last?last.kg:'70')+'"></div>'+
     '<div class="field"><label for="wDate">Date</label><input id="wDate" type="date" value="'+today()+'" max="'+today()+'"></div></div>'+
     '<button class="btn body wide" onclick="addWeight()">Save</button>'+
-    '<p class="tiny muted" style="margin-top:12px">Same morning routine each time: after the toilet, before food. Weekly is plenty — daily weight is mostly noise.</p>');
+    '<p class="tiny muted" style="margin-top:12px">Same morning routine each time: after the toilet, before food. Weekly is plenty. Daily weight is mostly noise.</p>');
 }
 function weightChart(ws){
   const data=ws.slice(-30);
@@ -3059,7 +3093,7 @@ function addPhoto(inp){
         renderBody(); toast('Photo saved ('+Math.round(data.length/1365)+' KB)');
       }catch(e){
         S.photos.pop();
-        toast('Storage full — delete old photos or export a backup first');
+        toast('Storage full. Delete old photos or export a backup first');
       }
     };
     img.onerror=function(){ toast('Could not read that image'); };
@@ -3148,7 +3182,7 @@ function addReminder(){
   const r={id:uid(), label:label, time:time};
   if(date) r.date=date;
   S.reminders.push(r);
-  save(); openSettings(); toast('Reminder added — '+time+(date?' on '+fmtD(date):' daily'));
+  save(); openSettings(); toast('Reminder added: '+time+(date?' on '+fmtD(date):' daily'));
 }
 function delReminder(id){
   collectSettings();
@@ -3159,7 +3193,7 @@ function aboutSheet(){
   openSheet('<h3>About CoachZ</h3>'+
     '<p class="small" style="color:var(--ink2); line-height:1.6">Version '+APP_VER+' · a personal health coach that lives entirely on your phone.</p>'+
     '<div class="tiny muted" style="font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin:14px 0 6px">Privacy</div>'+
-    '<p class="small" style="color:var(--ink2); line-height:1.6">All of your data — workouts, food, weight, photos, everything — is stored only in this device’s browser storage. CoachZ has no accounts, no servers, no analytics, and never transmits your data anywhere. Backups exist only as files you export yourself. <a href="privacy.html" target="_blank" rel="noopener">Full privacy policy</a></p>'+
+    '<p class="small" style="color:var(--ink2); line-height:1.6">All of your data (workouts, food, weight, photos, everything) is stored only in this device’s browser storage. CoachZ has no accounts, no servers, no analytics, and never transmits your data anywhere. Backups exist only as files you export yourself. <a href="privacy.html" target="_blank" rel="noopener">Full privacy policy</a></p>'+
     '<div class="tiny muted" style="font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin:14px 0 6px">Disclaimer</div>'+
     '<p class="small" style="color:var(--ink2); line-height:1.6">CoachZ provides general fitness and nutrition information, not medical advice. Consult a qualified physician before starting any exercise or diet program, especially with an injury, medical condition, or pregnancy. Stop any exercise that causes pain.</p>'+
     '<p class="tiny muted" style="margin-top:14px">Contact: malay@growleads.io</p>');
@@ -3204,6 +3238,7 @@ function importData(inp){
       /* a pre-v16 backup carries steps and the retired breathwork checkbox;
          migrations only run at boot, so apply the current one here too */
       delete S.seedV16; seedV16();
+      delete S.seedV17; seedV17();
       save(); closeSheet(); render(); toast('Backup restored');
     }catch(e){ toast('That file is not a CoachZ backup'); }
   };
@@ -3222,7 +3257,7 @@ setInterval(function(){
   const hm=pad(hr)+':'+pad(now.getMinutes());
   if(st.sleepRemind && slRemindedOn!==today() && hm===st.sleepRemind){
     slRemindedOn=today();
-    notify('Wind down 🌙','In bed by 11pm — sleep is where the muscle gets built.', true);
+    notify('Wind down 🌙','In bed by 11pm. Sleep is where the muscle gets built.', true);
   }
   (S.reminders||[]).forEach(function(r){
     if(r.date && r.date!==today()) return;
@@ -3234,7 +3269,7 @@ setInterval(function(){
   if(spRemindedOn!==today() && hm==='21:00'){
     spRemindedOn=today();
     const missed=S.supps.filter(function(sp){ return !(S.suppLog[today()]||{})[sp.id]; })
-      .map(function(sp){ return sp.name.split(' — ')[0]; });
+      .map(function(sp){ return shortSuppName(sp.name); });
     if(!breathMins(today())) missed.push('breathwork');
     if(missed.length) notify('Evening check ✅', missed.join(', '), true);
   }
@@ -3243,7 +3278,7 @@ setInterval(function(){
     if(since > st.waterEvery*60000){
       lastRemindTs=Date.now();
       const left=Math.max(0, st.waterGoal-waterToday());
-      notify('Time to drink water 💧', left>0 ? Math.round(left/1000*10)/10+'L to go today' : 'Goal already met — sip anyway', true);
+      notify('Time to drink water 💧', left>0 ? Math.round(left/1000*10)/10+'L to go today' : 'Goal already met, sip anyway', true);
     }
   }
   if(st.workoutRemind && wkRemindedOn!==today()){
@@ -3262,7 +3297,7 @@ function obStart(){
     '<img src="icon.svg" alt="" style="width:76px; height:76px; border-radius:18px" onerror="this.style.display=\'none\'">'+
     '<div style="font-family:var(--fd-disp); font-weight:700; font-size:30px; margin-top:12px">CoachZ</div>'+
     '<div class="serifacc" style="font-size:20px; color:var(--ink2)">Show up. I’ll count.</div>'+
-    '<p class="small" style="color:var(--ink2); margin:18px 0 22px; line-height:1.55">Your workouts, food, water, sleep and body — coached from one place. Everything stays on this phone. Two minutes of setup.</p>'+
+    '<p class="small" style="color:var(--ink2); margin:18px 0 22px; line-height:1.55">Your workouts, food, water, sleep and body, coached from one place. Everything stays on this phone. Two minutes of setup.</p>'+
     '<button class="btn primary wide" onclick="obProfile()">Set me up</button></div>');
 }
 function obProfile(){
@@ -3283,7 +3318,7 @@ function obGoal(){
   if($('#obH')) OB.h=+$('#obH').value||170;
   if($('#obW')) OB.w=+$('#obW').value||65;
   openSheet('<h3>Your goal</h3>'+
-    '<p class="tiny muted" style="margin:-6px 0 14px">This sets your calorie and protein targets — you can change everything later in Settings.</p>'+
+    '<p class="tiny muted" style="margin:-6px 0 14px">This sets your calorie and protein targets. You can change everything later in Settings.</p>'+
     [['gain','Build muscle','Small calorie surplus, high protein'],
      ['lose','Lose fat','Moderate deficit, protein protected'],
      ['fit','Stay fit','Maintenance calories, balanced']].map(function(g){
@@ -3294,9 +3329,9 @@ function obPlan(goal){
   OB.goal=goal;
   openSheet('<h3>Your training week</h3>'+
     '<p class="tiny muted" style="margin:-6px 0 14px">The Today screen will tell you what to do each day. Swap any day later in Edit weekly plan.</p>'+
-    [['ppl3','3 days a week','Push · Pull · Legs with rest between — the honest starting point'],
-     ['ppl6','6 days a week','Full Push-Pull-Legs ×2 — for experienced lifters'],
-     ['gentle','Gentle start','3 joint-friendly days + mobility — returning after a break or injury']].map(function(p){
+    [['ppl3','3 days a week','Push · Pull · Legs with rest between: the honest starting point'],
+     ['ppl6','6 days a week','Full Push-Pull-Legs ×2, for experienced lifters'],
+     ['gentle','Gentle start','3 joint-friendly days + mobility, returning after a break or injury']].map(function(p){
       return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obFinish(\''+p[0]+'\')"><span><b>'+p[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+p[2]+'</span></span></button>';
     }).join(''));
 }
@@ -3315,20 +3350,20 @@ function obFinish(planKey){
   if(w>0 && !S.weights.length) S.weights.push({date:today(), kg:w});
   /* friendlier public names for the joint-friendly routines */
   S.routines.forEach(function(r){
-    r.name=r.name.replace(' — wrist-safe return',' — joint-friendly')
-                 .replace(' — knee-safe return',' — joint-friendly (legs)')
+    r.name=r.name.replace(': wrist-safe return',': joint-friendly')
+                 .replace(': knee-safe return',': joint-friendly (legs)')
                  .replace('Rehab: knee & wrist (~15 min)','Joint prep (~15 min)');
   });
   function rid(n){ const r=S.routines.find(function(x){return x.name===n;}); return r?r.id:''; }
   if(planKey==='ppl6') S.plan={1:rid('Push day'),2:rid('Pull day'),3:rid('Legs day'),4:rid('Push day'),5:rid('Pull day'),6:rid('Legs day'),0:''};
-  else if(planKey==='gentle') S.plan={1:rid('Push — joint-friendly'),2:rid('Joint prep (~15 min)'),3:rid('Pull — joint-friendly'),4:'',5:rid('Legs — joint-friendly (legs)'),6:rid('Mobility & flexibility (~20 min)'),0:''};
+  else if(planKey==='gentle') S.plan={1:rid('Push: joint-friendly'),2:rid('Joint prep (~15 min)'),3:rid('Pull: joint-friendly'),4:'',5:rid('Legs: joint-friendly (legs)'),6:rid('Mobility & flexibility (~20 min)'),0:''};
   else S.plan={1:rid('Push day'),2:'',3:rid('Pull day'),4:'',5:rid('Legs day'),6:rid('Mobility & flexibility (~20 min)'),0:''};
   S.programStart=today();
   S.lastPhase=null; st.onboarded=true;
   save();
   S.lastPhase=currentPhase().name; save();
   closeSheet(); go('today');
-  toast('Welcome, '+(st.name||'athlete')+' — '+st.calGoal+' kcal · '+st.proteinGoal+'g protein set');
+  toast('Welcome, '+(st.name||'athlete')+': '+st.calGoal+' kcal · '+st.proteinGoal+'g protein set');
 }
 
 /* ============ theme ============ */
@@ -3350,7 +3385,7 @@ function phaseMoment(){
   if(!el){ el=document.createElement('div'); el.id='phasemo'; document.body.appendChild(el); }
   el.innerHTML='<div class="pin">'+
     '<div style="font-family:var(--fd-disp); font-weight:600; font-size:13px; letter-spacing:.18em; text-transform:uppercase; color:var(--wk)">Week '+programWeek()+' · New phase unlocked</div>'+
-    '<div class="serifacc" style="font-size:42px; display:block; margin:14px 0; line-height:1.15">'+ph.name.replace(/Phase \d+ — /,'')+'</div>'+
+    '<div class="serifacc" style="font-size:42px; display:block; margin:14px 0; line-height:1.15">'+ph.name.replace(PHASE_PREFIX,'')+'</div>'+
     '<p class="small" style="color:var(--ink2); line-height:1.55">'+ph.desc+'</p>'+
     '<button class="btn primary wide" style="margin-top:22px" onclick="phaseBegin()">Begin</button></div>';
   el.classList.add('on');

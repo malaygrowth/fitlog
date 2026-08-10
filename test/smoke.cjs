@@ -40,7 +40,7 @@ function check(name, cond, detail) {
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 16, boot.schema);
+  check('schemaVersion stamped', boot.schema === 17, boot.schema);
   check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
@@ -155,8 +155,8 @@ function check(name, cond, detail) {
     WV = 'home'; renderWorkout();
     return { target, pr: pr ? pr.txt : null };
   });
-  check('timed target phrased in seconds', /s — five seconds longer/.test(timedPR.target || ''), timedPR.target);
-  check('longest-hold PR detected', /300s — longest hold/.test(timedPR.pr || ''), timedPR.pr);
+  check('timed target phrased in seconds', /s, five seconds longer/.test(timedPR.target || ''), timedPR.target);
+  check('longest-hold PR detected', /300s: longest hold/.test(timedPR.pr || ''), timedPR.pr);
 
   console.log('coach logic');
   const coach = await page.evaluate(() => ({
@@ -249,7 +249,62 @@ function check(name, cond, detail) {
   check('steps state deleted by migration', migAfter.steps, migAfter);
   check('past ticks converted to logged minutes', migAfter.ticksConverted, migAfter.ticksConverted);
   check('breathwork supp retired from list + checklist', migAfter.suppGone && migAfter.checklistClean && migAfter.supps === mig.supps - 1, migAfter);
-  check('migration stamps schema 16', migAfter.schema === 16, migAfter.schema);
+  check('migration stamps schema 17', migAfter.schema === 17, migAfter.schema);
+
+  console.log('em-dash removal: parsers + v17 migration');
+  const dash = await page.evaluate(() => ({
+    // the four sites that parsed the em dash as a delimiter
+    shortSupp: shortSuppName('Casein: before bed') === 'Casein'
+            && shortSuppName('Casein — before bed') === 'Casein',
+    phasePrefix: currentPhase().name.replace(PHASE_PREFIX, '') === 'Rebuild'
+              && 'Phase 2 — Build'.replace(PHASE_PREFIX, '') === 'Build',
+    heroShort: (function () { go('today'); const t = document.querySelector('#tab-today').textContent; return /Rebuild/.test(t) && !/Phase 0/.test(t); })(),
+    // seeded names carry no em dash, and the plan lookups still resolve
+    seedClean: !S.routines.some((r) => /—/.test(r.name)) && !S.supps.some((s) => /—/.test(s.name)),
+    planFull: Object.keys(S.plan).filter((k) => S.plan[k]).length >= 6,
+    noneInCopy: !document.querySelector('#tab-today').textContent.includes('—'),
+  }));
+  check('supplement short-name parser handles both forms', dash.shortSupp, dash.shortSupp);
+  check('phase prefix strips old and new punctuation', dash.phasePrefix);
+  check('Today hero shows short phase name', dash.heroShort);
+  check('seeded routine/supplement names em-dash free', dash.seedClean);
+  check('weekly plan lookups still resolve', dash.planFull, dash.planFull);
+  check('no em dash rendered on Today', dash.noneInCopy);
+
+  const v17 = await page.evaluate(() => {
+    delete S.seedV17;
+    S.supps.push({ id: 'oldsp', name: 'Zinc — before bed', kcal: 0, p: 0, c: 0, f: 0, logFood: false });
+    S.routines.push({ id: 'oldrt', name: 'Push — my own routine', exIds: [] });
+    S.sessions.push({ id: 'oldses', name: 'Return — full body (light)', date: dShift(today(), -9), dur: 60, vol: 10,
+      ex: [], prs: [{ ex: 'Bench press', txt: '70×5 — heaviest ever' }] });
+    S.lastPhase = 'Phase 0 — Rebuild';
+    save();
+    return true;
+  });
+  await page.reload(); await page.waitForTimeout(900);
+  const v17After = await page.evaluate(() => {
+    const ses = S.sessions.find((s) => s.id === 'oldses');
+    const out = {
+      supp: (S.supps.find((s) => s.id === 'oldsp') || {}).name,
+      rt: (S.routines.find((r) => r.id === 'oldrt') || {}).name,
+      ses: ses && ses.name,
+      pr: ses && ses.prs[0].txt,
+      lastPhase: S.lastPhase,
+      // renaming phases must NOT look like a newly unlocked phase
+      celebrated: document.querySelector('#phasemo') !== null,
+      schema: S.schemaVersion,
+    };
+    S.supps = S.supps.filter((s) => s.id !== 'oldsp');
+    S.routines = S.routines.filter((r) => r.id !== 'oldrt');
+    S.sessions = S.sessions.filter((s) => s.id !== 'oldses');
+    save();
+    return out;
+  });
+  check('stored supplement renamed', v17After.supp === 'Zinc: before bed', v17After.supp);
+  check('user-authored routine renamed, wording kept', v17After.rt === 'Push: my own routine', v17After.rt);
+  check('stored session + PR text renamed', v17After.ses === 'Return: full body (light)' && v17After.pr === '70×5: heaviest ever', v17After);
+  check('S.lastPhase migrated (no false phase celebration)', v17After.lastPhase === 'Phase 0: Rebuild' && !v17After.celebrated, v17After);
+  check('migration stamps schema 17', v17After.schema === 17, v17After.schema);
 
   console.log('charts + report');
   const charts = await page.evaluate(() => {
@@ -288,9 +343,9 @@ function check(name, cond, detail) {
   check('light theme applies + persists', th1 && th2.light && th2.stored === 'light', th2);
   await page.evaluate(() => setTheme('dark'));
   const pm = await page.evaluate(() => {
-    S.lastPhase = 'Phase 0 — Rebuild';
+    S.lastPhase = 'Phase 0: Rebuild';
     const real = currentPhase().name;
-    S.lastPhase = 'Phase X — Fake old'; save();
+    S.lastPhase = 'Phase X: Fake old'; save();
     phaseMoment();
     const shown = !!document.querySelector('#phasemo.on');
     phaseBegin();
