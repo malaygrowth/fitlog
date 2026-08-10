@@ -374,6 +374,8 @@
 
 <script>
 /* ============ state ============ */
+const PUB = !!window.PUBLIC_BUILD;
+const APP_VER='1.0.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -430,7 +432,7 @@ const SEED_QK=[
 function defaults(){
   return {
     settings:{name:'', unit:'kg', waterGoal:3000, calGoal:2600, proteinGoal:120, carbGoal:340, fatGoal:75,
-      rest:90, height:'176', goalWeight:'68', waterRemind:true, waterEvery:75, workoutRemind:'',
+      rest:90, height:(PUB?'':'176'), goalWeight:(PUB?'':'68'), waterRemind:true, waterEvery:75, workoutRemind:'',
       sleepRemind:'22:30', sleepGoal:8, stepGoal:8000, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
@@ -539,6 +541,7 @@ const HIST=[
     ['Overhead triceps extension',[[15,15],[17.5,15],[15,18]]] ]}
 ];
 function seedV4(){
+  if(PUB){ S.seedV4=true; return; }
   if(S.seedV4) return; S.seedV4=true;
   DEF_EX.forEach(function(e){
     if(!S.exercises.some(function(x){return x.name===e[0];}))
@@ -599,6 +602,7 @@ const H2=[
 ['Back A','2026-06-02',87,8170,[['Barbell row',60,5],['Lat pulldown',40,12],['Seated cable row',85,12],['Face pull',25,20],['Barbell curl',20,12],['Hammer curl',10,10]]]
 ];
 function seedV8(){
+  if(PUB){ S.seedV8=true; return; }
   if(S.seedV8) return; S.seedV8=true;
   DEF_EX.forEach(function(e){
     if(!S.exercises.some(function(x){return x.name===e[0];}))
@@ -638,6 +642,7 @@ function seedV8(){
 /* v9: BCA-report calibration — push-ups added to the return session,
    BMR-informed calorie target, breathwork habit, April weigh-in */
 function seedV9(){
+  if(PUB){ S.seedV9=true; return; }
   if(S.seedV9) return; S.seedV9=true;
   DEF_EX.forEach(function(e){
     if(!S.exercises.some(function(x){return x.name===e[0];}))
@@ -674,11 +679,14 @@ function seedV5(){
 /* v7: the user's actual supplement stack */
 function seedV7(){
   if(S.seedV7) return; S.seedV7=true;
-  [
+  (PUB ? [
+    {name:'Creatine 5g — daily', kcal:0, p:0, c:0, f:0, logFood:false},
+    {name:'Whey protein (1 scoop)', kcal:130, p:24, c:4, f:2, logFood:true}
+  ] : [
     {name:'Creatine 5g — GNC monohydrate', kcal:0, p:0, c:0, f:0, logFood:false},
     {name:'Whey — Avatar Malay Kulfi (1 scoop)', kcal:150, p:27.5, c:4, f:2, logFood:true},
     {name:'Casein — before bed', kcal:120, p:24, c:4, f:1, logFood:true}
-  ].forEach(function(sp){
+  ]).forEach(function(sp){
     if(!S.supps.some(function(x){return x.name===sp.name;}))
       S.supps.push(Object.assign({id:uid()}, sp));
   });
@@ -686,6 +694,7 @@ function seedV7(){
 }
 /* v6: default weekly plan (injury-safe comeback schedule) */
 function seedV6(){
+  if(PUB){ S.seedV6=true; return; }
   if(S.seedV6) return; S.seedV6=true;
   if(!S.plan || !Object.keys(S.plan).some(function(k){return S.plan[k];})){
     const byName=function(n){ const r=S.routines.find(function(x){return x.name===n;}); return r? r.id : ''; };
@@ -713,12 +722,13 @@ function seedV10(){
     const r=S.routines.find(function(x){return x.name===n;});
     if(r && r.exIds.indexOf(bw.id)<0) r.exIds.push(bw.id);
   });
-  if(!S.reminders.some(function(x){return /re-?scan/i.test(x.label);}))
+  if(!PUB && !S.reminders.some(function(x){return /re-?scan/i.test(x.label);}))
     S.reminders.push({id:uid(), label:'Book BCA re-scan at Build & Trim (compare vs 16 Apr)', time:'10:00', date:'2026-10-18'});
   save();
 }
 /* v12: micronutrient stack with absorption-aware timing */
 function seedV12(){
+  if(PUB){ S.seedV12=true; return; }
   if(S.seedV12) return; S.seedV12=true;
   [
     ['D3 + K2 — morning, with food', /d3/i],
@@ -734,6 +744,7 @@ function seedV12(){
 }
 /* v13: omega-3 and L-theanine */
 function seedV13(){
+  if(PUB){ S.seedV13=true; return; }
   if(S.seedV13) return; S.seedV13=true;
   [
     ['Omega-3 — with lunch', /omega/i],
@@ -746,6 +757,7 @@ function seedV13(){
 }
 /* v11: wedding break around 24–25 Nov */
 function seedV11(){
+  if(PUB){ S.seedV11=true; return; }
   if(S.seedV11) return; S.seedV11=true;
   if(!S.breaks.some(function(b){return /wedding/i.test(b.label);}))
     S.breaks.push({id:uid(), from:'2026-11-20', to:'2026-11-27', label:'Wedding 💍'});
@@ -941,14 +953,19 @@ function foodTotals(date){
   return {kcal:kcal,p:p,c:c,f:f};
 }
 /* ============ coach ============ */
-const PROGRAM={start:'2026-08-09', phases:[
+const PROGRAM= PUB ? {start:null, phases:[
+  {w:4,   name:'Phase 1 — Foundation', desc:'Habits first: three sessions a week at easy loads, full range of motion, water and sleep dialled in. Exit test: four consistent weeks.'},
+  {w:16,  name:'Phase 2 — Build', desc:'Progressive overload — chase the amber targets, grow your cardio base, hit protein daily. Exit test: visibly stronger across twelve weeks.'},
+  {w:999, name:'Phase 3 — Perform', desc:'Train for something: a race, a number, a photo. PRs, a deload every 6–8 weeks, and a streak that never dies.'}
+]} : {start:'2026-08-09', phases:[
   {w:4,  name:'Phase 0 — Rebuild', desc:'Daily rehab block, the three return routines, 8k steps, sleep by 11. Exit test: one fully pain-free week + a brisk 30-minute walk feeling easy.'},
   {w:12, name:'Phase 1 — Base', desc:'Run/walk intervals 3×/week, strength rebuilt to ~80% of May weights, full Push/Pull/Legs returns. Exit test: 5 km continuous run and squat 50×8, both pain-free.'},
   {w:20, name:'Phase 2 — Hyrox strength', desc:'Runs grow to 6–8 km with one weekly tempo. Hyrox stations once a week — wall balls light, burpee broad jumps low volume. Exit test: 8 km easy run, 50 unbroken wall balls.'},
   {w:32, name:'Phase 3 — Simulation', desc:'Weekly bricks (1 km run + station + 1 km run), half-simulation ~week 26, full simulation ~week 30 — then enter the race.'}
 ]};
 function programWeek(){
-  const ms=new Date(today()+'T12:00:00')-new Date(PROGRAM.start+'T12:00:00');
+  const startD = PUB ? (S.programStart||today()) : PROGRAM.start;
+  const ms=new Date(today()+'T12:00:00')-new Date(startD+'T12:00:00');
   return Math.max(1, Math.floor(ms/604800000)+1);
 }
 function currentPhase(){
@@ -958,7 +975,7 @@ function currentPhase(){
 }
 function phaseInfo(){
   const wk=programWeek(), cur=currentPhase();
-  let from=1, h='<h3>Your Hyrox comeback</h3><p class="tiny muted" style="margin:-6px 0 12px">Week '+wk+' since restart ('+fmtD(PROGRAM.start)+')</p>';
+  let from=1, h='<h3>'+(PUB?'Your training journey':'Your Hyrox comeback')+'</h3><p class="tiny muted" style="margin:-6px 0 12px">Week '+wk+' since '+(PUB?'you started':'restart')+' ('+fmtD(PUB?(S.programStart||today()):PROGRAM.start)+')</p>';
   PROGRAM.phases.forEach(function(p){
     const on=p.name===cur.name;
     h+='<div style="border-left:3px solid '+(on?'var(--wk)':'var(--line)')+'; padding:2px 0 2px 12px; margin-bottom:14px'+(on?'':'; opacity:.65')+'">'+
@@ -1562,6 +1579,10 @@ function renderToday(){
   const notifOK = ('Notification' in window) && Notification.permission==='granted';
 
   let h='';
+  if(PUB && !S.settings.onboarded){
+    h+='<button class="card" style="width:100%; text-align:left; display:block; border:1px solid var(--wk)" onclick="obStart()">'+
+      '<b>👋 Finish your 2-minute setup</b><div class="tiny muted" style="margin-top:4px">Goals, targets and your training week — tap to continue.</div></button>';
+  }
   /* notifications enable card */
   if('Notification' in window && Notification.permission!=='granted'){
     h+='<button class="card" style="width:100%; text-align:left; display:block; border-color:#f2a03d66" onclick="askNotify()">'+
@@ -2124,7 +2145,7 @@ function finishSession(){
       ? prs.map(function(p){ return '<div class="listrow"><span class="small">🏆 '+esc(p.ex)+'</span><span class="small num muted">'+p.txt+'</span></div>'; }).join('')
       : '<p class="small muted">No records today — showing up is the base of every PR.</p>')+
     '<div class="field" style="margin-top:14px"><label for="sesNote">Note (optional)</label>'+
-    '<textarea id="sesNote" rows="2" placeholder="How did it feel? Knee/wrist okay?"></textarea></div>'+
+    '<textarea id="sesNote" rows="2" placeholder="'+(PUB?'How did it feel?':'How did it feel? Knee/wrist okay?')+'"></textarea></div>'+
     '<button class="btn primary wide" onclick="saveSesNote(\''+sess.id+'\')">Done</button>';
   if(prs.length) prCelebrate(prs, showSummary); else showSummary();
 }
@@ -2878,6 +2899,7 @@ function openSettings(){
     '<div class="row" style="gap:10px"><button class="btn grow" onclick="exportData()">Export backup</button>'+
     '<label class="btn grow" style="cursor:pointer">Import<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this)"></label></div>'+
     '<button class="btn danger wide" style="margin-top:10px" onclick="resetAll()">Erase all data</button>'+
+    '<button class="btn ghost wide" style="margin-top:10px" onclick="aboutSheet()">About CoachZ · privacy</button>'+
     '<p class="tiny muted" style="margin-top:14px">All data lives only on this device (browser storage). Export a backup now and then.</p>');
 }
 function addReminder(){
@@ -2894,6 +2916,15 @@ function delReminder(id){
   collectSettings();
   S.reminders=S.reminders.filter(function(r){ return r.id!==id; });
   save(); openSettings();
+}
+function aboutSheet(){
+  openSheet('<h3>About CoachZ</h3>'+
+    '<p class="small" style="color:var(--ink2); line-height:1.6">Version '+APP_VER+' · a personal health coach that lives entirely on your phone.</p>'+
+    '<div class="tiny muted" style="font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin:14px 0 6px">Privacy</div>'+
+    '<p class="small" style="color:var(--ink2); line-height:1.6">All of your data — workouts, food, weight, photos, everything — is stored only in this device’s browser storage. CoachZ has no accounts, no servers, no analytics, and never transmits your data anywhere. Backups exist only as files you export yourself. <a href="privacy.html" target="_blank" rel="noopener">Full privacy policy</a></p>'+
+    '<div class="tiny muted" style="font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin:14px 0 6px">Disclaimer</div>'+
+    '<p class="small" style="color:var(--ink2); line-height:1.6">CoachZ provides general fitness and nutrition information, not medical advice. Consult a qualified physician before starting any exercise or diet program, especially with an injury, medical condition, or pregnancy. Stop any exercise that causes pain.</p>'+
+    '<p class="tiny muted" style="margin-top:14px">Contact: malay@growleads.io</p>');
 }
 function saveSettings(){
   collectSettings();
@@ -2983,6 +3014,82 @@ setInterval(function(){
   }
 }, 30000);
 
+/* ============ onboarding (public builds, first run) ============ */
+let OB={};
+function obStart(){
+  openSheet('<div style="text-align:center; padding:16px 4px">'+
+    '<img src="icon.svg" alt="" style="width:76px; height:76px; border-radius:18px" onerror="this.style.display=\'none\'">'+
+    '<div style="font-family:var(--fd-disp); font-weight:700; font-size:30px; margin-top:12px">CoachZ</div>'+
+    '<div class="serifacc" style="font-size:20px; color:var(--ink2)">Show up. I’ll count.</div>'+
+    '<p class="small" style="color:var(--ink2); margin:18px 0 22px; line-height:1.55">Your workouts, food, water, sleep and body — coached from one place. Everything stays on this phone. Two minutes of setup.</p>'+
+    '<button class="btn primary wide" onclick="obProfile()">Set me up</button></div>');
+}
+function obProfile(){
+  openSheet('<h3>About you</h3>'+
+    '<div class="field"><label for="obName">Name</label><input id="obName" value="'+esc(OB.name||'')+'" placeholder="What should I call you?"></div>'+
+    '<div class="fields2">'+
+    '<div class="field"><label for="obSex">Sex</label><select id="obSex"><option value="m">Male</option><option value="f"'+(OB.sex==='f'?' selected':'')+'>Female</option></select></div>'+
+    '<div class="field"><label for="obAge">Age</label><input id="obAge" type="number" inputmode="numeric" value="'+(OB.age||'')+'" placeholder="e.g. 27"></div></div>'+
+    '<div class="fields2">'+
+    '<div class="field"><label for="obH">Height (cm)</label><input id="obH" type="number" inputmode="numeric" value="'+(OB.h||'')+'" placeholder="e.g. 172"></div>'+
+    '<div class="field"><label for="obW">Weight (kg)</label><input id="obW" type="number" inputmode="decimal" step="0.1" value="'+(OB.w||'')+'" placeholder="e.g. 68"></div></div>'+
+    '<button class="btn primary wide" onclick="obGoal()">Next</button>');
+}
+function obGoal(){
+  OB.name=$('#obName')?$('#obName').value.trim():OB.name;
+  if($('#obSex')) OB.sex=$('#obSex').value;
+  if($('#obAge')) OB.age=+$('#obAge').value||27;
+  if($('#obH')) OB.h=+$('#obH').value||170;
+  if($('#obW')) OB.w=+$('#obW').value||65;
+  openSheet('<h3>Your goal</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 14px">This sets your calorie and protein targets — you can change everything later in Settings.</p>'+
+    [['gain','Build muscle','Small calorie surplus, high protein'],
+     ['lose','Lose fat','Moderate deficit, protein protected'],
+     ['fit','Stay fit','Maintenance calories, balanced']].map(function(g){
+      return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obPlan(\''+g[0]+'\')"><span><b>'+g[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+g[2]+'</span></span></button>';
+    }).join(''));
+}
+function obPlan(goal){
+  OB.goal=goal;
+  openSheet('<h3>Your training week</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 14px">The Today screen will tell you what to do each day. Swap any day later in Edit weekly plan.</p>'+
+    [['ppl3','3 days a week','Push · Pull · Legs with rest between — the honest starting point'],
+     ['ppl6','6 days a week','Full Push-Pull-Legs ×2 — for experienced lifters'],
+     ['gentle','Gentle start','3 joint-friendly days + mobility — returning after a break or injury']].map(function(p){
+      return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obFinish(\''+p[0]+'\')"><span><b>'+p[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+p[2]+'</span></span></button>';
+    }).join(''));
+}
+function obFinish(planKey){
+  const st=S.settings;
+  st.name=OB.name||''; st.height=String(OB.h||''); st.unit='kg';
+  const w=OB.w||65, hgt=OB.h||170, age=OB.age||27;
+  const bmr = 10*w + 6.25*hgt - 5*age + (OB.sex==='f' ? -161 : 5);
+  const adj = OB.goal==='gain' ? 300 : (OB.goal==='lose' ? -350 : 0);
+  st.calGoal = Math.round((bmr*1.5 + adj)/50)*50;
+  st.proteinGoal = Math.round(w*1.8);
+  st.carbGoal = Math.round(st.calGoal*0.45/4);
+  st.fatGoal = Math.round(st.calGoal*0.27/9);
+  st.waterGoal = Math.round(w*35/250)*250;
+  st.goalWeight = OB.goal==='gain' ? String(Math.round(w+4)) : (OB.goal==='lose' ? String(Math.round(w-4)) : '');
+  if(w>0 && !S.weights.length) S.weights.push({date:today(), kg:w});
+  /* friendlier public names for the joint-friendly routines */
+  S.routines.forEach(function(r){
+    r.name=r.name.replace(' — wrist-safe return',' — joint-friendly')
+                 .replace(' — knee-safe return',' — joint-friendly (legs)')
+                 .replace('Rehab: knee & wrist (~15 min)','Joint prep (~15 min)');
+  });
+  function rid(n){ const r=S.routines.find(function(x){return x.name===n;}); return r?r.id:''; }
+  if(planKey==='ppl6') S.plan={1:rid('Push day'),2:rid('Pull day'),3:rid('Legs day'),4:rid('Push day'),5:rid('Pull day'),6:rid('Legs day'),0:''};
+  else if(planKey==='gentle') S.plan={1:rid('Push — joint-friendly'),2:rid('Joint prep (~15 min)'),3:rid('Pull — joint-friendly'),4:'',5:rid('Legs — joint-friendly (legs)'),6:rid('Mobility & flexibility (~20 min)'),0:''};
+  else S.plan={1:rid('Push day'),2:'',3:rid('Pull day'),4:'',5:rid('Legs day'),6:rid('Mobility & flexibility (~20 min)'),0:''};
+  S.programStart=today();
+  S.lastPhase=null; st.onboarded=true;
+  save();
+  S.lastPhase=currentPhase().name; save();
+  closeSheet(); go('today');
+  toast('Welcome, '+(st.name||'athlete')+' — '+st.calGoal+' kcal · '+st.proteinGoal+'g protein set');
+}
+
 /* ============ theme ============ */
 function applyTheme(){
   document.body.classList.toggle('light', S.settings.theme==='light');
@@ -3019,7 +3126,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeShee
 applyTheme();
 setTimeout(function(){ const sp=$('#splash'); if(sp) sp.remove(); }, 1700);
 drawRestPresets();
-setTimeout(phaseMoment, 1900);
+if(PUB && !S.settings.onboarded) setTimeout(obStart, 1500); else setTimeout(phaseMoment, 1900);
 if(S.settings.hiit){
   $('#hiWork').value=S.settings.hiit.w; $('#hiRest').value=S.settings.hiit.r; $('#hiRounds').value=S.settings.hiit.n;
 }
