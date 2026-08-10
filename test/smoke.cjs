@@ -36,11 +36,11 @@ function check(name, cond, detail) {
     shake: S.myFoods.some((m) => /post-workout shake/i.test(m.name)),
   }));
   check('38 imported sessions', boot.sessions === 38, boot.sessions);
-  check('11 supplements seeded', boot.supps === 11, boot.supps);
+  check('10 supplements seeded', boot.supps === 10, boot.supps);
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 15, boot.schema);
+  check('schemaVersion stamped', boot.schema === 16, boot.schema);
   check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
@@ -171,7 +171,7 @@ function check(name, cond, detail) {
   console.log('daily trackers');
   const daily = await page.evaluate(() => {
     addWater(750);
-    S.steps[today()] = 9000;
+    saveBreath(20); closeSheet();
     S.sleep[today()] = { bed: '23:30', wake: '06:45', hrs: 7.3, q: 'r' };
     save(); go('today');
     return {
@@ -179,12 +179,36 @@ function check(name, cond, detail) {
       heroRing: document.querySelector('#tab-today .ring') !== null,
       quote: document.querySelector('#tab-today').textContent.includes('“'),
       tiles: document.querySelectorAll('#tab-today .tile').length,
+      breathTile: document.querySelector('#tab-today').textContent.includes('Breathwork'),
     };
   });
   check('water logged', daily.water);
   check('hero day-ring renders', daily.heroRing);
   check('daily quote renders', daily.quote);
   check('4 metric tiles', daily.tiles === 4, daily.tiles);
+  check('breathwork tile replaces steps', daily.breathTile);
+
+  console.log('breathwork tracking');
+  const breath = await page.evaluate(() => {
+    const out = { manual: breathMins(today()) };
+    // a timed Breathwork set inside a workout counts toward the same number
+    startSession(); closeSheet();
+    addExToSession(S.exercises.find((e) => e.name === 'Breathwork').id);
+    setVal(0, 0, 'r', '600'); toggleSet(0, 0); restSkip();
+    finishSession(); closeSheet();
+    out.withSession = breathMins(today());
+    out.streak = breathStreak();
+    S.breath[dShift(today(), -1)] = 15;
+    out.streak2 = breathStreak();
+    out.noSteps = S.steps === undefined && S.settings.stepGoal === undefined;
+    out.noSupp = !S.supps.some((s) => /breathwork/i.test(s.name));
+    return out;
+  });
+  check('manual breathwork logged (20 min)', breath.manual === 20, breath.manual);
+  check('session-logged breathwork adds 10 min', breath.withSession === 30, breath.withSession);
+  check('streak counts today', breath.streak === 1 && breath.streak2 === 2, breath);
+  check('steps state removed by migration', breath.noSteps, breath.noSteps);
+  check('breathwork supp item retired', breath.noSupp);
 
   console.log('charts + report');
   const charts = await page.evaluate(() => {
