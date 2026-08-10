@@ -1,7 +1,7 @@
 {
-  "name": "CoachZ — personal health coach",
+  "name": "CoachZ: personal health coach",
   "short_name": "CoachZ",
-  "description": "Workouts, food, water, sleep and body — coached from one private app. All data stays on your device.",
+  "description": "Workouts, food, water, sleep and body, coached from one private app. All data stays on your device.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

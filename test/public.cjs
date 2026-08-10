@@ -103,6 +103,30 @@ function check(name, cond, detail) {
     noReonboard: !(document.querySelector('#sheet').classList.contains('on')),
   }));
   check('persists + no re-onboarding', persist.onboarded && persist.sessions === 1 && persist.noReonboard, persist);
+
+  // The 'gentle' plan is the em-dash rename chain's failure mode: SEED_RT names,
+  // the two .replace() operands and the rid() lookups must all still agree, and
+  // a mismatch shows up only as silently empty plan slots.
+  console.log('onboarding rename chain (gentle plan)');
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(APP); await page.waitForTimeout(1200);
+  const chain = await page.evaluate(() => {
+    obProfile();
+    document.querySelector('#obName').value = 'Chain';
+    document.querySelector('#obAge').value = '30';
+    document.querySelector('#obH').value = '175';
+    document.querySelector('#obW').value = '70';
+    obGoal(); obPlan('lose'); obFinish('gentle');
+    return {
+      filled: Object.keys(S.plan).filter((k) => S.plan[k]).length,
+      renamed: S.routines.filter((r) => /joint-friendly|Joint prep/.test(r.name)).length,
+      noDash: !S.routines.some((r) => /—/.test(r.name)) && !S.supps.some((s) => /—/.test(s.name)),
+    };
+  });
+  check('gentle plan resolves every slot (rename chain intact)', chain.filled === 5, chain);
+  check('joint-friendly routines renamed', chain.renamed >= 4, chain.renamed);
+  check('no em dashes in public seeded names', chain.noDash);
+
   check('zero page errors', pageErrors.length === 0, pageErrors.slice(0, 3));
 
   await browser.close();
