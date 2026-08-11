@@ -157,6 +157,10 @@
   .exfig .fs{stroke:var(--ink3); fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round}
   .exfig .fe{stroke:var(--wk); fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round}
   .exfig .fa{stroke:var(--ink2); fill:none; stroke-width:2; stroke-dasharray:4 4}
+  .exlink{background:none; border:0; padding:0; margin:0; text-align:left; color:var(--ink2);
+    font:inherit; min-height:0; text-decoration:underline; text-decoration-color:var(--line);
+    text-underline-offset:3px}
+  .exlink:active{color:var(--wk)}
   .exfig .fg{stroke:var(--line); stroke-width:2}
 
   .exblock{border-top:1px solid var(--line); padding-top:14px; margin-top:14px}
@@ -405,7 +409,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='1.0.0';
+const APP_VER='1.1.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -466,11 +470,12 @@ function defaults(){
       sleepRemind:'22:30', sleepGoal:8, breathGoal:15, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
   };
 }
 let S;
-try{ S = Object.assign(defaults(), JSON.parse(localStorage.getItem(K)||'null') || {}); }
+const RAW_AT_BOOT = (function(){ try{ return localStorage.getItem(K); }catch(e){ return null; } })();
+try{ S = Object.assign(defaults(), JSON.parse(RAW_AT_BOOT||'null') || {}); }
 catch(e){ S = defaults(); }
 S.settings = Object.assign(defaults().settings, S.settings||{});
 /* one-time seed/upgrade: adds new exercises, starter routines and quick foods
@@ -880,9 +885,20 @@ function seedV17(){
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
+const SCHEMA=18;
+/* Snapshot the store as it was BEFORE this build's migrations touch it, so a bad
+   upgrade is recoverable instead of permanent. Written once per schema bump. */
+(function(){
+  try{
+    if(RAW_AT_BOOT && S.schemaVersion !== SCHEMA){
+      localStorage.setItem(K+'.bak', RAW_AT_BOOT);
+      localStorage.setItem(K+'.bak.meta', JSON.stringify({at:Date.now(), from:S.schemaVersion||0, to:SCHEMA}));
+    }
+  }catch(e){}
+})();
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
  seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17].forEach(function(step){ step(); });
-S.schemaVersion=17;
+S.schemaVersion=SCHEMA;
 
 /* ============ utils ============ */
 function $(s){ return document.querySelector(s); }
@@ -897,6 +913,14 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on');
   clearTimeout(toast._t); toast._t=setTimeout(function(){ t.classList.remove('on'); },2200); }
+/* toast with one action, for reversible destructive steps */
+function toastUndo(msg, fn){
+  const t=$('#toast');
+  t.innerHTML='<span>'+esc(msg)+'</span> <button id="toastAct" style="background:none; border:0; color:var(--wk); font-weight:800; padding:0 0 0 12px; min-height:0">UNDO</button>';
+  t.classList.add('on');
+  t.querySelector('#toastAct').onclick=function(){ t.classList.remove('on'); fn(); };
+  clearTimeout(toast._t); toast._t=setTimeout(function(){ t.classList.remove('on'); },6000);
+}
 function vib(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 function unit(){ return S.settings.unit; }
 function est1RM(w,r){ return (+w||0)*(1+(+r||0)/30); }
@@ -1034,6 +1058,44 @@ const WU_BY_GROUP={
   Conditioning:'2 min easy jacks or brisk walk',
   Cardio:'First 3 minutes slower than target pace'
 };
+/* Warm-up and cool-down lines are prose, but most of them name a real exercise.
+   Longest phrase first so "dead hang" wins over "hang". */
+const PROTO_ALIASES=[
+  ['wrist flexor stretch','Wrist circles & prayer stretch'],
+  ['wrist circles','Wrist circles & prayer stretch'],
+  ['bodyweight squats','Squat'],
+  ['goblet squat','Goblet squat'],
+  ['couch stretch','Couch stretch'],
+  ['ankle rocks','Ankle rocks'],
+  ['dead hang','Dead hang'],
+  ['cat-cow','Cat-cow'],
+  ['dead bugs','Straight-leg raise'],
+  ['cobra','Downward dog to cobra'],
+  ['child’s pose','Downward dog to cobra'],
+  ['leg swings','Straight-leg raise'],
+  ['push-ups','Push-ups'],
+  ['arm circles','Shoulder dislocates (stick)'],
+  ['wall slides','Shoulder dislocates (stick)'],
+  ['cross-body stretch','Shoulder dislocates (stick)'],
+  ['quad','Couch stretch'],
+  ['shoulder','Shoulder dislocates (stick)'],
+  ['hamstring','Standing hamstring fold'],
+  ['jacks','Jumping jacks'],
+  ['nasal breathing','Breathwork'],
+  ['brisk walk','Walking'],
+  ['walk','Walking']
+];
+function protoItem(txt){
+  const low=txt.toLowerCase();
+  const hit=PROTO_ALIASES.find(function(a){ return low.indexOf(a[0])>-1; });
+  const ex=hit && S.exercises.find(function(x){ return x.name===hit[1]; });
+  if(!ex) return '<li style="margin-bottom:4px">'+esc(txt)+'</li>';
+  return '<li style="margin-bottom:4px"><button class="exlink" onclick="openExInfo(\''+ex.id+'\')">'+
+    esc(txt)+' <span class="muted">ⓘ</span></button></li>';
+}
+function protoList(txt){
+  return String(txt||'').split(' · ').map(protoItem).join('');
+}
 const CD_BY_GROUP={
   Chest:'Doorway chest stretch 40s/side',
   Back:'Lat stretch on the rack 40s/side · child’s pose 45s',
@@ -1091,6 +1153,7 @@ function phaseInfo(){
 function round25(x){ return Math.round(x/2.5)*2.5; }
 function lastDateFor(exId){
   for(let i=S.sessions.length-1;i>=0;i--){
+    if(S.sessions[i].id===editingId()) continue;
     const ex=S.sessions[i].ex.find(function(e){ return e.exId===exId; });
     if(ex && ex.sets.length) return S.sessions[i].date;
   }
@@ -1212,7 +1275,131 @@ const PATTERN_STEPS={
   raise:['Slight bend in the elbow throughout.','Raise to shoulder height, no higher.','Lead with the elbows, not the hands.'],
   cardio:['Start easier than feels necessary.','Hold a pace where short sentences are possible.','Finish feeling able to do a little more.']
 };
+/* Movements with no honest photo in the public-domain set get their own drawing
+   rather than a generic group diagram. Showing the wrong exercise on a rehab
+   card is worse than showing none. */
+const PAT_EX={
+  'Dead hang':'exhang', 'Wall sit (pain-free)':'exwall', 'Deep squat hold':'exdsquat',
+  'Cossack squat':'excossack', 'Thoracic rotations':'exthor',
+  'Wrist circles & prayer stretch':'exwrist', 'Downward dog to cobra':'exdogcobra',
+  'Breathwork':'exbreath', 'SkiErg':'exski',
+  'Sled pull':'exsledpull', 'Sled push':'exsledpush',
+  "World's greatest stretch":'exwgs'
+};
+Object.assign(PATTERNS, {
+  exhang:{label:'Dead hang: shoulders active, body still', svg:
+    '<line x1="52" y1="14" x2="148" y2="14" class="fe"/>'+
+    '<polyline points="88,14 100,52" class="fs"/><polyline points="112,14 100,52" class="fs"/>'+
+    '<circle cx="100" cy="34" r="6.5" class="fs"/>'+
+    '<polyline points="100,52 100,84" class="fs"/>'+
+    '<polyline points="100,84 96,108" class="fs"/><polyline points="100,84 104,108" class="fs"/>'+
+    '<path d="M132,42 Q140,62 132,82" class="fa"/>'},
+  exwall:{label:'Wall sit: back flat, knees over ankles', svg:
+    '<line x1="46" y1="16" x2="46" y2="112" class="fe"/>'+
+    '<circle cx="55" cy="44" r="6.5" class="fs"/>'+
+    '<polyline points="52,51 52,80" class="fs"/>'+
+    '<polyline points="52,80 94,80" class="fs"/>'+
+    '<polyline points="94,80 94,110" class="fs"/>'+
+    '<polyline points="52,58 86,68" class="fs"/>'+
+    '<polyline points="84,80 84,90 94,90" class="fa"/>'},
+  exdsquat:{label:'Deep squat hold: heels down, chest tall', svg:
+    '<circle cx="100" cy="44" r="6.5" class="fs"/>'+
+    '<polyline points="100,51 98,76" class="fs"/>'+
+    '<polyline points="98,76 80,92 84,110" class="fs"/>'+
+    '<polyline points="98,76 118,92 114,110" class="fs"/>'+
+    '<polyline points="99,58 88,80" class="fs"/><polyline points="99,58 110,80" class="fs"/>'+
+    '<path d="M132,60 Q140,84 132,102" class="fa"/>'},
+  excossack:{label:'Cossack squat: one hip deep, other leg straight', svg:
+    '<circle cx="82" cy="44" r="6.5" class="fs"/>'+
+    '<polyline points="82,51 82,76" class="fs"/>'+
+    '<polyline points="82,76 68,94 72,110" class="fs"/>'+
+    '<polyline points="82,76 144,108" class="fs"/>'+
+    '<polyline points="82,58 104,68" class="fs"/>'+
+    '<path d="M100,96 Q120,90 138,98" class="fa"/>'},
+  exthor:{label:'Thoracic rotation: hips still, chest opens', svg:
+    '<circle cx="64" cy="62" r="6.5" class="fs"/>'+
+    '<polyline points="71,62 122,62" class="fs"/>'+
+    '<polyline points="76,64 76,98" class="fs"/>'+
+    '<polyline points="120,64 120,98" class="fs"/>'+
+    '<polyline points="94,62 112,32" class="fe"/><circle cx="114" cy="28" r="3.5" class="fe"/>'+
+    '<path d="M96,48 Q112,40 118,52" class="fa"/>'},
+  exwrist:{label:'Prayer stretch: palms together, elbows wide', svg:
+    '<polyline points="64,104 92,60" class="fs"/><polyline points="136,104 108,60" class="fs"/>'+
+    '<polyline points="92,60 100,38 108,60" class="fe"/>'+
+    '<polyline points="92,60 108,60" class="fs"/>'+
+    '<path d="M138,52 a15,15 0 1,1 -7,-11" class="fa"/>'+
+    '<polyline points="126,38 131,41 128,47" class="fa"/>'},
+  exdogcobra:{label:'Down dog to cobra: hips high, then chest open', svg:
+    '<polyline points="34,110 66,46 98,110" class="fs"/>'+
+    '<circle cx="58" cy="58" r="5.5" class="fs"/>'+
+    '<polyline points="118,108 148,102" class="fe"/>'+
+    '<path d="M148,102 Q168,94 170,72" class="fe"/>'+
+    '<circle cx="172" cy="66" r="5.5" class="fe"/>'+
+    '<polyline points="156,86 156,108" class="fe"/>'+
+    '<path d="M100,70 Q112,60 124,72" class="fa"/>'},
+  exbreath:{label:'Breathwork: tall spine, long exhale', svg:
+    '<circle cx="94" cy="44" r="6.5" class="fs"/>'+
+    '<polyline points="94,51 94,86" class="fs"/>'+
+    '<polyline points="76,104 112,104" class="fs"/>'+
+    '<polyline points="94,86 78,102" class="fs"/><polyline points="94,86 110,102" class="fs"/>'+
+    '<polyline points="94,60 80,80" class="fs"/><polyline points="94,60 108,80" class="fs"/>'+
+    '<path d="M126,74 Q140,58 126,42" class="fe"/>'+
+    '<path d="M138,84 Q158,58 138,32" class="fa"/>'},
+  exski:{label:'SkiErg: hinge and drive the handles down', svg:
+    '<line x1="72" y1="14" x2="128" y2="14" class="fs"/>'+
+    '<polyline points="92,14 92,32" class="fs"/><polyline points="108,14 108,32" class="fs"/>'+
+    '<circle cx="100" cy="44" r="6.5" class="fs"/>'+
+    '<polyline points="100,51 100,78" class="fs"/>'+
+    '<polyline points="100,56 92,32" class="fs"/><polyline points="100,56 108,32" class="fs"/>'+
+    '<polyline points="100,78 92,96 94,110" class="fs"/>'+
+    '<polyline points="100,78 110,96 108,110" class="fs"/>'+
+    '<path d="M140,40 L140,88" class="fa"/><polyline points="134,80 140,90 146,80" class="fa"/>'},
+  exsledpull:{label:'Sled pull: sit back, drive the heels, pull hand over hand', svg:
+    '<rect x="150" y="98" width="34" height="12" class="fe"/>'+
+    '<polyline points="150,104 108,72" class="fs"/>'+
+    '<circle cx="86" cy="46" r="6.5" class="fs"/>'+
+    '<polyline points="88,53 96,78" class="fs"/>'+
+    '<polyline points="92,62 108,72" class="fs"/>'+
+    '<polyline points="96,78 78,94 82,110" class="fs"/>'+
+    '<polyline points="96,78 108,96 104,110" class="fs"/>'+
+    '<polyline points="60,90 40,90" class="fa"/><polyline points="48,84 38,90 48,96" class="fa"/>'},
+  exsledpush:{label:'Sled push: low body angle, short quick steps', svg:
+    '<rect x="150" y="94" width="34" height="16" class="fe"/>'+
+    '<polyline points="150,100 118,84" class="fs"/>'+
+    '<circle cx="94" cy="56" r="6.5" class="fs"/>'+
+    '<polyline points="100,60 118,84" class="fs"/>'+
+    '<polyline points="99,60 80,86" class="fs"/>'+
+    '<polyline points="80,86 62,104" class="fs"/>'+
+    '<polyline points="80,86 100,100 96,110" class="fs"/>'+
+    '<polyline points="150,70 176,70" class="fa"/><polyline points="168,64 178,70 168,76" class="fa"/>'},
+  exwgs:{label:'World’s greatest stretch: deep lunge, then open the chest', svg:
+    '<polyline points="46,110 62,80" class="fs"/>'+
+    '<polyline points="62,80 92,110" class="fs"/>'+
+    '<circle cx="62" cy="66" r="6" class="fs"/>'+
+    '<polyline points="62,72 62,84" class="fs"/>'+
+    '<polyline points="62,76 50,96" class="fs"/>'+
+    '<polyline points="126,110 142,78" class="fe"/>'+
+    '<polyline points="142,78 172,110" class="fe"/>'+
+    '<circle cx="142" cy="64" r="6" class="fe"/>'+
+    '<polyline points="142,74 156,44" class="fe"/><circle cx="158" cy="40" r="3.5" class="fe"/>'+
+    '<path d="M100,70 Q114,60 124,70" class="fa"/>'}
+});
+Object.assign(PATTERN_STEPS, {
+  exhang:['Grip just outside the shoulders.','Pull the shoulders down away from the ears, do not sag.','Breathe slowly and hold, stop before the grip fails.'],
+  exwall:['Back flat against the wall, feet hip width.','Slide down until the thighs are parallel, knees over ankles.','Only as deep as stays pain-free in the knee.'],
+  exdsquat:['Feet a little wider than the hips, toes slightly out.','Sit straight down, heels stay on the floor.','Elbows inside the knees, gently press them open.'],
+  excossack:['Wide stance, shift all the weight to one side.','Sit into that hip, keep the other leg straight with toes up.','Keep the chest up, come back through the middle.'],
+  exthor:['Start on all fours, hips over the knees.','One hand behind the head, rotate the chest to the ceiling.','The hips do not move, only the upper back turns.'],
+  exwrist:['Palms together in front of the chest, elbows wide.','Lower the hands until you feel the forearms stretch.','Then circle the wrists slowly both ways.'],
+  exdogcobra:['Push the hips high and back, heels reaching down.','Roll forward, hips to the floor, elbows soft.','Open the chest without cranking the lower back.'],
+  exbreath:['Sit tall, shoulders relaxed, hands on the knees.','Inhale through the nose, let the belly widen.','Exhale longer than the inhale, keep it quiet.'],
+  exski:['Reach tall, hands above the head.','Hinge at the hips and drive the handles down past the thighs.','Stand back up tall between reps, arms follow the hips.'],
+  exsledpull:['Sit the hips back and keep the arms long to start.','Pull hand over hand, driving through the heels.','Let the legs do the work, not the lower back.'],
+  exsledpush:['Low body angle, arms locked out.','Short quick steps, keep the hips behind the shoulders.','Breathe in rhythm with the steps.'],
+  exwgs:['Step into a deep lunge, back leg long.','Drop the same-side elbow toward the instep.','Then rotate and reach that arm to the ceiling.']
+});
 function patternOf(n,g){
+  if(PAT_EX[n]) return PAT_EX[n];
   n=n.toLowerCase();
   if(g==='Mobility') return /hang/.test(n) ? 'vpull' : 'stretch';
   if(g==='Cardio') return 'cardio';
@@ -1949,10 +2136,13 @@ function isPRTimed(id){
 }
 function holdBest(exId){
   let best=0;
-  S.sessions.forEach(function(ss){ ss.ex.forEach(function(e){
-    if(e.exId!==exId) return;
-    e.sets.forEach(function(t){ if(!t.wu && (+t.r||0)>best) best=+t.r; });
-  });});
+  S.sessions.forEach(function(ss){
+    if(ss.id===editingId()) return;
+    ss.ex.forEach(function(e){
+      if(e.exId!==exId) return;
+      e.sets.forEach(function(t){ if(!t.wu && (+t.r||0)>best) best=+t.r; });
+    });
+  });
   return best;
 }
 function fmtSet(s, grp, timed){
@@ -1962,6 +2152,7 @@ function fmtSet(s, grp, timed){
 }
 function prevArr(exId){
   for(let i=S.sessions.length-1;i>=0;i--){
+    if(S.sessions[i].id===editingId()) continue;
     const ex=S.sessions[i].ex.find(function(e){ return e.exId===exId; });
     if(ex && ex.sets.length) return ex.sets;
   }
@@ -2156,6 +2347,7 @@ function startSession(routineId){
 function sessionHTML(){
   const a=S.active;
   let h='<div class="card"><div class="spread"><div><b style="font-size:17px">'+esc(a.name)+'</b>'+
+    ((a.backdated||a.editing)? '<div class="tiny" style="color:var(--wk); font-weight:700">'+(a.editing?'Editing · ':'Logging ')+fmtD(a.date)+'</div>':'')+
     '<div class="tiny muted num" id="sesTime">0:00</div></div>'+
     '<div class="row"><button class="btn sm danger" onclick="cancelSession()">Discard</button>'+
     '<button class="btn primary sm" onclick="finishSession()">Finish</button></div></div></div>';
@@ -2164,8 +2356,8 @@ function sessionHTML(){
   if(sesGrps.length){
     h+='<details class="card" style="padding:13px 16px"><summary class="small" style="cursor:pointer; list-style:none"><b>🔥 Warm-up</b> <span class="tiny muted">~5 min · tap to open</span></summary>'+
       '<ul class="small" style="margin:10px 0 2px 18px; color:var(--ink2)">'+
-      '<li style="margin-bottom:4px">2 min easy cardio: jacks, brisk walk or bike</li>'+
-      sesGrps.map(function(g){ return WU_BY_GROUP[g]? '<li style="margin-bottom:4px">'+WU_BY_GROUP[g]+'</li>' : ''; }).join('')+
+      protoItem('2 min easy cardio: jacks, brisk walk or bike')+
+      sesGrps.map(function(g){ return WU_BY_GROUP[g]? protoList(WU_BY_GROUP[g]) : ''; }).join('')+
       '<li>First set of each lift = the warm-up ramp shown on its card</li></ul></details>';
   }
   a.ex.forEach(function(e,ei){
@@ -2206,7 +2398,7 @@ function sessionHTML(){
   if(sesGrps.length){
     h+='<details class="card" style="padding:13px 16px; margin-top:10px"><summary class="small" style="cursor:pointer; list-style:none"><b>🧊 Cool-down</b> <span class="tiny muted">~4 min · tap to open</span></summary>'+
       '<ul class="small" style="margin:10px 0 2px 18px; color:var(--ink2)">'+
-      sesGrps.map(function(g){ return CD_BY_GROUP[g]? '<li style="margin-bottom:4px">'+CD_BY_GROUP[g]+'</li>' : ''; }).join('')+
+      sesGrps.map(function(g){ return CD_BY_GROUP[g]? protoList(CD_BY_GROUP[g]) : ''; }).join('')+
       '<li>Finish: 5 slow nasal breaths, recovery starts now</li></ul></details>';
   }
   h+='<button class="btn primary wide" style="margin-top:10px" onclick="finishSession()">Finish workout</button>'+
@@ -2300,8 +2492,16 @@ function saveNewExercise(intoSession){
 }
 function finishSession(){
   const a=S.active;
+  const rawEx=a.ex;
   a.ex=a.ex.filter(function(e){ return e.sets.some(function(s){ return s.done||s.w||s.r; }); });
-  if(!a.ex.length){ toast('Nothing logged, discarding'); S.active=null; save(); WV='home'; renderWorkout(); return; }
+  if(!a.ex.length){
+    /* nothing measurable, but never silently destroy: an edit keeps its
+       original, and a fresh session goes to Recently deleted */
+    if(a.editing){ S.active=null; save(); WV='home'; renderWorkout(); toast('Edit discarded, workout unchanged'); return; }
+    if(rawEx.length) binSession({id:a.id, name:a.name, date:a.date, dur:0, vol:0, ex:rawEx, prs:[]});
+    toast('Nothing logged'+(rawEx.length?', moved to Recently deleted':''));
+    S.active=null; save(); WV='home'; renderWorkout(); return;
+  }
   let vol=0, nSets=0;
   const prs=[];
   a.ex.forEach(function(e){
@@ -2310,6 +2510,7 @@ function finishSession(){
     /* bests before this session (warm-ups never count) */
     let bw=0, b1=0, bh=0;
     if(lift) S.sessions.forEach(function(s){
+      if(s.id===a.editing) return; /* don't compare an edit against its own old numbers */
       const pe=s.ex.find(function(x){return x.exId===e.exId;}); if(!pe) return;
       pe.sets.forEach(function(t){ if(t.wu) return;
         const w=+t.w||0, est=est1RM(t.w,t.r);
@@ -2335,7 +2536,9 @@ function finishSession(){
   const dur=Math.round((Date.now()-a.start)/1000);
   const sess={id:a.id, name:a.name, date:a.date, dur:dur, vol:vol, ex:a.ex, prs:prs};
   if(a.note) sess.note=a.note;
-  S.sessions.push(sess);
+  const at=a.editing ? S.sessions.findIndex(function(s){return s.id===a.editing;}) : -1;
+  if(at>-1){ sess.dur=S.sessions[at].dur||dur; S.sessions[at]=sess; } /* replace in place, keep the logged duration */
+  else S.sessions.push(sess);
   S.sessions.sort(function(x,y){ return x.date<y.date?-1:1; });
   S.active=null; save(); WV='home'; renderWorkout();
   const total=S.sessions.length;
@@ -2379,9 +2582,25 @@ function saveSesNote(id){
   if(s && v){ s.note=v; save(); }
   closeSheet();
 }
-function cancelSession(){ if(confirm('Discard this workout?')){ S.active=null; save(); WV='home'; renderWorkout(); } }
+function cancelSession(){
+  const a=S.active; if(!a) return;
+  /* an edit and a new workout are different things — say which one is at stake */
+  if(a.editing){
+    if(!confirm('Discard your edits? The logged workout stays in history.')) return;
+    S.active=null; save(); WV='home'; renderWorkout(); toast('Edits discarded, workout unchanged'); return;
+  }
+  const logged=a.ex.some(function(e){ return e.sets.some(function(s){ return s.done||s.w||s.r; }); });
+  if(!confirm(logged? 'Discard this workout? It moves to Recently deleted.' : 'Discard this workout?')) return;
+  if(logged) binSession({id:a.id, name:a.name, date:a.date, dur:Math.round((Date.now()-a.start)/1000), vol:0, ex:a.ex, prs:[]});
+  S.active=null; save(); WV='home'; renderWorkout();
+  if(logged) toastUndo('Workout discarded', function(){ restoreSession(a.id); });
+}
 function historyHTML(){
   let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
+  h+='<div class="row" style="gap:10px; margin-top:12px">'+
+    '<button class="btn grow" onclick="pastWorkoutForm()">+ Add past workout</button>'+
+    ((S.trash&&S.trash.length)? '<button class="btn ghost grow" onclick="trashSheet()">🗑 Recently deleted <span class="muted num">'+S.trash.length+'</span></button>':'')+
+    '</div>';
   h+='<div class="osec" style="margin-top:12px"><h2><span class="dot" style="background:var(--wk)"></span>History</h2>';
   if(!S.sessions.length) h+='<div class="empty">No workouts yet.</div>';
   S.sessions.slice().reverse().forEach(function(s){
@@ -2401,17 +2620,86 @@ function historyHTML(){
   h+='</div>';
   return h;
 }
-function delSession(id){ if(!confirm('Delete this workout?')) return;
-  S.sessions=S.sessions.filter(function(s){return s.id!==id;}); save(); renderWorkout(); }
+/* ---- log a workout you did earlier (or rebuild one that was lost) ---- */
+function pastWorkoutForm(){
+  if(S.active){ toast('Finish or discard the current session first'); return; }
+  openSheet('<h3>Add a past workout</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">Log something you did earlier. You add the exercises and sets exactly like a live session, then press Finish.</p>'+
+    '<div class="fields2">'+
+    '<div class="field"><label for="pwDate">Date</label><input id="pwDate" type="date" max="'+today()+'" value="'+dShift(today(),-1)+'"></div>'+
+    '<div class="field"><label for="pwMins">Duration (min)</label><input id="pwMins" type="number" inputmode="numeric" value="45"></div></div>'+
+    '<div class="field"><label for="pwName">Name</label><input id="pwName" placeholder="e.g. Full body" value="Workout"></div>'+
+    '<button class="btn primary wide" onclick="startPastWorkout()">Start logging</button>');
+}
+function startPastWorkout(){
+  const d=$('#pwDate').value||today();
+  const mins=Math.max(1, +$('#pwMins').value||45);
+  const nm=($('#pwName').value||'Workout').trim();
+  S.active={id:uid(), name:nm, start:Date.now()-mins*60000, date:d, ex:[], backdated:true};
+  save(); closeSheet(); WV='session'; go('workout');
+  pickExercise();
+  toast('Logging '+fmtD(d));
+}
+
+/* ---- Recently deleted: nothing leaves the app without a way back ---- */
+const TRASH_MAX=20;
+function binSession(sess){
+  if(!sess) return;
+  S.trash=S.trash||[];
+  S.trash.push(Object.assign({}, sess, {deletedAt:Date.now()}));
+  if(S.trash.length>TRASH_MAX) S.trash=S.trash.slice(-TRASH_MAX);
+  save();
+}
+function restoreSession(id){
+  const i=(S.trash||[]).findIndex(function(s){return s.id===id;});
+  if(i<0) return;
+  const s=S.trash.splice(i,1)[0];
+  delete s.deletedAt;
+  if(!S.sessions.some(function(x){return x.id===s.id;})){
+    S.sessions.push(s);
+    S.sessions.sort(function(x,y){ return x.date<y.date?-1:1; });
+  }
+  save(); renderWorkout(); toast('Restored '+s.name);
+}
+function purgeSession(id){
+  if(!confirm('Delete permanently? This cannot be undone.')) return;
+  S.trash=(S.trash||[]).filter(function(s){return s.id!==id;}); save(); trashSheet();
+}
+function trashSheet(){
+  const t=(S.trash||[]).slice().reverse();
+  openSheet('<h3>Recently deleted</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">The last '+TRASH_MAX+' deleted or discarded workouts are kept here so nothing is lost by accident.</p>'+
+    (t.length ? t.map(function(s){
+      return '<div class="listrow"><div><b class="small">'+esc(s.name)+'</b>'+
+        '<div class="tiny muted">'+fmtD(s.date)+' · '+(s.ex||[]).length+' exercises · deleted '+fmtD(isoOf(s.deletedAt))+'</div></div>'+
+        '<div class="row"><button class="btn sm primary" onclick="restoreSession(\''+s.id+'\')">Restore</button>'+
+        '<button class="btn ghost sm danger" onclick="purgeSession(\''+s.id+'\')">✕</button></div></div>';
+    }).join('') : '<div class="empty">Nothing deleted recently.</div>'));
+}
+function isoOf(ms){ const d=new Date(ms||Date.now());
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function delSession(id){
+  if(!confirm('Delete this workout? It moves to Recently deleted.')) return;
+  const s=S.sessions.find(function(x){return x.id===id;});
+  binSession(s);
+  S.sessions=S.sessions.filter(function(x){return x.id!==id;}); save(); renderWorkout();
+  toastUndo('Workout deleted', function(){ restoreSession(id); });
+}
 function editSession(id){
   if(S.active){ toast('Finish or discard the current session first'); return; }
-  const i=S.sessions.findIndex(function(s){return s.id===id;});
-  if(i<0) return;
-  const s=S.sessions.splice(i,1)[0];
-  S.active={id:s.id, name:s.name, date:s.date, start:Date.now()-(s.dur||0)*1000, ex:s.ex, note:s.note};
+  const s=S.sessions.find(function(x){return x.id===id;});
+  if(!s) return;
+  /* the session STAYS in history while it is edited. Finishing replaces it in
+     place; discarding just drops the edit. Editing must never be able to
+     destroy a logged workout. */
+  S.active={id:s.id, name:s.name, date:s.date, start:Date.now()-(s.dur||0)*1000,
+    ex:JSON.parse(JSON.stringify(s.ex)), note:s.note, editing:id};
   save(); WV='session'; go('workout');
   toast('Editing '+s.name+'. Fix the sets, then press Finish');
 }
+/* id of the session currently being edited, so history lookups can ignore its
+   pre-edit copy (previous sets, last date, bests) */
+function editingId(){ return (S.active && S.active.editing) || null; }
 function libraryHTML(){
   let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
   h+='<div class="osec" style="margin-top:12px"><h2><span class="dot" style="background:var(--wk)"></span>Exercise library</h2>';
@@ -3170,6 +3458,9 @@ function openSettings(){
     '<hr style="border:0;border-top:1px solid var(--line); margin:16px 0">'+
     '<div class="row" style="gap:10px"><button class="btn grow" onclick="exportData()">Export backup</button>'+
     '<label class="btn grow" style="cursor:pointer">Import<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this)"></label></div>'+
+    '<button class="btn ghost wide" style="margin-top:10px" onclick="trashSheet()">🗑 Recently deleted workouts'+
+      ((S.trash&&S.trash.length)? ' <span class="muted num">'+S.trash.length+'</span>':'')+'</button>'+
+    (snapshotMeta()? '<button class="btn ghost wide" style="margin-top:10px" onclick="restoreSnapshot()">⏪ Restore pre-update snapshot <span class="muted tiny">'+fmtD(isoOf(snapshotMeta().at))+'</span></button>':'')+
     '<button class="btn danger wide" style="margin-top:10px" onclick="resetAll()">Erase all data</button>'+
     '<button class="btn ghost wide" style="margin-top:10px" onclick="aboutSheet()">About CoachZ · privacy</button>'+
     '<p class="tiny muted" style="margin-top:14px">All data lives only on this device (browser storage). Export a backup now and then.</p>');
@@ -3215,6 +3506,22 @@ function collectSettings(){
   st.workoutRemind=$('#sWkRemind').value;
   st.sleepRemind=$('#sSlRemind').value; st.sleepGoal=+$('#sSlGoal').value||8;
   st.breathGoal=+$('#sBrGoal').value||15;
+}
+function snapshotMeta(){
+  try{ const m=localStorage.getItem(K+'.bak.meta'); return m? JSON.parse(m) : null; }catch(e){ return null; }
+}
+function restoreSnapshot(){
+  let raw=null;
+  try{ raw=localStorage.getItem(K+'.bak'); }catch(e){}
+  if(!raw){ toast('No snapshot stored'); return; }
+  const m=snapshotMeta()||{};
+  if(!confirm('Restore your data as it was before the '+(m.from?'v'+m.from+' → v'+m.to+' ':'')+'update?\n\nAnything logged since then will be replaced.')) return;
+  try{
+    /* keep the current state recoverable too, so this is never a one-way door */
+    localStorage.setItem(K+'.undo', localStorage.getItem(K)||'');
+    localStorage.setItem(K, raw);
+    location.reload();
+  }catch(e){ toast('Could not restore, storage unavailable'); }
 }
 function exportData(){
   const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
@@ -3409,7 +3716,7 @@ if(S.settings.hiit){
 hiReset();
 renderToday();
 </script>
-<script>window.EXIMG={"Bench press": "bench-press", "Incline dumbbell press": "incline-dumbbell-press", "Push-ups": "push-ups", "Squat": "squat", "Leg press": "leg-press", "Romanian deadlift": "romanian-deadlift", "Lunges": "lunges", "Calf raise": "calf-raise", "Deadlift": "deadlift", "Barbell row": "barbell-row", "Lat pulldown": "lat-pulldown", "Pull-ups": "pull-ups", "Seated cable row": "seated-cable-row", "Overhead press": "overhead-press", "Lateral raise": "lateral-raise", "Face pull": "face-pull", "Barbell curl": "barbell-curl", "Dumbbell curl": "dumbbell-curl", "Triceps pushdown": "triceps-pushdown", "Skull crushers": "skull-crushers", "Plank": "plank", "Crunches": "crunches", "Hanging leg raise": "hanging-leg-raise", "Treadmill run": "treadmill-run", "Running (outdoor)": "running-outdoor", "Walking": "walking", "Cycling": "cycling", "Jump rope": "jump-rope", "Chest fly (dumbbell)": "chest-fly-dumbbell", "Cable crossover": "cable-crossover", "One-arm dumbbell row": "one-arm-dumbbell-row", "Reverse fly": "reverse-fly", "Arnold press": "arnold-press", "Front squat": "front-squat", "Hip thrust": "hip-thrust", "Bulgarian split squat": "bulgarian-split-squat", "Leg extension": "leg-extension", "Leg curl": "leg-curl", "Seated calf raise": "seated-calf-raise", "Close-grip bench press": "close-grip-bench-press", "Triceps dip": "triceps-dip", "Hammer curl": "hammer-curl", "Incline curl": "incline-curl", "Incline barbell press": "incline-barbell-press", "Overhead triceps extension": "overhead-triceps-extension", "Wrist curl": "wrist-curl", "Glute bridge": "glute-bridge", "Mountain climbers": "mountain-climbers", "Jumping jacks": "jumping-jacks", "Kettlebell swing": "kettlebell-swing", "Farmer’s carry": "farmer-s-carry", "Rowing (erg)": "rowing-erg", "Sled push": "sled-push", "Dumbbell bench press": "dumbbell-bench-press", "Decline dumbbell press": "decline-dumbbell-press", "Goblet squat": "goblet-squat", "Cat-cow": "cat-cow", "Standing hamstring fold": "standing-hamstring-fold"};</script>
+<script>window.EXIMG={"Bench press":"bench-press","Incline dumbbell press":"incline-dumbbell-press","Push-ups":"push-ups","Squat":"squat","Leg press":"leg-press","Romanian deadlift":"romanian-deadlift","Lunges":"lunges","Calf raise":"calf-raise","Deadlift":"deadlift","Barbell row":"barbell-row","Lat pulldown":"lat-pulldown","Pull-ups":"pull-ups","Seated cable row":"seated-cable-row","Overhead press":"overhead-press","Lateral raise":"lateral-raise","Face pull":"face-pull","Barbell curl":"barbell-curl","Dumbbell curl":"dumbbell-curl","Triceps pushdown":"triceps-pushdown","Skull crushers":"skull-crushers","Plank":"plank","Crunches":"crunches","Hanging leg raise":"hanging-leg-raise","Treadmill run":"treadmill-run","Running (outdoor)":"running-outdoor","Walking":"walking","Cycling":"cycling","Jump rope":"jump-rope","Chest fly (dumbbell)":"chest-fly-dumbbell","Cable crossover":"cable-crossover","One-arm dumbbell row":"one-arm-dumbbell-row","Reverse fly":"reverse-fly","Arnold press":"arnold-press","Front squat":"front-squat","Hip thrust":"hip-thrust","Bulgarian split squat":"bulgarian-split-squat","Leg extension":"leg-extension","Leg curl":"leg-curl","Seated calf raise":"seated-calf-raise","Close-grip bench press":"close-grip-bench-press","Triceps dip":"triceps-dip","Hammer curl":"hammer-curl","Incline curl":"incline-curl","Incline barbell press":"incline-barbell-press","Overhead triceps extension":"overhead-triceps-extension","Wrist curl":"wrist-curl","Glute bridge":"glute-bridge","Mountain climbers":"mountain-climbers","Jumping jacks":"jumping-jacks","Kettlebell swing":"kettlebell-swing","Farmer’s carry":"farmer-s-carry","Rowing (erg)":"rowing-erg","Sled push":"sled-push","Dumbbell bench press":"dumbbell-bench-press","Decline dumbbell press":"decline-dumbbell-press","Goblet squat":"goblet-squat","Cat-cow":"cat-cow","Standing hamstring fold":"standing-hamstring-fold","Straight-leg raise":"straight-leg-raise","90/90 hip switch":"hip-90-90","Couch stretch":"couch-stretch","Shoulder dislocates (stick)":"shoulder-dislocates","Ankle rocks":"ankle-rocks"};</script>
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function(){});
