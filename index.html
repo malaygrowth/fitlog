@@ -443,7 +443,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='1.2.0';
+const APP_VER='1.3.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -1199,7 +1199,17 @@ function lastDateFor(exId){
    three sessions rather than a single top set, so a session that fell apart
    and one that was comfortable no longer look identical. */
 
-const RXLABEL={up:'↑', deload:'↓', reps:'→', comeback:'⟲', first:'•', progress:'↑', steady:'→'};
+const RXLABEL={up:'↑', deload:'↓', reps:'→', comeback:'⟲', first:'•', progress:'↑', steady:'→', hold:'='};
+/* One banner explaining any readiness hold, so a lighter day is never a
+   mystery. Returns '' when nothing is being held back. */
+function readinessBanner(){
+  const rd=readiness();
+  if(!rd.hold) return '';
+  return '<div class="card" style="border-left:3px solid var(--sl); padding:11px 14px">'+
+    '<b class="small">Holding loads steady today</b>'+
+    '<div class="tiny muted" style="margin-top:3px">'+esc(rd.reasons.join(' · '))+
+    '. Earned increases are waiting for you, not cancelled.</div></div>';
+}
 /* how many sets and what rep window. Per-exercise override wins. */
 function schemeFor(exId){
   const e=S.exercises.find(function(x){return x.id===exId;})||{};
@@ -1240,6 +1250,81 @@ function topWeight(sets){ return sets.reduce(function(a,s){ return Math.max(a,+s
 function daysSince(iso){
   return Math.round((new Date(today()+'T12:00:00')-new Date(iso+'T12:00:00'))/86400000);
 }
+/* ---- readiness: sleep and bodyweight decide whether today is a day to add
+   load. It only ever holds an increase you already earned, never invents a
+   heavier one, and the reason is always shown rather than applied quietly. */
+function recentSleep(n){
+  const out=[];
+  for(let i=0;i<=n;i++){
+    const sl=S.sleep[dShift(today(),-i)];
+    if(sl && +sl.hrs) out.push(+sl.hrs);
+    if(out.length>=n) break;
+  }
+  return out;
+}
+function bwOn(iso){
+  let best=null;
+  (S.weights||[]).forEach(function(w){
+    if(w.date<=iso && (!best || w.date>best.date)) best=w;
+  });
+  return best? +best.kg : null;
+}
+function dayGap(a,b){
+  return Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/86400000);
+}
+/* Rate of change, not raw difference between two readings that may be months
+   apart: weigh-ins are sporadic, and 3 kg over ten weeks is not 3 kg in a week. */
+function bwChange(days){
+  const ws=(S.weights||[]).slice().sort(function(a,b){ return a.date<b.date?-1:1; });
+  if(ws.length<2) return null;
+  const latest=ws[ws.length-1];
+  if(daysSince(latest.date)>10) return null;        /* no current reading to judge from */
+  let base=null;
+  for(let i=ws.length-2;i>=0;i--){
+    if(dayGap(ws[i].date, latest.date)>=days){ base=ws[i]; break; }
+  }
+  if(!base) base=ws[0];
+  const span=dayGap(base.date, latest.date);
+  if(span<3) return null;
+  const delta=latest.kg-base.kg;
+  return {from:base.kg, to:latest.kg, span:span,
+    delta:Math.round(delta*10)/10,
+    perWeek:Math.round(delta/span*7*10)/10};
+}
+function isBodyweightEx(exId){
+  return /pull-?up|chin-?up|\bdip|push-?up|hang|plank/i.test(exName(exId));
+}
+function readiness(){
+  const reasons=[]; let hold=false;
+  const goal=+S.settings.sleepGoal||8;
+  const sl=recentSleep(2);
+  let avg=null;
+  if(sl.length){
+    avg=Math.round((sl.reduce(function(a,b){return a+b;},0)/sl.length)*10)/10;
+    if(avg < goal-1.5){
+      hold=true;
+      reasons.push(avg+'h sleep'+(sl.length>1?' across two nights':' last night')+', short of your '+goal+'h');
+    }
+  }
+  const bw=bwChange(7);
+  if(bw && bw.perWeek<0 && bw.to>0 && Math.abs(bw.perWeek)/bw.to > 0.01){
+    hold=true;
+    reasons.push('losing '+Math.abs(bw.perWeek)+' '+unit()+' a week, fast enough that recovery is running behind');
+  }
+  return {hold:hold, reasons:reasons, sleepAvg:avg, bw:bw};
+}
+/* On a pull-up or a dead hang your bodyweight IS the load, so a change in it
+   silently changes the difficulty. Say so instead of letting the reps look
+   like pure progress or pure regression. */
+function bwNote(exId, sinceISO){
+  if(!isBodyweightEx(exId) || !sinceISO) return null;
+  const now=bwOn(today()), then=bwOn(sinceISO);
+  if(now===null||then===null) return null;
+  const d=Math.round((now-then)*10)/10;
+  if(Math.abs(d)<1) return null;
+  return d<0 ? 'you are '+Math.abs(d)+' '+unit()+' lighter than last time, so the same reps are less work'
+             : 'you are '+d+' '+unit()+' heavier than last time, so the same reps are more work';
+}
 /* The prescription: an array of {w,r} — one per set — plus the reasoning. */
 function prescribe(exId){
   const sc=schemeFor(exId), g=exGroupOf(exId), tmd=isTimedEx(exId);
@@ -1274,7 +1359,10 @@ function prescribe(exId){
 
   if(tmd){
     const b=Math.max.apply(null,last.sets.map(function(s){return +s.r||0;}));
-    return {sets:mk('', b+5), why:'five seconds longer than last time ('+b+'s)', tag:'progress'};
+    const rdT=readiness();
+    if(rdT.hold) return {sets:mk('', b), why:'match last time’s '+b+'s rather than pushing it: '+rdT.reasons[0], tag:'hold', readiness:rdT};
+    const bwn=bwNote(exId,last.date);
+    return {sets:mk('', b+5), why:'five seconds longer than last time ('+b+'s)'+(bwn?', and '+bwn:''), tag:'progress'};
   }
 
   const reps=last.sets.map(function(s){ return +s.r||0; });
@@ -1286,6 +1374,14 @@ function prescribe(exId){
   /* earned the increase: every prescribed set at the top of the range */
   if(hitAll){
     const inc=incFor(exId)*(allEasy?2:1);
+    const rd=readiness();
+    /* the increase was earned, but sleep or a sharp weight drop says today is
+       not the day to take it. Hold, and say both halves out loud. */
+    if(rd.hold){
+      return {sets:mk(topW, sc.hi),
+        why:'you earned +'+inc+' '+unit()+', but '+rd.reasons[0]+' — repeat '+topW+' '+unit()+' today and take it next session',
+        tag:'hold', held:inc, readiness:rd};
+    }
     return {sets:mk(roundTo(topW+inc, incFor(exId)), sc.lo),
       why:'you hit '+sc.sets+'×'+sc.hi+' at '+topW+' '+unit()+(allEasy?' and called it easy, so up '+inc:', so up '+inc)+' '+unit(),
       tag:'up'};
@@ -1308,10 +1404,12 @@ function prescribe(exId){
     out.push({w:topW||'', r:Math.min(sc.hi, had+1)});
   }
   const fell=reps.length>1 && reps[reps.length-1] < reps[0]*0.7;
+  const bwn=bwNote(exId, last.date);
   return {sets:out,
-    why: hardSet ? 'last set felt hard, so hold '+topW+' '+unit()+' and repeat it clean'
+    why:(hardSet ? 'last set felt hard, so hold '+topW+' '+unit()+' and repeat it clean'
        : fell ? 'reps dropped off badly last time, hold '+topW+' '+unit()+' until all '+sc.sets+' sets match'
-       : 'hold '+topW+' '+unit()+', one more rep per set until you reach '+sc.sets+'×'+sc.hi,
+       : 'hold '+topW+' '+unit()+', one more rep per set until you reach '+sc.sets+'×'+sc.hi)
+       +(bwn? ' — '+bwn : ''),
     tag:'reps'};
 }
 /* One-line summary of the prescription, for cards and the exercise sheet.
@@ -2433,6 +2531,7 @@ function renderWorkout(){
   const wkN=S.sessions.filter(function(s){return s.date>dShift(today(),-7);}).length;
   const ach=achievements(), achGot=ach.filter(function(a){return a.ok;});
   let h='';
+  if(!trainedToday) h+=readinessBanner();
   /* hero */
   h+='<div class="card">';
   if(trainedToday){
@@ -2608,6 +2707,7 @@ function sessionHTML(){
     '<div class="tiny muted num" id="sesTime">0:00</div></div>'+
     '<div class="row"><button class="btn sm danger" onclick="cancelSession()">Discard</button>'+
     '<button class="btn primary sm" onclick="finishSession()">Finish</button></div></div></div>';
+  h+=readinessBanner();
   /* warm-up protocol from today's muscle groups */
   const sesGrps=[]; a.ex.forEach(function(e){ const g=exGroupOf(e.exId); if(g&&g!=='Mobility'&&sesGrps.indexOf(g)<0) sesGrps.push(g); });
   if(sesGrps.length){
