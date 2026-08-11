@@ -35,12 +35,12 @@ function check(name, cond, detail) {
     weights: S.weights.length,
     shake: S.myFoods.some((m) => /post-workout shake/i.test(m.name)),
   }));
-  check('38 imported sessions', boot.sessions === 38, boot.sessions);
+  check('38 imported sessions + the re-entered 10 August push', boot.sessions === 39, boot.sessions);
   check('10 supplements seeded', boot.supps === 10, boot.supps);
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 18, boot.schema);
+  check('schemaVersion stamped', boot.schema === 19, boot.schema);
   check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
@@ -53,6 +53,38 @@ function check(name, cond, detail) {
   check('no duplicate sessions', again.sessions === boot.sessions, again.sessions);
   check('no duplicate supplements', again.supps === boot.supps, again.supps);
   check('no duplicate routines', again.routines === boot.routines, again.routines);
+
+  console.log('the re-entered 10 August session');
+  const aug10 = await page.evaluate(() => {
+    const all = S.sessions.filter((s) => s.date === '2026-08-10');
+    const s = all[0];
+    const push = S.routines.find((r) => /Push: wrist/.test(r.name));
+    const rx = {};
+    push.exIds.forEach((id) => { const r = prescribe(id); rx[exName(id)] = { tag: r.tag, w: r.sets[0].w, r: r.sets[0].r }; });
+    const wk = S.sessions.filter((x) => x.date > dShift(today(), -7)).length;
+    return {
+      count: all.length, name: s && s.name, vol: s && s.vol,
+      exCount: s && s.ex.length, sets: s && s.ex.reduce((a, e) => a + e.sets.length, 0),
+      prs: s && (s.prs || []).length,
+      allDone: s && s.ex.every((e) => e.sets.every((t) => t.done === true)),
+      allEasy: s && s.ex.every((e) => e.sets.every((t) => t.e === 'easy')),
+      sorted: S.sessions.every((x, i, a) => !i || a[i - 1].date <= x.date),
+      inWeek: wk, total: S.sessions.length, rx, held: readiness().hold,
+    };
+  });
+  check('exactly one session on 10 August', aug10.count === 1, aug10.count);
+  check('it is the Monday push routine', aug10.name === 'Push: wrist-safe return', aug10.name);
+  check('6 exercises, 18 sets, all completed', aug10.exCount === 6 && aug10.sets === 18 && aug10.allDone, aug10);
+  check('volume 1575, plank contributes nothing', aug10.vol === 1575, aug10.vol);
+  check('comeback loads set no records', aug10.prs === 0, aug10.prs);
+  check('every set marked easy', aug10.allEasy);
+  check('history stays sorted and it counts in the week', aug10.sorted && aug10.inWeek >= 1, aug10);
+  check('the payoff: every push lift now progresses', Object.values(aug10.rx).every((r) => r.tag === 'up' || r.tag === 'progress'), aug10.rx);
+  check('easy sets double the jump (press 10→15, raise 2.5→5)',
+    aug10.rx['Incline dumbbell press'].w === 15 && aug10.rx['Lateral raise'].w === 5, aug10.rx);
+  check('an easy hold adds ten seconds, not five', aug10.rx['Plank'].r === 30, aug10.rx['Plank']);
+  check('readiness does not hold it back on real data', aug10.held === false);
+
 
   console.log('food database + My Foods');
   const food = await page.evaluate(() => {
@@ -176,7 +208,7 @@ function check(name, cond, detail) {
     hasSnapshot: !!localStorage.getItem('fitlog.v1.bak'),
     meta: JSON.parse(localStorage.getItem('fitlog.v1.bak.meta') || 'null'),
   }));
-  check('pre-update snapshot written', snap.hasSnapshot && snap.meta && snap.meta.to === 18, snap.meta);
+  check('pre-update snapshot written', snap.hasSnapshot && snap.meta && snap.meta.to === 19, snap.meta);
 
   const past = await page.evaluate(() => {
     const d = dShift(today(), -3);
@@ -345,7 +377,7 @@ function check(name, cond, detail) {
   check('steps state deleted by migration', migAfter.steps, migAfter);
   check('past ticks converted to logged minutes', migAfter.ticksConverted, migAfter.ticksConverted);
   check('breathwork supp retired from list + checklist', migAfter.suppGone && migAfter.checklistClean && migAfter.supps === mig.supps - 1, migAfter);
-  check('migration stamps schema 18', migAfter.schema === 18, migAfter.schema);
+  check('migration stamps schema 19', migAfter.schema === 19, migAfter.schema);
 
   console.log('em-dash removal: parsers + v17 migration');
   const dash = await page.evaluate(() => ({
@@ -400,7 +432,7 @@ function check(name, cond, detail) {
   check('user-authored routine renamed, wording kept', v17After.rt === 'Push: my own routine', v17After.rt);
   check('stored session + PR text renamed', v17After.ses === 'Return: full body (light)' && v17After.pr === '70×5: heaviest ever', v17After);
   check('S.lastPhase migrated (no false phase celebration)', v17After.lastPhase === 'Phase 0: Rebuild' && !v17After.celebrated, v17After);
-  check('migration stamps schema 18', v17After.schema === 18, v17After.schema);
+  check('migration stamps schema 19', v17After.schema === 19, v17After.schema);
 
   console.log('workout cards: preview before starting');
   const cards = await page.evaluate(() => {
@@ -448,6 +480,52 @@ function check(name, cond, detail) {
   check('exercises without photos show their own diagram', thumbs.figures >= 5, thumbs.figures);
   check('photo thumbnails still render', thumbs.photos >= 20, thumbs.photos);
   check('every mobility move resolves to a visual', thumbs.mobilityUncovered.length === 0, thumbs.mobilityUncovered);
+
+  console.log('rest timer, including mobility');
+  const rest = await page.evaluate(() => {
+    const on = () => document.querySelector('#rest').classList.contains('on');
+    const out = {};
+    const mobId = S.exercises.find((e) => e.name === 'Dead hang').id;
+    const legId = S.exercises.find((e) => e.name === 'Leg press').id;
+    out.mobRest = exRest(mobId);
+    out.liftRest = exRest(legId);
+
+    startSession(); closeSheet(); addExToSession(legId);
+    setVal(0, 0, 'w', '80'); setVal(0, 0, 'r', '10'); toggleSet(0, 0);
+    out.liftStarts = on(); restSkip();
+    setEffort(0, 0, 'ok'); out.survivesEffortTap = document.querySelector('#rest') !== null;
+    cancelSession(); closeSheet();
+
+    startSession(); closeSheet(); addExToSession(mobId);
+    toggleSet(0, 0);
+    out.mobStarts = on(); restSkip();
+    // and via the hold timer, which is how mobility is normally completed
+    S.active.ex[0].sets[1].plan = true;
+    holdEi = 0; holdSi = 1; holdFinish(30);
+    out.holdStarts = on();
+    out.holdClearsPlan = S.active.ex[0].sets[1].plan === undefined;
+    restSkip(); cancelSession(); closeSheet();
+
+    // today's plan is the all-mobility rehab block: it must rest now
+    const rt = todaysPlanRoutine();
+    startSession(rt.id); closeSheet(); toggleSet(0, 0);
+    out.todayPlan = rt.name;
+    out.todayStarts = on();
+    restSkip(); cancelSession(); closeSheet();
+
+    const stats = {};
+    S.routines.forEach((r) => { if (/Rehab|Mobility &/.test(r.name)) stats[r.name] = routineStats(r.exIds).mins; });
+    out.stats = stats;
+    return out;
+  });
+  check('mobility rests briefly, lifts rest fully', rest.mobRest === 25 && rest.liftRest > 25, rest);
+  check('a lift still starts the rest timer', rest.liftStarts);
+  check('a mobility set now starts one too', rest.mobStarts);
+  check('completing a hold starts a rest', rest.holdStarts);
+  check('a completed hold leaves no plan flag behind', rest.holdClearsPlan);
+  check("today's all-mobility rehab block rests between moves", rest.todayStarts, rest.todayPlan);
+  check('rehab still estimates near its ~15 min label', rest.stats['Rehab: knee & wrist (~15 min)'] <= 25, rest.stats);
+  check('mobility block still estimates near its ~20 min label', rest.stats['Mobility & flexibility (~20 min)'] <= 32, rest.stats);
 
   console.log('coaching engine: what to lift, and why');
   const rxEngine = await page.evaluate(() => {
