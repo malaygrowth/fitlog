@@ -162,6 +162,26 @@
     font:inherit; min-height:0; text-decoration:underline; text-decoration-color:var(--line);
     text-underline-offset:3px}
   .exlink:active{color:var(--wk)}
+  /* routine cards: recognise the workout, don't read it */
+  .exthumbs{display:inline-flex; gap:5px}
+  .exthumb{width:38px; height:38px; border-radius:9px; overflow:hidden; background:#fff;
+    display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto}
+  .exthumb img{width:100%; height:100%; object-fit:cover; display:block}
+  .exthumb.ph{background:var(--raised); color:var(--ink3); font-family:var(--fd-disp);
+    font-weight:700; font-size:15px}
+  .exthumb.more{background:var(--raised); color:var(--ink2); font-size:12px; font-weight:700}
+  .gchip{font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink3); background:var(--raised); border-radius:99px; padding:3px 9px}
+  .rcard{display:block; width:100%; text-align:left; background:var(--surface); border:0;
+    border-radius:14px; padding:13px 14px; margin-bottom:10px}
+  .rcard:active{background:var(--raised)}
+  .rmeta{font-size:11.5px; color:var(--ink2); font-weight:500}
+  .rready{font-size:11.5px; color:var(--wk); font-weight:700}
+  .prow{display:flex; align-items:center; gap:11px; width:100%; background:none; border:0;
+    border-bottom:1px solid var(--line); padding:10px 2px; text-align:left; min-height:0}
+  .prow:active{background:var(--raised)}
+  .tline{display:flex; justify-content:space-between; gap:10px; padding:7px 0;
+    border-bottom:1px solid var(--line)}
   .exfig .fg{stroke:var(--line); stroke-width:2}
 
   .exblock{border-top:1px solid var(--line); padding-top:14px; margin-top:14px}
@@ -2190,6 +2210,88 @@ function bestFor(exId){
   });});
   return best;
 }
+/* ---- what a routine actually costs you, so a card can say something ---- */
+function setsForEx(exId){
+  const pa=prevArr(exId);
+  const n=pa? pa.filter(function(s){return !s.wu;}).length : 0;
+  /* imported history keeps only the best set per exercise, so a count of 1 is
+     a record-keeping artefact rather than a real single-set session */
+  return n>=2 ? n : 3;
+}
+function routineStats(exIds){
+  const groups=[]; let sets=0, secs=0, ready=0;
+  (exIds||[]).forEach(function(id){
+    const g=exGroupOf(id); if(g && groups.indexOf(g)<0) groups.push(g);
+    const n=setsForEx(id); sets+=n;
+    /* Mobility flows straight through with no rest (toggleSet doesn't start a
+       rest timer for it either), so charging it 90s a set made a 15-minute
+       rehab block read as 47 */
+    if(g==='Cardio') secs += n*600;
+    else if(g==='Mobility') secs += n*45;
+    else secs += n*((isTimedEx(id)?45:40) + exRest(id));
+    const t=targetFor(id); if(t && /^target:/.test(t)) ready++;
+  });
+  return {groups:groups, sets:sets, mins:Math.max(1,Math.round(secs/60)), ready:ready};
+}
+/* Match by name first, then by what was actually trained: a routine renamed or
+   started empty still counts as having been done. */
+function lastDoneOf(name, exIds){
+  for(let i=S.sessions.length-1;i>=0;i--) if(S.sessions[i].name===name) return S.sessions[i];
+  if(!exIds || !exIds.length) return null;
+  for(let i=S.sessions.length-1;i>=0;i--){
+    const s=S.sessions[i];
+    const shared=s.ex.filter(function(e){ return exIds.indexOf(e.exId)>-1; }).length;
+    if(shared >= Math.ceil(exIds.length*0.6)) return s;
+  }
+  return null;
+}
+function agoTxt(iso){
+  if(!iso) return null;
+  const d=Math.round((new Date(today()+'T12:00:00')-new Date(iso+'T12:00:00'))/86400000);
+  return d<=0? 'today' : d===1? 'yesterday' : d+'d ago';
+}
+function exThumb(exId){
+  const nm=exName(exId), im=(window.EXIMG||{})[nm];
+  const initial=esc(nm.replace(/[^A-Za-z]/g,'').slice(0,1).toUpperCase()||'?');
+  if(!im) return '<span class="exthumb ph">'+initial+'</span>';
+  return '<span class="exthumb"><img src="img/ex/'+esc(im)+'_0.jpg" alt="" loading="lazy" onerror="thumbFail(this,\''+initial+'\')"></span>';
+}
+function thumbFail(img, initial){ const p=img.parentNode; p.className='exthumb ph'; p.textContent=initial; }
+function thumbRow(exIds, max){
+  max=max||4;
+  const ids=exIds||[];
+  return '<span class="exthumbs">'+ids.slice(0,max).map(exThumb).join('')+
+    (ids.length>max? '<span class="exthumb more">+'+(ids.length-max)+'</span>':'')+'</span>';
+}
+function groupChips(groups){
+  return (groups||[]).map(function(g){ return '<span class="gchip">'+esc(g)+'</span>'; }).join('');
+}
+/* the full breakdown, before you commit to starting */
+function previewRoutine(id){
+  const r=S.routines.find(function(x){return x.id===id;}); if(!r) return;
+  const st=routineStats(r.exIds), last=lastDoneOf(r.name, r.exIds);
+  let h='<h3>'+esc(r.name)+'</h3>'+
+    '<div class="row wrap" style="gap:6px; margin:-6px 0 12px">'+groupChips(st.groups)+'</div>'+
+    '<div class="statrow" style="margin-bottom:12px">'+
+      '<div class="stat"><span class="tl">Time</span><div class="tv num" style="font-size:19px; white-space:nowrap">~'+st.mins+'<span class="ts"> min</span></div></div>'+
+      '<div class="stat"><span class="tl">Sets</span><div class="tv num" style="font-size:19px">'+st.sets+'</div></div>'+
+      '<div class="stat"><span class="tl">Last done</span><div class="tv" style="font-size:15px; white-space:nowrap">'+(last? esc(agoTxt(last.date)) : 'never')+'</div></div>'+
+    '</div>';
+  r.exIds.forEach(function(exId){
+    const tg=targetFor(exId), pv=prevSets(exId), wu=warmupFor(exId);
+    h+='<button class="prow" onclick="openExInfo(\''+exId+'\')">'+exThumb(exId)+
+      '<span class="grow" style="text-align:left">'+
+        '<b class="small">'+esc(exName(exId))+'</b>'+
+        '<span class="tiny muted" style="display:block">'+setsForEx(exId)+' sets · rest '+fmtRest(exRest(exId))+'</span>'+
+        (tg? '<span class="tiny num" style="display:block; color:var(--wk); font-weight:600">'+esc(tg)+'</span>'
+           : (pv? '<span class="tiny muted num" style="display:block">prev '+pv+'</span>':''))+
+        (wu? '<span class="tiny muted num" style="display:block">'+esc(wu)+'</span>':'')+
+      '</span><span class="muted">ⓘ</span></button>';
+  });
+  h+='<button class="btn primary wide" style="margin-top:14px" onclick="closeSheet();startSession(\''+r.id+'\')">Start this workout</button>'+
+     '<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet();editRoutine(\''+r.id+'\')">Edit routine</button>';
+  openSheet(h);
+}
 function renderWorkout(){
   const el=$('#tab-workout');
   if(S.active){ WV='session'; }
@@ -2213,11 +2315,24 @@ function renderWorkout(){
     h+='<b style="font-size:18px">Trained today ✓</b><div class="tiny muted" style="margin:3px 0 12px">'+esc(s.name)+' · '+Math.round(s.vol).toLocaleString()+' '+unit()+((s.prs&&s.prs.length)?' · 🏆 '+s.prs.length:'')+'</div>'+
        '<button class="btn wide" onclick="startSession()">Start another (empty)</button>';
   } else if(planRt){
+    /* show the actual work, not just a name: what you're chasing today */
+    const pst=routineStats(planRt.exIds), plast=lastDoneOf(planRt.name, planRt.exIds);
     h+='<div class="tiny muted" style="font-weight:700; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px">Today’s plan</div>'+
        '<b style="font-size:18px">'+esc(planRt.name)+'</b>'+
-       '<div class="tiny muted" style="margin:3px 0 12px">'+planRt.exIds.map(function(id){return esc(exName(id));}).slice(0,4).join(' · ')+(planRt.exIds.length>4?' +'+(planRt.exIds.length-4):'')+'</div>'+
+       '<div class="row wrap" style="gap:6px; margin:7px 0 10px">'+groupChips(pst.groups)+'</div>';
+    planRt.exIds.slice(0,3).forEach(function(exId){
+      const tg=targetFor(exId), pv=prevSets(exId);
+      h+='<div class="tline"><span class="small">'+esc(exName(exId))+'</span>'+
+        '<span class="tiny num" style="text-align:right; '+(tg?'color:var(--wk); font-weight:700':'color:var(--ink3)')+'">'+
+        esc(tg? tg.replace(/^target:\s*/,'').replace(/\s*[—,].*$/,'') : (pv? pv.split('  ')[0] : 'first time'))+'</span></div>';
+    });
+    h+='<div class="rmeta" style="margin:9px 0 11px">'+
+        (planRt.exIds.length>3? '+'+(planRt.exIds.length-3)+' more · ':'')+
+        '~'+pst.mins+' min · '+pst.sets+' sets'+(plast? ' · last '+esc(agoTxt(plast.date)):'')+'</div>'+
        '<button class="btn primary wide" onclick="startSession(\''+planRt.id+'\')">Start today’s workout</button>'+
-       '<button class="btn ghost wide" style="margin-top:8px" onclick="startSession()">Start empty instead</button>';
+       '<div class="row" style="gap:8px; margin-top:8px">'+
+       '<button class="btn ghost grow" onclick="previewRoutine(\''+planRt.id+'\')">Preview all</button>'+
+       '<button class="btn ghost grow" onclick="startSession()">Empty workout</button></div>';
   } else {
     h+='<b style="font-size:18px">Rest day 🛌</b><div class="tiny muted" style="margin:3px 0 12px">Planned recovery. Train anyway only if you genuinely feel fresh.</div>'+
        '<button class="btn wide" onclick="startSession()">Start empty workout</button>';
@@ -2236,9 +2351,16 @@ function renderWorkout(){
   /* routines */
   h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Routines</h2>';
   S.routines.forEach(function(r){
-    h+='<div class="listrow"><div><b>'+esc(r.name)+'</b><div class="tiny muted">'+r.exIds.map(function(id){return esc(exName(id));}).slice(0,4).join(' · ')+(r.exIds.length>4?' +'+(r.exIds.length-4):'')+'</div></div>'+
-      '<div class="row"><button class="btn sm" onclick="editRoutine(\''+r.id+'\')">Edit</button>'+
-      '<button class="btn primary sm" onclick="startSession(\''+r.id+'\')">Start</button></div></div>';
+    const rst=routineStats(r.exIds), rlast=lastDoneOf(r.name, r.exIds);
+    h+='<button class="rcard" onclick="previewRoutine(\''+r.id+'\')">'+
+      '<div class="spread" style="align-items:flex-start; margin-bottom:9px">'+
+        '<b style="font-size:15px">'+esc(r.name)+'</b><span class="muted">›</span></div>'+
+      thumbRow(r.exIds,4)+
+      '<div class="row wrap" style="gap:5px; margin:9px 0 7px">'+groupChips(rst.groups)+'</div>'+
+      '<div class="rmeta">~'+rst.mins+' min · '+rst.sets+' sets · '+r.exIds.length+' exercises'+
+        (rlast? ' · last '+esc(agoTxt(rlast.date)) : ' · never done')+'</div>'+
+      (rst.ready? '<div class="rready" style="margin-top:3px">'+rst.ready+' progression'+(rst.ready>1?'s':'')+' ready today</div>':'')+
+      '</button>';
   });
   h+='<button class="btn ghost wide" style="margin-top:10px" onclick="editRoutine(null)">+ New routine</button></div>';
 
@@ -3092,8 +3214,34 @@ const FOODDB=[
 /* ice cream & biscuits */
 ['Softy cone (1)',160,3,25,5],['Choco bar (1)',180,2,18,11],['Cassata slice (1)',250,4,30,12],
 ['Bourbon / Hide&Seek (2)',100,1,14,4.5],['Good Day (2)',90,1,12,4],['Cream biscuit (2)',130,1,18,6],
+/* plate components — log the parts when the whole dish doesn't match */
+['Paneer cubes (1 piece, ~15g)',40,2.7,0.3,3.2],['Paneer raw (50g)',132,9,1,10.5],
+['Dal plain boiled, no tadka (katori)',110,7,18,1],['Tadka only (1 tbsp ghee/masala)',110,0,1,12],
+['Rajma boiled (katori)',130,8,21,0.6],['Chole boiled (katori)',140,8,22,2.5],
+['Cooked rice (katori, 100g)',130,2.7,28,0.3],['Jeera rice (katori)',180,3,30,5],
+['Sabzi gravy only (katori)',120,2,8,9],['Dry sabzi (katori)',110,3,12,6],
+['Cooking oil (1 tsp)',40,0,0,4.5],['Cream / malai (1 tbsp)',52,0.4,0.8,5.5],
+['Curd (katori, 100g)',60,3.5,4.5,3],['Buttermilk / chaas (glass)',40,2,3,1.5],
+['Milk toned (250ml)',120,8,12,4],['Milk skimmed (250ml)',80,8,12,0.2],
+/* branded biscuits — per piece AND per packet, because both are how you eat them */
+['Monaco (1 biscuit)',25,0.4,3.2,1.1],['Monaco (small packet, 63g)',330,5,42,15],
+['Krackjack (1 biscuit)',28,0.4,4,1.1],['Krackjack (small packet, 60g)',300,4,44,12],
+['Parle-G (1 biscuit)',27,0.4,4.5,0.8],['Parle-G (small packet, 55g)',250,4,41,8],
+['Marie Gold (1 biscuit)',21,0.4,3.8,0.5],['Marie Gold (packet, 75g)',330,6,60,8],
+['Good Day butter (1 biscuit)',45,0.6,6,2],['Good Day cashew (1 biscuit)',48,0.7,6,2.2],
+['Hide & Seek (1 biscuit)',48,0.6,6.5,2.2],['Bourbon (1 biscuit)',60,0.7,8.5,2.5],
+['50-50 / Maska Chaska (1 biscuit)',26,0.4,3.4,1.2],['Nice / coconut (1 biscuit)',33,0.4,4.6,1.4],
+['Milk Bikis (1 biscuit)',26,0.5,4.2,0.8],['Little Hearts (10 pieces)',110,1.5,15,4.5],
+['Oreo (1 biscuit)',48,0.5,7,2],['Digestive / NutriChoice (1 biscuit)',42,0.8,6,1.6],
+['Rusk / toast (1)',45,1,8,1],['Khari puff (1)',50,0.8,5,3],
+/* branded namkeen & chips */
+['Lays classic (small packet, 26g)',140,1.5,15,8],['Kurkure (small packet, 30g)',165,2,17,10],
+['Bingo Mad Angles (small pack)',150,2,17,8.5],['Uncle Chipps (small pack)',150,1.5,16,9],
+['Haldiram aloo bhujia (30g)',170,4,15,11],['Haldiram bhujia sev (30g)',165,5,14,10],
+['Moong dal namkeen (30g)',150,7,16,7],['Haldiram khatta meetha (30g)',150,3,18,8],
+['Peanuts masala (30g)',170,7,6,13],['Makhana roasted (30g)',105,3,17,0.5],
 /* random snacks */
-['Kurkure / chips small pack',160,2,17,10],['Popcorn (bowl)',120,3,20,4],['Frooti / Maaza (200ml)',90,0,22,0],
+['Popcorn (bowl)',120,3,20,4],['Frooti / Maaza (200ml)',90,0,22,0],
 ['Meetha paan (1)',70,0.5,15,1],
 ['Green chutney (1 tbsp)',15,0.5,2,0.5],['Coconut chutney (2 tbsp)',60,1,3,5],['Achar / pickle (1 tsp)',25,0,1,2],
 ['Sugar (1 tsp)',20,0,5,0],['Jaggery / gud (10g)',38,0,10,0],['Honey (1 tsp)',20,0,6,0],

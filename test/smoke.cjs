@@ -68,6 +68,22 @@ function check(name, cond, detail) {
   check('kaju shake findable', food.kaju >= 1, food.kaju);
   check('per-piece almond findable', food.almond >= 1);
   check('DB has 190+ foods', food.total >= 190, food.total);
+  const brands = await page.evaluate(() => {
+    function hits(q) {
+      const t = q.toLowerCase().split(/\s+/);
+      return fdbAllFoods().filter((f) => t.every((x) => f.name.toLowerCase().includes(x)));
+    }
+    return {
+      monaco: hits('monaco').length, krackjack: hits('krackjack').length,
+      perBiscuit: hits('1 biscuit').length, packet: hits('packet').length,
+      paneerPiece: hits('paneer piece').length, dalPlain: hits('dal plain').length,
+      dalTypes: hits('dal').length, oil: hits('cooking oil').length,
+    };
+  });
+  check('Monaco and Krackjack findable', brands.monaco >= 2 && brands.krackjack >= 2, brands);
+  check('biscuits loggable per piece and per packet', brands.perBiscuit >= 10 && brands.packet >= 5, brands);
+  check('plate components (paneer piece, plain dal, oil)', brands.paneerPiece >= 1 && brands.dalPlain >= 1 && brands.oil >= 1, brands);
+  check('multiple dal types', brands.dalTypes >= 8, brands.dalTypes);
   const my = await page.evaluate(() => {
     go('food'); addFoodForm('s');
     S.myFoods.push({ id: 'tmf1', name: 'Test kheer (bowl)', kcal: 111, p: 3, c: 20, f: 2 });
@@ -382,6 +398,34 @@ function check(name, cond, detail) {
   check('stored session + PR text renamed', v17After.ses === 'Return: full body (light)' && v17After.pr === '70×5: heaviest ever', v17After);
   check('S.lastPhase migrated (no false phase celebration)', v17After.lastPhase === 'Phase 0: Rebuild' && !v17After.celebrated, v17After);
   check('migration stamps schema 18', v17After.schema === 18, v17After.schema);
+
+  console.log('workout cards: preview before starting');
+  const cards = await page.evaluate(() => {
+    WV = 'home'; go('workout');
+    const html = document.querySelector('#tab-workout').innerHTML;
+    const r = S.routines.find((x) => /Rehab/.test(x.name));
+    const st = routineStats(r.exIds);
+    previewRoutine(r.id);
+    const sheet = document.querySelector('#sheetIn').textContent;
+    closeSheet();
+    const push = S.routines.find((x) => x.name === 'Push day');
+    return {
+      thumbs: document.querySelectorAll('#tab-workout .exthumb').length,
+      chips: document.querySelectorAll('#tab-workout .gchip').length,
+      cards: document.querySelectorAll('#tab-workout .rcard').length,
+      rehabMins: st.mins,
+      previewHasEveryEx: r.exIds.every((id) => sheet.includes(exName(id))),
+      previewHasTime: /min/.test(sheet) && /Sets/.test(sheet),
+      lastDone: !!lastDoneOf(push.name, push.exIds),
+    };
+  });
+  check('routine cards show exercise thumbnails', cards.thumbs >= 8, cards.thumbs);
+  check('routine cards show muscle groups', cards.chips >= 6, cards.chips);
+  check('every routine is a tappable card', cards.cards >= 10, cards.cards);
+  check('rehab block estimates ~15 min, not 47', cards.rehabMins >= 10 && cards.rehabMins <= 22, cards.rehabMins);
+  check('preview lists every exercise before starting', cards.previewHasEveryEx);
+  check('preview shows time and set count', cards.previewHasTime);
+  check('last-done resolves from training history', cards.lastDone);
 
   console.log('exercise visuals: every movement shows something accurate');
   const vis = await page.evaluate(() => {
