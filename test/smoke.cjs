@@ -40,7 +40,7 @@ function check(name, cond, detail) {
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 17, boot.schema);
+  check('schemaVersion stamped', boot.schema === 18, boot.schema);
   check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
@@ -107,6 +107,83 @@ function check(name, cond, detail) {
   check('volume computed', wo.vol === 350, wo.vol);
   check('history stays sorted', wo.sorted);
   check('edit session round-trip', wo.editing && wo.editedRep === '6', wo.editedRep);
+
+  console.log('data safety: edit / discard / delete never lose a workout');
+  const safety = await page.evaluate(() => {
+    const out = {};
+    // 1. a finished workout stays in history while it is being edited
+    startSession(); closeSheet();
+    addExToSession(S.exercises.find((e) => e.name === 'Squat').id);
+    setVal(0, 0, 'w', '60'); setVal(0, 0, 'r', '8'); toggleSet(0, 0); restSkip();
+    finishSession(); closeSheet();
+    const s = S.sessions[S.sessions.length - 1];
+    const id = s.id, vol = s.vol;
+    editSession(id);
+    out.stillInHistoryWhileEditing = S.sessions.some((x) => x.id === id);
+    // 2. discarding an edit leaves the original untouched
+    cancelSession();
+    const after = S.sessions.find((x) => x.id === id);
+    out.survivesDiscardedEdit = !!after && after.vol === vol && after.ex[0].sets[0].w === '60';
+    out.notBinned = !(S.trash || []).some((t) => t.id === id);
+    // 3. a real edit replaces in place rather than duplicating
+    editSession(id);
+    setVal(0, 0, 'w', '65'); finishSession(); closeSheet();
+    out.editedInPlace = S.sessions.filter((x) => x.id === id).length === 1
+      && S.sessions.find((x) => x.id === id).ex[0].sets[0].w === '65';
+    // 4. deleting bins it, and restore brings it back identically
+    delSession(id);
+    out.goneFromHistory = !S.sessions.some((x) => x.id === id);
+    out.inTrash = (S.trash || []).some((t) => t.id === id);
+    restoreSession(id);
+    const back = S.sessions.find((x) => x.id === id);
+    out.restored = !!back && back.ex[0].sets[0].w === '65' && back.date === s.date;
+    out.leftTrash = !(S.trash || []).some((t) => t.id === id);
+    // 5. an empty session is binned, not silently dropped
+    startSession(); closeSheet();
+    addExToSession(S.exercises.find((e) => e.name === 'Squat').id);
+    const emptyId = S.active.id;
+    finishSession(); closeSheet();
+    out.emptyBinned = (S.trash || []).some((t) => t.id === emptyId);
+    // cleanup
+    S.sessions = S.sessions.filter((x) => x.id !== id);
+    S.trash = []; save(); WV = 'home'; renderWorkout();
+    return out;
+  });
+  check('workout stays in history while being edited', safety.stillInHistoryWhileEditing);
+  check('discarding an edit keeps the original workout', safety.survivesDiscardedEdit && safety.notBinned, safety);
+  check('finishing an edit replaces in place (no duplicate)', safety.editedInPlace);
+  check('delete moves to Recently deleted', safety.goneFromHistory && safety.inTrash, safety);
+  check('restore brings the workout back intact', safety.restored && safety.leftTrash, safety);
+  check('empty session is binned, not silently dropped', safety.emptyBinned);
+
+  const snap = await page.evaluate(() => ({
+    hasSnapshot: !!localStorage.getItem('fitlog.v1.bak'),
+    meta: JSON.parse(localStorage.getItem('fitlog.v1.bak.meta') || 'null'),
+  }));
+  check('pre-update snapshot written', snap.hasSnapshot && snap.meta && snap.meta.to === 18, snap.meta);
+
+  const past = await page.evaluate(() => {
+    const d = dShift(today(), -3);
+    pastWorkoutForm();
+    document.querySelector('#pwDate').value = d;
+    document.querySelector('#pwMins').value = '40';
+    document.querySelector('#pwName').value = 'Recovered session';
+    startPastWorkout(); closeSheet();
+    addExToSession(S.exercises.find((e) => e.name === 'Bench press').id);
+    setVal(0, 0, 'w', '50'); setVal(0, 0, 'r', '10'); toggleSet(0, 0); restSkip();
+    finishSession(); closeSheet();
+    const s = S.sessions.find((x) => x.name === 'Recovered session');
+    const out = {
+      dated: s && s.date === d,
+      sorted: S.sessions.every((x, i, a) => !i || a[i - 1].date <= x.date),
+      mins: s && Math.round(s.dur / 60) >= 39 && Math.round(s.dur / 60) <= 41,
+    };
+    S.sessions = S.sessions.filter((x) => x.name !== 'Recovered session'); save();
+    return out;
+  });
+  check('past workout logs on the chosen date', past.dated, past);
+  check('past workout keeps history sorted', past.sorted);
+  check('past workout keeps its duration', past.mins, past.mins);
 
   console.log('timed exercises (plank / holds)');
   const plankRow = await page.evaluate(() => {
@@ -249,7 +326,7 @@ function check(name, cond, detail) {
   check('steps state deleted by migration', migAfter.steps, migAfter);
   check('past ticks converted to logged minutes', migAfter.ticksConverted, migAfter.ticksConverted);
   check('breathwork supp retired from list + checklist', migAfter.suppGone && migAfter.checklistClean && migAfter.supps === mig.supps - 1, migAfter);
-  check('migration stamps schema 17', migAfter.schema === 17, migAfter.schema);
+  check('migration stamps schema 18', migAfter.schema === 18, migAfter.schema);
 
   console.log('em-dash removal: parsers + v17 migration');
   const dash = await page.evaluate(() => ({
@@ -304,7 +381,48 @@ function check(name, cond, detail) {
   check('user-authored routine renamed, wording kept', v17After.rt === 'Push: my own routine', v17After.rt);
   check('stored session + PR text renamed', v17After.ses === 'Return: full body (light)' && v17After.pr === '70×5: heaviest ever', v17After);
   check('S.lastPhase migrated (no false phase celebration)', v17After.lastPhase === 'Phase 0: Rebuild' && !v17After.celebrated, v17After);
-  check('migration stamps schema 17', v17After.schema === 17, v17After.schema);
+  check('migration stamps schema 18', v17After.schema === 18, v17After.schema);
+
+  console.log('exercise visuals: every movement shows something accurate');
+  const vis = await page.evaluate(() => {
+    const noVisual = [], genericMobility = [];
+    S.exercises.forEach((e) => {
+      const img = (window.EXIMG || {})[e.name];
+      const pat = patternOf(e.name, e.group);
+      if (!img && !(pat && PATTERNS[pat])) noVisual.push(e.name);
+      // a Mobility move falling back to the shared 'stretch' drawing is the
+      // "old visuals" complaint: it is not a picture of that movement
+      if (!img && e.group === 'Mobility' && pat === 'stretch') genericMobility.push(e.name);
+    });
+    // the nine hand-drawn ones resolve to their own diagram, not a group one
+    const custom = Object.keys(PAT_EX).map((n) => {
+      const p = patternOf(n, 'Mobility');
+      return { n, ok: !!PATTERNS[p] && p === PAT_EX[n], label: PATTERNS[p] && PATTERNS[p].label };
+    });
+    return {
+      noVisual, genericMobility,
+      customOk: custom.every((c) => c.ok),
+      labels: custom.map((c) => c.label),
+      steps: Object.keys(PAT_EX).every((n) => (PATTERN_STEPS[PAT_EX[n]] || []).length === 3),
+      newPhotos: ['Straight-leg raise', '90/90 hip switch', 'Couch stretch', 'Shoulder dislocates (stick)', 'Ankle rocks']
+        .every((n) => !!(window.EXIMG || {})[n]),
+    };
+  });
+  check('every exercise has a photo or a diagram', vis.noVisual.length === 0, vis.noVisual);
+  check('no Mobility move left on the generic stretch drawing', vis.genericMobility.length === 0, vis.genericMobility);
+  check('nine hand-drawn movements resolve to their own diagram', vis.customOk, vis.labels);
+  check('each hand-drawn movement has how-to steps', vis.steps);
+  check('five mobility photos mapped', vis.newPhotos);
+
+  const proto = await page.evaluate(() => {
+    startSession(); closeSheet();
+    addExToSession(S.exercises.find((e) => e.name === 'Bench press').id);
+    const html = document.querySelector('#tab-workout').innerHTML;
+    const links = document.querySelectorAll('#tab-workout .exlink').length;
+    cancelSession();
+    return { links, hasWarm: /Warm-up/.test(html), hasCool: /Cool-down/.test(html) };
+  });
+  check('warm-up and cool-down lines are tappable', proto.links >= 3 && proto.hasWarm && proto.hasCool, proto);
 
   console.log('charts + report');
   const charts = await page.evaluate(() => {
