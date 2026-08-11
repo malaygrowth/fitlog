@@ -426,6 +426,86 @@ function check(name, cond, detail) {
   check('preview lists every exercise before starting', cards.previewHasEveryEx);
   check('preview shows time and set count', cards.previewHasTime);
   check('last-done resolves from training history', cards.lastDone);
+  const thumbs = await page.evaluate(() => {
+    WV = 'home'; go('workout');
+    const root = document.querySelector('#tab-workout');
+    const mob = S.exercises.filter((e) => e.group === 'Mobility');
+    return {
+      letters: root.querySelectorAll('.exthumb.ph').length,
+      figures: root.querySelectorAll('.exthumb.fig svg').length,
+      photos: root.querySelectorAll('.exthumb img').length,
+      mobilityUncovered: mob.filter((e) => {
+        if ((window.EXIMG || {})[e.name]) return false;
+        const p = patternOf(e.name, e.group);
+        return !(p && PATTERNS[p]);
+      }).map((e) => e.name),
+    };
+  });
+  check('no grey letter tiles left on routine cards', thumbs.letters === 0, thumbs.letters);
+  check('exercises without photos show their own diagram', thumbs.figures >= 5, thumbs.figures);
+  check('photo thumbnails still render', thumbs.photos >= 20, thumbs.photos);
+  check('every mobility move resolves to a visual', thumbs.mobilityUncovered.length === 0, thumbs.mobilityUncovered);
+
+  console.log('plate builder: log a meal from its parts');
+  const plate = await page.evaluate(() => {
+    const d = foodDate, before = (S.food[d] && S.food[d].l ? S.food[d].l.length : 0);
+    addFoodForm('l');
+    const emptyOnOpen = PLATE.length === 0;
+    function pick(q) {
+      document.querySelector('#fdbQ').value = q;
+      fdbSearch(q);
+      fdbPick(0);
+      return FDITEM.name;
+    }
+    pick('roti'); document.querySelector('#fdbQty').value = '2'; plateAdd();
+    pick('dal plain'); plateAdd();
+    pick('paneer cubes'); document.querySelector('#fdbQty').value = '6'; plateAdd();
+    pick('curd katori'); plateAdd();
+    const four = PLATE.length;
+    plateDel(3);                       // drop the curd
+    plateQty(0, 0.5);                  // roti 2 -> 2.5
+    const three = PLATE.length;        // read before plateLog() clears it
+    const t = plateTotals(), nm = plateName();
+    const addBtnGone = !/onclick="fdbAdd\(\)"/.test(document.querySelector('#fdbSel').innerHTML || '');
+    plateLog();
+    const list = (S.food[d] || {}).l || [];
+    const e = list[list.length - 1];
+    return {
+      emptyOnOpen, four, three, added: list.length - before,
+      name: nm, entryName: e.name, kcal: e.kcal, p: e.p,
+      sumKcal: Math.round(t.kcal), sumP: Math.round(t.p * 10) / 10,
+      clearedAfterLog: PLATE.length === 0, addBtnGone,
+    };
+  });
+  check('plate starts empty when the sheet opens', plate.emptyOnOpen);
+  check('four components collect on the plate', plate.four === 4, plate.four);
+  check('removing a component works', plate.three === 3, plate.three);
+  check('logs exactly one entry, not four', plate.added === 1, plate.added);
+  check('entry macros equal the sum of the parts', plate.kcal === plate.sumKcal && plate.p === plate.sumP, plate);
+  check('entry is named from its parts', /Roti/i.test(plate.entryName) && /\+/.test(plate.entryName), plate.entryName);
+  check('plain Add hidden while a plate is building', plate.addBtnGone);
+  check('plate clears after logging', plate.clearedAfterLog);
+
+  const plate2 = await page.evaluate(() => {
+    addFoodForm('d');
+    const leaked = PLATE.length;
+    document.querySelector('#fdbQ').value = 'monaco'; fdbSearch('monaco'); fdbPick(0);
+    const single = FDITEM.name;
+    fdbAdd();
+    const list = (S.food[foodDate] || {}).d || [];
+    // save a plate to My Foods
+    addFoodForm('d');
+    document.querySelector('#fdbQ').value = 'dal plain'; fdbSearch('dal plain'); fdbPick(0); plateAdd();
+    document.querySelector('#fdbQ').value = 'cooked rice'; fdbSearch('cooked rice'); fdbPick(0); plateAdd();
+    const n = plateName();
+    platesSave();
+    const found = S.myFoods.some((m) => m.name === n);
+    closeSheet();
+    return { leaked, single, logged: list.length, savedName: n, found };
+  });
+  check('plate does not leak into the next meal', plate2.leaked === 0, plate2.leaked);
+  check('single-item Add still logs one item and closes', plate2.logged === 1, plate2.logged);
+  check('plate can be saved to My Foods', plate2.found, plate2.savedName);
 
   console.log('exercise visuals: every movement shows something accurate');
   const vis = await page.evaluate(() => {
