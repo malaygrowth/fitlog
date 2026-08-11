@@ -443,7 +443,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='1.3.0';
+const APP_VER='1.4.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -914,12 +914,52 @@ function seedV17(){
   save();
 }
 
+/* Re-enter the Monday 10 August push session, which the old edit-then-discard
+   path destroyed before that path was made non-destructive. Nothing can recover
+   the original, so this is the workout as it was prescribed and completed:
+   the comeback loads for 'Push: wrist-safe return', every set at the top of the
+   rep range and marked easy. Numbers are hardcoded rather than recomputed at
+   boot so the seed cannot drift with whenever it happens to run. */
+function seedV19(){
+  if(PUB){ S.seedV19=true; return; }
+  if(S.seedV19) return; S.seedV19=true;
+  const DATE='2026-08-10';
+  if((S.sessions||[]).some(function(s){ return s.date===DATE; })) return;
+  const byName=function(n){ const e=S.exercises.find(function(x){return x.name===n;}); return e? e.id : null; };
+  const rows=[
+    ['Incline dumbbell press',10,12],
+    ['Chest fly (dumbbell)',6.25,12],
+    ['Lateral raise',2.5,12],
+    ['Overhead triceps extension',10,12],
+    ['Triceps pushdown',15,12]
+  ];
+  const ex=[];
+  rows.forEach(function(r){
+    const id=byName(r[0]); if(!id) return;
+    const sets=[];
+    for(let i=0;i<3;i++) sets.push({w:r[1], r:r[2], done:true, e:'easy'});
+    ex.push({exId:id, sets:sets});
+  });
+  const plank=byName('Plank');
+  if(plank) ex.push({exId:plank, sets:[{r:20,done:true,e:'easy'},{r:20,done:true,e:'easy'},{r:20,done:true,e:'easy'}]});
+  if(!ex.length) return;
+  /* same arithmetic finishSession uses: w*r over every non-warm-up set, so the
+     timed plank contributes nothing. No PRs — these comeback loads are far
+     under the old bests, and holdBest(Plank) is 0 so 20s is not a record. */
+  let vol=0;
+  ex.forEach(function(e){ e.sets.forEach(function(s){ vol += (+s.w||0)*(+s.r||0); }); });
+  S.sessions.push({id:uid(), name:'Push: wrist-safe return', date:DATE,
+    dur:2700, vol:vol, ex:ex, prs:[]});   /* duration not recorded at the time; 45 min is an estimate */
+  S.sessions.sort(function(x,y){ return x.date<y.date?-1:1; });
+  save();
+}
+
 /* ============ migration runner ============
    Ordered and append-only — this list IS the execution order (it preserves
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
-const SCHEMA=18;
+const SCHEMA=19;
 /* Snapshot the store as it was BEFORE this build's migrations touch it, so a bad
    upgrade is recoverable instead of permanent. Written once per schema bump. */
 (function(){
@@ -931,7 +971,7 @@ const SCHEMA=18;
   }catch(e){}
 })();
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
- seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17].forEach(function(step){ step(); });
+ seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19].forEach(function(step){ step(); });
 S.schemaVersion=SCHEMA;
 
 /* ============ utils ============ */
@@ -1361,8 +1401,15 @@ function prescribe(exId){
     const b=Math.max.apply(null,last.sets.map(function(s){return +s.r||0;}));
     const rdT=readiness();
     if(rdT.hold) return {sets:mk('', b), why:'match last time’s '+b+'s rather than pushing it: '+rdT.reasons[0], tag:'hold', readiness:rdT};
+    if(last.sets.some(function(s){ return s.e==='hard'; }))
+      return {sets:mk('', b), why:'last hold felt hard, so repeat '+b+'s clean before adding time', tag:'reps'};
+    /* same doubling rule the weighted branch uses when every set felt easy */
+    const easyT=last.sets.length>1 && last.sets.every(function(s){ return s.e==='easy'; });
+    const step=easyT?10:5;
     const bwn=bwNote(exId,last.date);
-    return {sets:mk('', b+5), why:'five seconds longer than last time ('+b+'s)'+(bwn?', and '+bwn:''), tag:'progress'};
+    return {sets:mk('', b+step),
+      why:(easyT? 'you called '+b+'s easy, so ten seconds longer' : 'five seconds longer than last time ('+b+'s)')+(bwn?', and '+bwn:''),
+      tag:'progress'};
   }
 
   const reps=last.sets.map(function(s){ return +s.r||0; });
@@ -2443,7 +2490,6 @@ function routineStats(exIds){
        rest timer for it either), so charging it 90s a set made a 15-minute
        rehab block read as 47 */
     if(g==='Cardio') secs += n*600;
-    else if(g==='Mobility') secs += n*45;
     else secs += n*((isTimedEx(id)?45:40) + exRest(id));
     if(prescribe(id).tag==='up') ready++;   /* only an earned load increase counts */
   });
@@ -2791,11 +2837,13 @@ function toggleSet(ei,si){
   if(st.done) delete st.plan;     /* ticking it makes the prescription a real set */
   save(); renderWorkout();
   const g=exGroupOf(ex.exId);
-  if(st.done && g!=='Cardio' && g!=='Mobility') startRest(exRest(ex.exId));
+  if(st.done && g!=='Cardio') startRest(exRest(ex.exId));
 }
+const MOB_REST=25;   /* long enough to switch sides, short enough to keep flowing */
 function exRest(exId){
   const e=S.exercises.find(function(x){return x.id===exId;});
-  return (e && e.rest) ? e.rest : S.settings.rest;
+  if(e && e.rest) return e.rest;
+  return exGroupOf(exId)==='Mobility' ? MOB_REST : S.settings.rest;
 }
 function fmtRest(s){ return s<60 ? s+'s' : (s%60===0 ? (s/60)+'m' : Math.floor(s/60)+':'+pad(s%60)); }
 function restPicker(exId){
@@ -3317,8 +3365,9 @@ function holdFinish(secs){
   const e=a.ex[holdEi]; if(!e) return;
   const st=e.sets[holdSi]; if(!st) return;
   st.r=String(Math.max(1, Math.round(secs))); st.done=true;
+  delete st.plan;                 /* a completed hold is a real set, not a suggestion */
   save(); renderWorkout();
-  if(exGroupOf(e.exId)!=='Mobility') startRest(exRest(e.exId));
+  if(exGroupOf(e.exId)!=='Cardio') startRest(exRest(e.exId));
 }
 function holdCancel(){ clearInterval(holdInt); holdInt=null; $('#hold').classList.remove('on'); }
 
