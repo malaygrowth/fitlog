@@ -507,6 +507,79 @@ function check(name, cond, detail) {
   check('increment differs by movement (legs 5, raise 1.25)', rxEngine.increments.legJump === 5 && rxEngine.increments.latJump === 1.25, rxEngine.increments);
   check('a long layoff overrides progression', rxEngine.comeback.tag === 'comeback' && rxEngine.comeback.w === 60, rxEngine.comeback);
 
+  const ready = await page.evaluate(() => {
+    const savedS = JSON.stringify(S.sessions), savedSl = JSON.stringify(S.sleep), savedW = JSON.stringify(S.weights);
+    const legId = S.exercises.find((e) => e.name === 'Leg press').id;
+    const hangId = S.exercises.find((e) => e.name === 'Dead hang').id;
+    const earned = () => { S.sessions = [{ id: uid(), name: 'T', date: dShift(today(), -3), dur: 1, vol: 1, prs: [],
+      ex: [{ exId: legId, sets: [{ w: 100, r: 12, done: true }, { w: 100, r: 12, done: true }, { w: 100, r: 12, done: true }] }] }]; };
+    const out = {};
+
+    earned(); S.sleep = {}; S.weights = [];
+    let rx = prescribe(legId);
+    out.rested = { tag: rx.tag, w: rx.sets[0].w };
+
+    // short sleep holds the earned increase
+    S.sleep[dShift(today(), -1)] = { hrs: 5, q: 'p' };
+    rx = prescribe(legId);
+    out.tired = { tag: rx.tag, w: rx.sets[0].w, why: rx.why, banner: readinessBanner().length > 0 };
+
+    // a full night does not
+    S.sleep[dShift(today(), -1)] = { hrs: 8, q: 'g' };
+    out.slept = { tag: prescribe(legId).tag, w: prescribe(legId).sets[0].w, banner: readinessBanner().length };
+
+    // a sharp weekly weight drop holds it too
+    S.sleep = {}; S.weights = [{ date: dShift(today(), -7), kg: 70 }, { date: today(), kg: 68.5 }];
+    rx = prescribe(legId);
+    out.cutting = { tag: rx.tag, w: rx.sets[0].w, why: rx.why };
+
+    // day-to-day noise does not
+    S.weights = [{ date: dShift(today(), -7), kg: 70 }, { date: today(), kg: 69.8 }];
+    out.noise = { tag: prescribe(legId).tag, w: prescribe(legId).sets[0].w };
+
+    // sparse weigh-ins: a 3 kg drop spread over ten weeks is not a crash diet.
+    // Comparing two readings months apart once reported it as "this week".
+    S.weights = [{ date: dShift(today(), -70), kg: 67 }, { date: dShift(today(), -2), kg: 63.9 }];
+    out.sparse = { ch: bwChange(7), hold: readiness().hold, tag: prescribe(legId).tag };
+
+    // a stale reading is no basis for holding anything
+    S.weights = [{ date: dShift(today(), -200), kg: 70 }, { date: dShift(today(), -40), kg: 64 }];
+    out.stale = { ch: bwChange(7), hold: readiness().hold };
+
+    // gaining weight is never a reason to hold
+    S.weights = [{ date: dShift(today(), -7), kg: 68 }, { date: today(), kg: 70 }];
+    out.gaining = { tag: prescribe(legId).tag, w: prescribe(legId).sets[0].w };
+
+    // Bodyweight movements say when your own weight changed the difficulty.
+    // The drift has to sit outside the 7-day window, otherwise the deficit
+    // rule fires first — which is correct, but a different behaviour.
+    S.sleep = {};
+    S.sessions = [{ id: uid(), name: 'T', date: dShift(today(), -19), dur: 1, vol: 1, prs: [],
+      ex: [{ exId: hangId, sets: [{ r: 40, done: true }] }] }];
+    S.weights = [{ date: dShift(today(), -60), kg: 72 }, { date: dShift(today(), -18), kg: 69 }];
+    out.lighter = prescribe(hangId).why;
+    out.lighterSteady = readiness().hold;      // the week itself is stable
+    S.weights = [{ date: dShift(today(), -60), kg: 66 }, { date: dShift(today(), -18), kg: 69 }];
+    out.heavier = prescribe(hangId).why;
+
+    S.sessions = JSON.parse(savedS); S.sleep = JSON.parse(savedSl); S.weights = JSON.parse(savedW); save();
+    return out;
+  });
+  check('rested and stable: the increase goes through', ready.rested.tag === 'up' && ready.rested.w === 105, ready.rested);
+  check('5h sleep holds the earned increase at the old weight', ready.tired.tag === 'hold' && ready.tired.w === 100, ready.tired);
+  check('the hold names both the earned jump and the reason', /earned \+5/.test(ready.tired.why) && /5h sleep/.test(ready.tired.why), ready.tired.why);
+  check('a held increase is announced, never silent', ready.tired.banner);
+  check('a full night lets the increase through, no banner', ready.slept.tag === 'up' && ready.slept.w === 105 && ready.slept.banner === 0, ready.slept);
+  check('a sharp weekly weight drop holds the increase', ready.cutting.tag === 'hold' && /losing 1.5/.test(ready.cutting.why), ready.cutting);
+  check('normal weight fluctuation is ignored', ready.noise.tag === 'up' && ready.noise.w === 105, ready.noise);
+  check('gaining weight never holds a lift back', ready.gaining.tag === 'up' && ready.gaining.w === 105, ready.gaining);
+  check('sparse weigh-ins measure a rate, not a raw gap', ready.sparse.ch && ready.sparse.ch.perWeek === -0.3 && ready.sparse.hold === false, ready.sparse);
+  check('a gradual cut still lets the increase through', ready.sparse.tag === 'up', ready.sparse.tag);
+  check('a stale weigh-in holds nothing back', ready.stale.ch === null && ready.stale.hold === false, ready.stale);
+  check('bodyweight movements flag being lighter', /3 kg lighter/.test(ready.lighter) && /less work/.test(ready.lighter), ready.lighter);
+  check('that note is not a readiness hold in disguise', ready.lighterSteady === false, ready.lighterSteady);
+  check('bodyweight movements flag being heavier', /3 kg heavier/.test(ready.heavier) && /more work/.test(ready.heavier), ready.heavier);
+
   const planSafety = await page.evaluate(() => {
     const before = S.sessions.length;
     const r = S.routines.find((x) => /Push: wrist/.test(x.name));
