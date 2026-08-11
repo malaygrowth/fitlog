@@ -187,6 +187,13 @@
   .prow:active{background:var(--raised)}
   .tline{display:flex; justify-content:space-between; gap:10px; padding:7px 0;
     border-bottom:1px solid var(--line)}
+  .effrow{display:flex; align-items:center; gap:6px; padding:2px 0 9px 10px; white-space:nowrap}
+  .effrow>.tiny{margin-right:auto}
+  .eff{background:var(--raised); color:var(--ink2); border:0; border-radius:99px;
+    padding:5px 11px; font-size:11.5px; font-weight:700; min-height:0}
+  .eff.on.easy{background:var(--good); color:#06210f}
+  .eff.on.ok{background:var(--wk); color:#231402}
+  .eff.on.hard{background:var(--bad); color:#2a0b0b}
   .exfig .fg{stroke:var(--line); stroke-width:2}
 
   .exblock{border-top:1px solid var(--line); padding-top:14px; margin-top:14px}
@@ -435,7 +442,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='1.1.0';
+const APP_VER='1.2.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -1185,35 +1192,138 @@ function lastDateFor(exId){
   }
   return null;
 }
-function targetFor(exId){
+/* ---------- coaching engine ----------
+   Everything below answers one question per exercise: what should you put on
+   the bar right now, for how many sets and reps, and why. It reads the last
+   three sessions rather than a single top set, so a session that fell apart
+   and one that was comfortable no longer look identical. */
+
+const RXLABEL={up:'↑', deload:'↓', reps:'→', comeback:'⟲', first:'•', progress:'↑', steady:'→'};
+/* how many sets and what rep window. Per-exercise override wins. */
+function schemeFor(exId){
+  const e=S.exercises.find(function(x){return x.id===exId;})||{};
+  if(e.scheme) return e.scheme;
   const g=exGroupOf(exId);
-  if(isTimedEx(exId)){
-    const b=holdBest(exId); if(!b) return null;
-    const ld=lastDateFor(exId);
-    if(ld){
-      const gap=Math.round((new Date(today()+'T12:00:00')-new Date(ld+'T12:00:00'))/86400000);
-      if(gap>21) return 'comeback: ~'+Math.max(10,Math.round(b*0.6/5)*5)+'s, '+gap+' days since last time, rebuild the hold';
-    }
-    return 'target: '+(b+5)+'s, five seconds longer than last time';
+  if(g==='Cardio') return {sets:1, lo:0, hi:0};
+  if(g==='Mobility') return {sets:2, lo:30, hi:45};
+  if(isTimedEx(exId)) return {sets:3, lo:20, hi:60};
+  if(g==='Legs') return {sets:3, lo:8, hi:12};
+  if(g==='Core') return {sets:3, lo:12, hi:20};
+  return {sets:3, lo:8, hi:12};
+}
+/* the smallest jump that is actually loadable for this movement: a lateral
+   raise does not go up in the same steps as a leg press */
+function incFor(exId){
+  const g=exGroupOf(exId), n=exName(exId).toLowerCase();
+  if(/leg press|squat|deadlift|hip thrust|sled/.test(n)) return 5;
+  if(g==='Legs') return 5;
+  if(g==='Shoulders'||g==='Arms') return 1.25;
+  if(/fly|raise|curl|extension|pushdown/.test(n)) return 1.25;
+  return 2.5;
+}
+function roundTo(w,inc){ return Math.round(w/inc)*inc; }
+/* work sets from the last n sessions containing this exercise, newest first */
+function historyFor(exId,n){
+  const out=[];
+  for(let i=S.sessions.length-1;i>=0 && out.length<n;i--){
+    const s=S.sessions[i];
+    if(s.id===editingId()) continue;
+    const ex=s.ex.find(function(e){ return e.exId===exId; });
+    if(!ex) continue;
+    const work=ex.sets.filter(function(t){ return !t.wu && (+t.w||+t.r); });
+    if(work.length) out.push({date:s.date, sets:work});
   }
-  if(g==='Cardio'||g==='Mobility') return null;
-  const pa=prevArr(exId); if(!pa) return null;
-  const work=pa.filter(function(s){ return !s.wu && (+s.w||+s.r); });
-  if(!work.length) return null;
-  const top=work.reduce(function(a,s){ return (+s.w||0)>(+a.w||0)?s:a; }, work[0]);
-  const w=+top.w||0, r=+top.r||0;
-  /* layoff detection: after 3+ weeks away from a lift, prescribe a
-     comeback load instead of progression — old numbers are a ceiling, not a target */
-  const ld=lastDateFor(exId);
-  if(ld){
-    const gap=Math.round((new Date(today()+'T12:00:00')-new Date(ld+'T12:00:00'))/86400000);
-    if(gap>21 && w>0){
-      return 'comeback: ~'+Math.max(2.5,round25(w*0.6))+'×10–12 light, '+gap+' days since last time, rebuild first';
-    }
+  return out;
+}
+function topWeight(sets){ return sets.reduce(function(a,s){ return Math.max(a,+s.w||0); },0); }
+function daysSince(iso){
+  return Math.round((new Date(today()+'T12:00:00')-new Date(iso+'T12:00:00'))/86400000);
+}
+/* The prescription: an array of {w,r} — one per set — plus the reasoning. */
+function prescribe(exId){
+  const sc=schemeFor(exId), g=exGroupOf(exId), tmd=isTimedEx(exId);
+  const hist=historyFor(exId,3);
+  const mk=function(w,r,n){ const a=[]; for(let i=0;i<(n||sc.sets);i++) a.push({w:w,r:r}); return a; };
+
+  if(g==='Cardio'){
+    const cb=hist.length? hist[0].sets[0] : null;
+    return {sets:mk(cb?cb.w:'', cb?cb.r:'', 1),
+      why: cb? 'last time '+cb.w+' km in '+cb.r+' min, match it or beat the pace' : 'log distance and minutes',
+      tag:'steady'};
   }
-  if(!w) return r ? 'target: '+(r+1)+' reps' : null;
-  if(r>=12) return 'target: '+round25(w+2.5)+'×8, add weight, reset reps';
-  return 'target: '+w+'×'+(r+1)+', one more rep than last time';
+  if(!hist.length){
+    return {sets:mk(tmd?'':'', sc.lo),
+      why: tmd? 'first time: hold '+sc.lo+'s, stop before form goes'
+              : 'first time: pick a weight you could do about '+sc.hi+' with two reps left in reserve',
+      tag:'first'};
+  }
+
+  const last=hist[0], gap=daysSince(last.date), topW=topWeight(last.sets);
+
+  /* three weeks away: the old numbers are a ceiling, not a starting point */
+  if(gap>21){
+    if(tmd){
+      const b=Math.max.apply(null,last.sets.map(function(s){return +s.r||0;}));
+      return {sets:mk('', Math.max(10,Math.round(b*0.6/5)*5)),
+        why:gap+' days off, rebuild the hold at about 60%', tag:'comeback'};
+    }
+    return {sets:mk(topW? Math.max(incFor(exId), roundTo(topW*0.6, incFor(exId))) : '', sc.hi),
+      why:gap+' days off, rebuild at about 60% and earn it back', tag:'comeback'};
+  }
+
+  if(tmd){
+    const b=Math.max.apply(null,last.sets.map(function(s){return +s.r||0;}));
+    return {sets:mk('', b+5), why:'five seconds longer than last time ('+b+'s)', tag:'progress'};
+  }
+
+  const reps=last.sets.map(function(s){ return +s.r||0; });
+  const hardSet=last.sets.some(function(s){ return s.e==='hard'; });
+  const allEasy=last.sets.length>1 && last.sets.every(function(s){ return s.e==='easy'; });
+  const atTop=last.sets.filter(function(s){ return (+s.w||0)>=topW && (+s.r||0)>=sc.hi; }).length;
+  const hitAll=atTop>=sc.sets && !hardSet;
+
+  /* earned the increase: every prescribed set at the top of the range */
+  if(hitAll){
+    const inc=incFor(exId)*(allEasy?2:1);
+    return {sets:mk(roundTo(topW+inc, incFor(exId)), sc.lo),
+      why:'you hit '+sc.sets+'×'+sc.hi+' at '+topW+' '+unit()+(allEasy?' and called it easy, so up '+inc:', so up '+inc)+' '+unit(),
+      tag:'up'};
+  }
+
+  /* stalled: same weight for three sessions and the top of the range never came */
+  const stuck=hist.length>=3 && hist.every(function(hh){
+    return topWeight(hh.sets)===topW && !hh.sets.some(function(s){ return (+s.r||0)>=sc.hi; });
+  });
+  if(stuck && topW>0){
+    return {sets:mk(Math.max(incFor(exId), roundTo(topW*0.9, incFor(exId))), sc.lo+2),
+      why:'three sessions stuck at '+topW+' '+unit()+', back off 10% and build through it again',
+      tag:'deload'};
+  }
+
+  /* otherwise hold the weight and chase reps, set by set */
+  const out=[];
+  for(let i=0;i<sc.sets;i++){
+    const had=reps[i]||reps[reps.length-1]||sc.lo;
+    out.push({w:topW||'', r:Math.min(sc.hi, had+1)});
+  }
+  const fell=reps.length>1 && reps[reps.length-1] < reps[0]*0.7;
+  return {sets:out,
+    why: hardSet ? 'last set felt hard, so hold '+topW+' '+unit()+' and repeat it clean'
+       : fell ? 'reps dropped off badly last time, hold '+topW+' '+unit()+' until all '+sc.sets+' sets match'
+       : 'hold '+topW+' '+unit()+', one more rep per set until you reach '+sc.sets+'×'+sc.hi,
+    tag:'reps'};
+}
+/* One-line summary of the prescription, for cards and the exercise sheet.
+   Same engine as the session screen, so guidance never disagrees with itself. */
+function targetFor(exId){
+  const rx=prescribe(exId);
+  if(!rx || rx.tag==='first') return null;
+  const s=rx.sets, g=exGroupOf(exId);
+  if(g==='Cardio') return rx.why;
+  const load=isTimedEx(exId)
+    ? s.length+'×'+s[0].r+'s'
+    : (s[0].w? s.length+'×'+s[0].w+'×'+s[0].r : s.length+'×'+s[0].r+' reps');
+  return load+' — '+rx.why;
 }
 function warmupFor(exId){
   const pa=prevArr(exId); if(!pa) return null;
@@ -2225,25 +2335,18 @@ function bestFor(exId){
   return best;
 }
 /* ---- what a routine actually costs you, so a card can say something ---- */
-function setsForEx(exId){
-  const pa=prevArr(exId);
-  const n=pa? pa.filter(function(s){return !s.wu;}).length : 0;
-  /* imported history keeps only the best set per exercise, so a count of 1 is
-     a record-keeping artefact rather than a real single-set session */
-  return n>=2 ? n : 3;
-}
 function routineStats(exIds){
   const groups=[]; let sets=0, secs=0, ready=0;
   (exIds||[]).forEach(function(id){
     const g=exGroupOf(id); if(g && groups.indexOf(g)<0) groups.push(g);
-    const n=setsForEx(id); sets+=n;
+    const n=schemeFor(id).sets; sets+=n;   /* what the coach prescribes, not what got logged */
     /* Mobility flows straight through with no rest (toggleSet doesn't start a
        rest timer for it either), so charging it 90s a set made a 15-minute
        rehab block read as 47 */
     if(g==='Cardio') secs += n*600;
     else if(g==='Mobility') secs += n*45;
     else secs += n*((isTimedEx(id)?45:40) + exRest(id));
-    const t=targetFor(id); if(t && /^target:/.test(t)) ready++;
+    if(prescribe(id).tag==='up') ready++;   /* only an earned load increase counts */
   });
   return {groups:groups, sets:sets, mins:Math.max(1,Math.round(secs/60)), ready:ready};
 }
@@ -2295,14 +2398,18 @@ function previewRoutine(id){
       '<div class="stat"><span class="tl">Last done</span><div class="tv" style="font-size:15px; white-space:nowrap">'+(last? esc(agoTxt(last.date)) : 'never')+'</div></div>'+
     '</div>';
   r.exIds.forEach(function(exId){
-    const tg=targetFor(exId), pv=prevSets(exId), wu=warmupFor(exId);
+    const rx=prescribe(exId), pv=prevSets(exId), wu=warmupFor(exId);
+    const tmd=isTimedEx(exId), cardio=exGroupOf(exId)==='Cardio';
+    const plan=cardio? '' : rx.sets.map(function(s){
+      return tmd? s.r+'s' : (s.w? s.w+'×'+s.r : s.r+' reps');
+    }).join(' · ');
     h+='<button class="prow" onclick="openExInfo(\''+exId+'\')">'+exThumb(exId)+
       '<span class="grow" style="text-align:left">'+
         '<b class="small">'+esc(exName(exId))+'</b>'+
-        '<span class="tiny muted" style="display:block">'+setsForEx(exId)+' sets · rest '+fmtRest(exRest(exId))+'</span>'+
-        (tg? '<span class="tiny num" style="display:block; color:var(--wk); font-weight:600">'+esc(tg)+'</span>'
-           : (pv? '<span class="tiny muted num" style="display:block">prev '+pv+'</span>':''))+
+        (plan? '<span class="tiny num" style="display:block; color:'+(rx.tag==='deload'?'var(--bad)':'var(--wk)')+'; font-weight:700">'+esc(plan)+'</span>':'')+
+        '<span class="tiny muted" style="display:block">'+esc(rx.why)+'</span>'+
         (wu? '<span class="tiny muted num" style="display:block">'+esc(wu)+'</span>':'')+
+        (pv? '<span class="tiny muted num" style="display:block; opacity:.7">prev '+pv+'</span>':'')+
       '</span><span class="muted">ⓘ</span></button>';
   });
   h+='<button class="btn primary wide" style="margin-top:14px" onclick="closeSheet();startSession(\''+r.id+'\')">Start this workout</button>'+
@@ -2338,10 +2445,13 @@ function renderWorkout(){
        '<b style="font-size:18px">'+esc(planRt.name)+'</b>'+
        '<div class="row wrap" style="gap:6px; margin:7px 0 10px">'+groupChips(pst.groups)+'</div>';
     planRt.exIds.slice(0,3).forEach(function(exId){
-      const tg=targetFor(exId), pv=prevSets(exId);
+      const rx=prescribe(exId), tmd=isTimedEx(exId);
+      const plan=exGroupOf(exId)==='Cardio' ? '' : rx.sets.map(function(s){
+        return tmd? s.r+'s' : (s.w? s.w+'×'+s.r : s.r+' reps');
+      }).join(' · ');
       h+='<div class="tline"><span class="small">'+esc(exName(exId))+'</span>'+
-        '<span class="tiny num" style="text-align:right; '+(tg?'color:var(--wk); font-weight:700':'color:var(--ink3)')+'">'+
-        esc(tg? tg.replace(/^target:\s*/,'').replace(/\s*[—,].*$/,'') : (pv? pv.split('  ')[0] : 'first time'))+'</span></div>';
+        '<span class="tiny num" style="text-align:right; '+(plan?(rx.tag==='deload'?'color:var(--bad)':'color:var(--wk)')+'; font-weight:700':'color:var(--ink3)')+'">'+
+        esc(plan||'log it')+'</span></div>';
     });
     h+='<div class="rmeta" style="margin:9px 0 11px">'+
         (planRt.exIds.length>3? '+'+(planRt.exIds.length-3)+' more · ':'')+
@@ -2477,7 +2587,13 @@ function startSession(routineId){
   const ex=[];
   if(routineId){
     const r=S.routines.find(function(x){return x.id===routineId;});
-    if(r) r.exIds.forEach(function(id){ ex.push({exId:id, sets:[{w:'',r:'',done:false}]}); });
+    /* arrive with the work already prescribed: plan:true marks a set as
+       suggested rather than performed, so an untouched one is never logged */
+    if(r) r.exIds.forEach(function(id){
+      ex.push({exId:id, sets:prescribe(id).sets.map(function(p){
+        return {w:p.w, r:p.r, done:false, plan:true};
+      })});
+    });
   }
   S.active={id:uid(), name: routineId ? (S.routines.find(function(x){return x.id===routineId;})||{}).name||'Workout' : 'Workout',
     start:Date.now(), date:today(), ex:ex};
@@ -2507,11 +2623,12 @@ function sessionHTML(){
       '<div class="tiny muted" style="font-weight:500; margin-top:1px">'+esc(grp)+'</div></button>'+
       '<span class="row" style="gap:6px"><button class="btn ghost sm" onclick="restPicker(\''+e.exId+'\')">⏱ '+fmtRest(exRest(e.exId))+'</button>'+
       '<button class="btn ghost sm danger" onclick="rmSessionEx('+ei+')">✕</button></span></div>';
-    const tg=targetFor(e.exId);
+    const rx=prescribe(e.exId), tg=rx.why;
     if(pv||tg){
       h+='<div style="background:var(--raised); border-radius:10px; padding:8px 10px; margin-top:8px">';
       if(pv) h+='<div class="tiny muted num">prev &nbsp;'+pv+'</div>';
-      if(tg) h+='<div class="tiny num" style="color:var(--wk); font-weight:600'+(pv?'; margin-top:3px':'')+'">'+tg+'</div>';
+      if(tg) h+='<div class="tiny num" style="color:'+(rx.tag==='deload'?'var(--bad)':'var(--wk)')+'; font-weight:600'+(pv?'; margin-top:3px':'')+'">'+
+        RXLABEL[rx.tag]+' '+esc(tg)+'</div>';
       if(!e.sets.some(function(s){return s.done;})){
         const wupp=warmupFor(e.exId);
         if(wupp) h+='<div class="tiny muted num" style="margin-top:3px">'+wupp+'</div>';
@@ -2531,6 +2648,14 @@ function sessionHTML(){
           '<input type="number" inputmode="numeric" value="'+esc(st.r)+'" placeholder="'+(ph?esc(ph.r):'0')+'" onchange="setVal('+ei+','+si+',\'r\',this.value)">')+
         '<button class="check'+(st.done?' on':'')+'" onclick="toggleSet('+ei+','+si+')" aria-label="set done">'+
         '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 10 18 19.5 6.5"/></svg></button></div>';
+      /* one optional tap: it is what lets the next prescription know the
+         difference between a comfortable set and a grind */
+      if(st.done && !st.wu && grp!=='Cardio'){
+        h+='<div class="effrow"><span class="tiny muted">how did that feel?</span>'+
+          [['easy','Easy'],['ok','Right'],['hard','Hard']].map(function(o){
+            return '<button class="eff'+(st.e===o[0]?' on '+o[0]:'')+'" onclick="setEffort('+ei+','+si+',\''+o[0]+'\')">'+o[1]+'</button>';
+          }).join('')+'</div>';
+      }
     });
     h+='<button class="btn sm wide ghost" style="border:1px dashed var(--line)" onclick="addSet('+ei+')">+ Add set</button></div>';
   });
@@ -2545,7 +2670,13 @@ function sessionHTML(){
      '<div class="tiny muted" style="text-align:center; margin-top:10px">Tick an empty set to auto-fill last time’s numbers · tap the set number for warm-up (W)</div>';
   return h;
 }
-function setVal(ei,si,k,v){ S.active.ex[ei].sets[si][k]=v; save(); }
+function setVal(ei,si,k,v){ const st=S.active.ex[ei].sets[si]; st[k]=v; delete st.plan; save(); }
+function setEffort(ei,si,val){
+  const st=S.active.ex[ei].sets[si];
+  st.e = (st.e===val) ? undefined : val;      /* tapping again clears it */
+  if(st.e===undefined) delete st.e;
+  save(); renderWorkout();
+}
 function addSet(ei){ const sets=S.active.ex[ei].sets, last=sets[sets.length-1]||{w:'',r:''};
   sets.push({w:last.w,r:last.r,done:false}); save(); renderWorkout(); }
 function rmSessionEx(ei){ S.active.ex.splice(ei,1); save(); renderWorkout(); }
@@ -2555,7 +2686,9 @@ function toggleSet(ei,si){
     const pa=prevArr(ex.exId);
     if(pa && pa[si]){ st.w=pa[si].w; st.r=pa[si].r; }
   }
-  st.done=!st.done; save(); renderWorkout();
+  st.done=!st.done;
+  if(st.done) delete st.plan;     /* ticking it makes the prescription a real set */
+  save(); renderWorkout();
   const g=exGroupOf(ex.exId);
   if(st.done && g!=='Cardio' && g!=='Mobility') startRest(exRest(ex.exId));
 }
@@ -2611,7 +2744,9 @@ function exPickListHTML(q){
 function filterEx(q){ $('#exPickList').innerHTML=exPickListHTML(q); }
 function addExToSession(id){
   if(!S.active) return;
-  S.active.ex.push({exId:id, sets:[{w:'',r:'',done:false}]});
+  S.active.ex.push({exId:id, sets:prescribe(id).sets.map(function(p){
+    return {w:p.w, r:p.r, done:false, plan:true};
+  })});
   save(); closeSheet(); renderWorkout();
 }
 function newExerciseForm(intoSession){
@@ -2633,6 +2768,9 @@ function saveNewExercise(intoSession){
 function finishSession(){
   const a=S.active;
   const rawEx=a.ex;
+  /* a prescribed set you never touched is a suggestion, not a lift: drop it
+     before anything counts it as volume, a PR, or next time's baseline */
+  a.ex.forEach(function(e){ e.sets=e.sets.filter(function(s){ return s.done || !s.plan; }); });
   a.ex=a.ex.filter(function(e){ return e.sets.some(function(s){ return s.done||s.w||s.r; }); });
   if(!a.ex.length){
     /* nothing measurable, but never silently destroy: an edit keeps its
