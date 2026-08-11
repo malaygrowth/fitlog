@@ -40,7 +40,7 @@ function check(name, cond, detail) {
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 19, boot.schema);
+  check('schemaVersion stamped', boot.schema === 20, boot.schema);
   check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
@@ -67,7 +67,8 @@ function check(name, cond, detail) {
       exCount: s && s.ex.length, sets: s && s.ex.reduce((a, e) => a + e.sets.length, 0),
       prs: s && (s.prs || []).length,
       allDone: s && s.ex.every((e) => e.sets.every((t) => t.done === true)),
-      allEasy: s && s.ex.every((e) => e.sets.every((t) => t.e === 'easy')),
+      allOk: s && s.ex.every((e) => e.sets.every((t) => t.e === 'ok')),
+      anyEasy: s && s.ex.some((e) => e.sets.some((t) => t.e === 'easy')),
       sorted: S.sessions.every((x, i, a) => !i || a[i - 1].date <= x.date),
       inWeek: wk, total: S.sessions.length, rx, held: readiness().hold,
     };
@@ -77,14 +78,113 @@ function check(name, cond, detail) {
   check('6 exercises, 18 sets, all completed', aug10.exCount === 6 && aug10.sets === 18 && aug10.allDone, aug10);
   check('volume 1575, plank contributes nothing', aug10.vol === 1575, aug10.vol);
   check('comeback loads set no records', aug10.prs === 0, aug10.prs);
-  check('every set marked easy', aug10.allEasy);
+  check('every set marked moderate, not easy', aug10.allOk && !aug10.anyEasy, aug10);
   check('history stays sorted and it counts in the week', aug10.sorted && aug10.inWeek >= 1, aug10);
   check('the payoff: every push lift now progresses', Object.values(aug10.rx).every((r) => r.tag === 'up' || r.tag === 'progress'), aug10.rx);
-  check('easy sets double the jump (press 10→15, raise 2.5→5)',
-    aug10.rx['Incline dumbbell press'].w === 15 && aug10.rx['Lateral raise'].w === 5, aug10.rx);
-  check('an easy hold adds ten seconds, not five', aug10.rx['Plank'].r === 30, aug10.rx['Plank']);
+  check('moderate sets earn a single increment, not a doubled one',
+    aug10.rx['Incline dumbbell press'].w === 12.5 && aug10.rx['Chest fly (dumbbell)'].w === 7.5
+    && aug10.rx['Lateral raise'].w === 3.75 && aug10.rx['Overhead triceps extension'].w === 11.25
+    && aug10.rx['Triceps pushdown'].w === 16.25, aug10.rx);
+  check('a moderate hold adds five seconds, not ten', aug10.rx['Plank'].r === 25, aug10.rx['Plank']);
   check('readiness does not hold it back on real data', aug10.held === false);
 
+
+  console.log('section navigation');
+  const nav = await page.evaluate(() => {
+    const out = {};
+    go('workout'); WV = 'home'; renderWorkout();
+    const bar = () => document.querySelector('#tab-workout .subnav');
+    out.onWorkout = !!bar();
+    out.labels = bar() ? [...bar().querySelectorAll('.chip')].map((b) => b.textContent) : [];
+    out.sticky = bar() ? getComputedStyle(bar()).position : null;
+    out.todayActive = bar().querySelector('.chip.on').textContent;
+    // every destination reachable, and each marks itself
+    const reach = {};
+    ['progress', 'history', 'library'].forEach((v) => {
+      goWV(v);
+      const b = document.querySelector('#tab-workout .subnav');
+      reach[v] = !!b && document.querySelector('#tab-workout').innerHTML.length > 200
+        && !!b.querySelector('.chip.on');
+    });
+    out.reach = reach;
+    // the old buried buttons are gone
+    goWV('home');
+    out.noOldButtons = !/WV=.progress.;renderWorkout\(\)">.*Progress/.test(document.querySelector('#tab-workout').innerHTML);
+    out.routinesAnchor = !!document.getElementById('rtHead');
+    // hidden while training
+    startSession(); closeSheet();
+    out.hiddenInSession = !document.querySelector('#tab-workout .subnav');
+    cancelSession(); closeSheet();
+    // body tab
+    go('body'); goBV('weight');
+    const bbar = () => document.querySelector('#tab-body .subnav');
+    out.onBody = !!bbar();
+    out.bodyLabels = bbar() ? [...bbar().querySelectorAll('.chip')].map((b) => b.textContent) : [];
+    const breach = {};
+    ['bmi', 'meas', 'photos', 'entries'].forEach((v) => {
+      goBV(v);
+      breach[v] = document.querySelector('#tab-body').innerHTML.length > 200
+        && !!document.querySelector('#tab-body .subnav .chip.on');
+    });
+    out.bodyReach = breach;
+    // each body section renders alone, not stacked
+    goBV('meas');
+    out.oneSectionOnly = (document.querySelector('#tab-body').innerHTML.match(/class="osec"/g) || []).length === 1;
+    goBV('weight'); go('workout'); WV = 'home'; renderWorkout();
+    return out;
+  });
+  check('workout tab has a pinned section row', nav.onWorkout && nav.sticky === 'sticky', nav.sticky);
+  check('it lists every workout section', nav.labels.join('|') === 'Today|Routines|Progress|History|Exercises|Plan', nav.labels);
+  check('the current section is marked', nav.todayActive === 'Today', nav.todayActive);
+  check('Progress, History and Exercises all reachable', Object.values(nav.reach).every(Boolean), nav.reach);
+  check('the old buried buttons are gone', nav.noOldButtons);
+  check('Routines chip has something to scroll to', nav.routinesAnchor);
+  check('the row stays out of the way mid-workout', nav.hiddenInSession);
+  check('body tab has the same row', nav.onBody && nav.bodyLabels.join('|') === 'Weight|BMI|Measurements|Photos|Entries', nav.bodyLabels);
+  check('every body section reachable', Object.values(nav.bodyReach).every(Boolean), nav.bodyReach);
+  check('body sections render one at a time', nav.oneSectionOnly);
+
+  console.log('BMI analysis');
+  const bmi = await page.evaluate(() => {
+    const st = S.settings;
+    const last = S.weights[S.weights.length - 1];
+    go('body'); goBV('bmi');
+    const txt = document.querySelector('#tab-body').textContent;
+    const savedH = st.height;
+    st.height = '';
+    const noHeight = document.createElement('div');
+    noHeight.innerHTML = bmiHTML();
+    const missing = noHeight.textContent;
+    st.height = savedH; save();
+    return {
+      value: bmiOf(last.kg, st.height),
+      band: bmiBand(bmiOf(last.kg, st.height), BMI_IN),
+      who: bmiBand(bmiOf(last.kg, st.height), BMI_WHO),
+      goal: bmiOf(+st.goalWeight, st.height),
+      lo: kgForBmi(18.5, st.height), hi: kgForBmi(22.9, st.height), hiWho: kgForBmi(24.9, st.height),
+      shows: /20\.6/.test(txt) && /Normal/.test(txt),
+      caveat: /muscle/.test(txt),
+      bothStandards: /Indian/.test(txt) && /WHO/.test(txt),
+      missingHandled: /height/i.test(missing) && !/NaN/.test(missing),
+      // where the standards actually diverge: 72 kg at 176 cm is BMI 23.2,
+      // overweight on Indian cutoffs but still normal on WHO; 80 kg is 25.8,
+      // obese on Indian and merely overweight on WHO
+      edge: [bmiBand(bmiOf(72, 176), BMI_IN), bmiBand(bmiOf(72, 176), BMI_WHO),
+             bmiBand(bmiOf(80, 176), BMI_IN), bmiBand(bmiOf(80, 176), BMI_WHO)],
+      under: bmiBand(17, BMI_IN),
+    };
+  });
+  check('BMI computes 20.6 from 63.9 kg at 176 cm', bmi.value === 20.6, bmi.value);
+  check('normal on both standards', bmi.band === 'Normal' && bmi.who === 'Normal', bmi);
+  check('the goal of 68 kg reads BMI 22', bmi.goal === 22, bmi.goal);
+  check('healthy range 57.3-70.9 (77.1 WHO)', bmi.lo === 57.3 && bmi.hi === 70.9 && bmi.hiWho === 77.1, bmi);
+  check('the section shows the number and its band', bmi.shows);
+  check('both standards are named', bmi.bothStandards);
+  check('the muscle-mass caveat is stated', bmi.caveat);
+  check('Indian cutoffs are stricter than WHO where it matters',
+    bmi.edge.join('|') === 'Overweight|Normal|Obese|Overweight', bmi.edge);
+  check('underweight band works', bmi.under === 'Underweight', bmi.under);
+  check('missing height prompts instead of rendering NaN', bmi.missingHandled, bmi.missingHandled);
 
   console.log('food database + My Foods');
   const food = await page.evaluate(() => {
@@ -208,7 +308,7 @@ function check(name, cond, detail) {
     hasSnapshot: !!localStorage.getItem('fitlog.v1.bak'),
     meta: JSON.parse(localStorage.getItem('fitlog.v1.bak.meta') || 'null'),
   }));
-  check('pre-update snapshot written', snap.hasSnapshot && snap.meta && snap.meta.to === 19, snap.meta);
+  check('pre-update snapshot written', snap.hasSnapshot && snap.meta && snap.meta.to === 20, snap.meta);
 
   const past = await page.evaluate(() => {
     const d = dShift(today(), -3);
@@ -377,7 +477,7 @@ function check(name, cond, detail) {
   check('steps state deleted by migration', migAfter.steps, migAfter);
   check('past ticks converted to logged minutes', migAfter.ticksConverted, migAfter.ticksConverted);
   check('breathwork supp retired from list + checklist', migAfter.suppGone && migAfter.checklistClean && migAfter.supps === mig.supps - 1, migAfter);
-  check('migration stamps schema 19', migAfter.schema === 19, migAfter.schema);
+  check('migration stamps schema 20', migAfter.schema === 20, migAfter.schema);
 
   console.log('em-dash removal: parsers + v17 migration');
   const dash = await page.evaluate(() => ({
@@ -432,7 +532,7 @@ function check(name, cond, detail) {
   check('user-authored routine renamed, wording kept', v17After.rt === 'Push: my own routine', v17After.rt);
   check('stored session + PR text renamed', v17After.ses === 'Return: full body (light)' && v17After.pr === '70×5: heaviest ever', v17After);
   check('S.lastPhase migrated (no false phase celebration)', v17After.lastPhase === 'Phase 0: Rebuild' && !v17After.celebrated, v17After);
-  check('migration stamps schema 19', v17After.schema === 19, v17After.schema);
+  check('migration stamps schema 20', v17After.schema === 20, v17After.schema);
 
   console.log('workout cards: preview before starting');
   const cards = await page.evaluate(() => {

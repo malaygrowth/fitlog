@@ -114,6 +114,24 @@
   .btn.sm{padding:7px 11px; min-height:36px; font-size:13px; border-radius:10px}
   .chip{background:var(--raised); border:1px solid var(--line); border-radius:999px; padding:8px 14px; font-size:13.5px; font-weight:600; min-height:38px}
   .chip.on{background:var(--wk); border-color:var(--wk); color:#191106}
+  /* section row: every sub-screen one tap from the top, instead of buried
+     under the routine list */
+  .subnav{position:sticky; top:0; z-index:40; display:flex; gap:7px; overflow-x:auto;
+    background:var(--bg); padding:8px 0 10px; margin:-6px 0 10px;
+    scrollbar-width:none; -webkit-overflow-scrolling:touch}
+  .subnav::-webkit-scrollbar{display:none}
+  .subnav .chip{flex:0 0 auto; min-height:36px; padding:7px 13px; font-size:13px}
+  /* BMI band scale spanning 15-32: under / normal / overweight / obese */
+  .bmiscale{position:relative; height:12px; border-radius:99px; margin-bottom:5px;
+    background:linear-gradient(90deg,
+      var(--sl) 0%, var(--sl) 20.6%,
+      var(--good) 20.6%, var(--good) 47.1%,
+      var(--wk) 47.1%, var(--wk) 58.8%,
+      var(--bad) 58.8%, var(--bad) 100%)}
+  .bmiscale i{position:absolute; top:-4px; width:4px; height:20px; border-radius:2px;
+    background:var(--ink); box-shadow:0 0 0 2px var(--bg); transform:translateX(-2px)}
+  .bmiticks{display:flex; justify-content:space-between; font-size:10px; color:var(--ink3);
+    font-variant-numeric:tabular-nums; margin-bottom:14px}
 
   /* bottom nav */
   nav.tabs{
@@ -442,7 +460,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='1.4.0';
+const APP_VER='1.5.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -936,11 +954,11 @@ function seedV19(){
   rows.forEach(function(r){
     const id=byName(r[0]); if(!id) return;
     const sets=[];
-    for(let i=0;i<3;i++) sets.push({w:r[1], r:r[2], done:true, e:'easy'});
+    for(let i=0;i<3;i++) sets.push({w:r[1], r:r[2], done:true, e:'ok'});
     ex.push({exId:id, sets:sets});
   });
   const plank=byName('Plank');
-  if(plank) ex.push({exId:plank, sets:[{r:20,done:true,e:'easy'},{r:20,done:true,e:'easy'},{r:20,done:true,e:'easy'}]});
+  if(plank) ex.push({exId:plank, sets:[{r:20,done:true,e:'ok'},{r:20,done:true,e:'ok'},{r:20,done:true,e:'ok'}]});
   if(!ex.length) return;
   /* same arithmetic finishSession uses: w*r over every non-warm-up set, so the
      timed plank contributes nothing. No PRs — these comeback loads are far
@@ -952,13 +970,25 @@ function seedV19(){
   S.sessions.sort(function(x,y){ return x.date<y.date?-1:1; });
   save();
 }
+/* The 10 August session went in marked easy; it was moderate. seedV19 is fixed
+   for fresh installs, but any store that already ran it holds the wrong value,
+   and effort is not cosmetic here: an all-easy session doubles the next load
+   increase, so this was prescribing jumps that were never earned. */
+function seedV20(){
+  if(PUB){ S.seedV20=true; return; }
+  if(S.seedV20) return; S.seedV20=true;
+  const s=(S.sessions||[]).find(function(x){ return x.date==='2026-08-10'; });
+  if(!s) return;
+  s.ex.forEach(function(e){ e.sets.forEach(function(t){ if(t.e==='easy') t.e='ok'; }); });
+  save();
+}
 
 /* ============ migration runner ============
    Ordered and append-only — this list IS the execution order (it preserves
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
-const SCHEMA=19;
+const SCHEMA=20;
 /* Snapshot the store as it was BEFORE this build's migrations touch it, so a bad
    upgrade is recoverable instead of permanent. Written once per schema bump. */
 (function(){
@@ -970,7 +1000,7 @@ const SCHEMA=19;
   }catch(e){}
 })();
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
- seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19].forEach(function(step){ step(); });
+ seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20].forEach(function(step){ step(); });
 S.schemaVersion=SCHEMA;
 
 /* ============ utils ============ */
@@ -2560,14 +2590,32 @@ function previewRoutine(id){
      '<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet();editRoutine(\''+r.id+'\')">Edit routine</button>';
   openSheet(h);
 }
+/* Every workout screen one tap from the top, instead of three buttons buried
+   under the routine list. Plan reuses the existing weekly editor sheet. */
+function workoutNav(){
+  const items=[['home','Today'],['progress','Progress'],['history','History'],['library','Exercises']];
+  let h='<div class="subnav">';
+  h+='<button class="chip'+(WV==='home'?' on':'')+'" onclick="goWV(\'home\')">Today</button>';
+  h+='<button class="chip" onclick="goWV(\'home\',\'rtHead\')">Routines</button>';
+  items.slice(1).forEach(function(it){
+    h+='<button class="chip'+(WV===it[0]?' on':'')+'" onclick="goWV(\''+it[0]+'\')">'+it[1]+'</button>';
+  });
+  return h+'<button class="chip" onclick="planEditor()">Plan</button></div>';
+}
+function goWV(v, anchor){
+  WV=v; renderWorkout();
+  const el=anchor && document.getElementById(anchor);
+  if(el) el.scrollIntoView({block:'start'}); else window.scrollTo(0,0);
+}
 function renderWorkout(){
   const el=$('#tab-workout');
   if(S.active){ WV='session'; }
   if(WV==='session' && S.active){ el.innerHTML=sessionHTML(); return; }
-  if(WV==='library'){ el.innerHTML=libraryHTML(); return; }
-  if(WV==='history'){ el.innerHTML=historyHTML(); return; }
+  const nav=workoutNav();
+  if(WV==='library'){ el.innerHTML=nav+libraryHTML(); return; }
+  if(WV==='history'){ el.innerHTML=nav+historyHTML(); return; }
   if(WV==='routine'){ el.innerHTML=routineHTML(); return; }
-  if(WV==='progress'){ el.innerHTML=progressHTML(); return; }
+  if(WV==='progress'){ el.innerHTML=nav+progressHTML(); return; }
   /* home */
   const planRt=todaysPlanRoutine();
   const trainedToday=S.sessions.some(function(s){return s.date===today();});
@@ -2575,7 +2623,7 @@ function renderWorkout(){
   const volAll=S.sessions.reduce(function(a,s){return a+(s.vol||0);},0);
   const wkN=S.sessions.filter(function(s){return s.date>dShift(today(),-7);}).length;
   const ach=achievements(), achGot=ach.filter(function(a){return a.ok;});
-  let h='';
+  let h=nav;
   if(!trainedToday) h+=readinessBanner();
   /* hero */
   h+='<div class="card">';
@@ -2621,7 +2669,7 @@ function renderWorkout(){
     '<span class="small"><b>Achievements</b> <span class="muted num">'+achGot.length+'/'+ach.length+'</span></span>'+
     '<span style="font-size:19px; letter-spacing:3px">'+achGot.slice(-6).map(function(a){return a.i;}).join('')+(achGot.length<ach.length?' <span style="opacity:.3">'+ach.filter(function(a){return !a.ok;})[0].i+'</span>':'')+' <span class="muted">›</span></span></button>';
   /* routines */
-  h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Routines</h2>';
+  h+='<div class="osec" id="rtHead"><h2><span class="dot" style="background:var(--wk)"></span>Routines</h2>';
   S.routines.forEach(function(r){
     const rst=routineStats(r.exIds), rlast=lastDoneOf(r.name, r.exIds);
     h+='<button class="rcard" onclick="previewRoutine(\''+r.id+'\')">'+
@@ -2659,9 +2707,7 @@ function renderWorkout(){
     : '<div class="empty">Finish a workout and your bests appear here.</div>';
   h+='</div>';
 
-  h+='<div class="row" style="gap:10px"><button class="btn grow" onclick="WV=\'progress\';renderWorkout()">📈 Progress</button>'+
-     '<button class="btn grow" onclick="WV=\'history\';renderWorkout()">History</button>'+
-     '<button class="btn grow" onclick="WV=\'library\';renderWorkout()">Exercises</button></div>';
+
   el.innerHTML=h;
 }
 function heatCalHTML(){
@@ -2688,7 +2734,7 @@ function heatCalHTML(){
   return h;
 }
 function progressHTML(){
-  let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
+  let h='';
   /* consistency heat map */
   h+='<div class="osec" style="margin-top:12px"><h2><span class="dot" style="background:var(--wk)"></span>Consistency: 16 weeks</h2>'+heatCalHTML()+'</div>';
   /* weekly volume — last 10 weeks */
@@ -3022,7 +3068,7 @@ function cancelSession(){
   if(logged) toastUndo('Workout discarded', function(){ restoreSession(a.id); });
 }
 function historyHTML(){
-  let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
+  let h='';
   h+='<div class="row" style="gap:10px; margin-top:12px">'+
     '<button class="btn grow" onclick="pastWorkoutForm()">+ Add past workout</button>'+
     ((S.trash&&S.trash.length)? '<button class="btn ghost grow" onclick="trashSheet()">🗑 Recently deleted <span class="muted num">'+S.trash.length+'</span></button>':'')+
@@ -3127,7 +3173,7 @@ function editSession(id){
    pre-edit copy (previous sets, last date, bests) */
 function editingId(){ return (S.active && S.active.editing) || null; }
 function libraryHTML(){
-  let h='<button class="btn sm ghost" onclick="WV=\'home\';renderWorkout()">‹ Back</button>';
+  let h='';
   h+='<div class="osec" style="margin-top:12px"><h2><span class="dot" style="background:var(--wk)"></span>Exercise library</h2>';
   const groups={};
   S.exercises.forEach(function(e){ (groups[e.group]=groups[e.group]||[]).push(e); });
@@ -3775,15 +3821,74 @@ function delFood(meal,id){
 }
 
 /* ============ BODY ============ */
-function renderBody(){
-  const ws=S.weights.slice().sort(function(a,b){ return a.date<b.date?-1:1; });
-  const last=ws[ws.length-1], prev=ws[ws.length-2];
+/* ---- BMI analysis ----
+   Indian (ICMR/WHO-Asia) cutoffs are the clinically relevant ones here; the
+   international WHO set is shown alongside so the number still lines up with
+   every chart online. */
+const BMI_IN=[[18.5,'Underweight'],[23,'Normal'],[25,'Overweight'],[Infinity,'Obese']];
+const BMI_WHO=[[18.5,'Underweight'],[25,'Normal'],[30,'Overweight'],[Infinity,'Obese']];
+function bmiOf(kg,cm){ const m=+cm/100; return (!kg||!cm)? null : Math.round(kg/(m*m)*10)/10; }
+function bmiBand(v,table){
+  for(let i=0;i<table.length;i++) if(v<table[i][0]) return table[i][1];
+  return table[table.length-1][1];
+}
+function kgForBmi(b,cm){ const m=+cm/100; return Math.round(b*m*m*10)/10; }
+function bmiHTML(){
   const st=S.settings;
+  const ws=S.weights.slice().sort(function(a,b){ return a.date<b.date?-1:1; });
+  const last=ws[ws.length-1];
+  let h='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>BMI analysis</h2>';
+  if(!last || !st.height){
+    h+='<div class="empty">'+(!last?'Log a weigh-in':'Set your height in Settings')+' and this fills in.</div>'+
+      '<button class="btn wide" style="margin-top:12px" onclick="'+(!last?'weightForm()':'openSettings()')+'">'+
+      (!last?'Log weight':'Open Settings')+'</button></div>';
+    return h;
+  }
+  const v=bmiOf(last.kg, st.height);
+  const band=bmiBand(v,BMI_IN), who=bmiBand(v,BMI_WHO);
+  const ok=(v>=18.5 && v<23);
+  /* pointer position across an 15-32 span, which covers every band worth showing */
+  const pos=Math.max(0, Math.min(100, (v-15)/(32-15)*100));
+  h+='<div class="row" style="align-items:baseline; gap:10px; margin-bottom:2px">'+
+      '<span class="tv num" style="font-size:40px; font-family:var(--fd-disp); font-weight:700">'+v+'</span>'+
+      '<span class="small" style="color:'+(ok?'var(--good)':'var(--wk)')+'; font-weight:700">'+band+'</span></div>'+
+    '<div class="tiny muted" style="margin-bottom:12px">Indian cutoffs · '+who+' by international WHO bands</div>'+
+    '<div class="bmiscale"><i style="left:'+pos+'%"></i></div>'+
+    '<div class="bmiticks"><span>15</span><span>18.5</span><span>23</span><span>25</span><span>30</span></div>';
+  const loIn=kgForBmi(18.5,st.height), hiIn=kgForBmi(22.9,st.height), hiWho=kgForBmi(24.9,st.height);
+  h+='<div class="tline"><span class="small">Healthy range at '+st.height+' cm</span>'+
+      '<span class="tiny num" style="text-align:right">'+loIn+' - '+hiIn+' '+unit()+
+      '<span class="muted"> · to '+hiWho+' WHO</span></span></div>';
+  if(st.goalWeight){
+    const gb=bmiOf(+st.goalWeight, st.height);
+    h+='<div class="tline"><span class="small">Your goal, '+st.goalWeight+' '+unit()+'</span>'+
+      '<span class="tiny num" style="text-align:right">BMI '+gb+' <span class="muted">'+bmiBand(gb,BMI_IN)+'</span></span></div>';
+  }
+  const room=Math.round((hiIn-last.kg)*10)/10;
+  h+='<div class="tline" style="border:0"><span class="small">Room before the next band</span>'+
+    '<span class="tiny num" style="text-align:right">'+(room>0? '+'+room+' '+unit() : Math.abs(room)+' '+unit()+' over')+'</span></div>';
+  if(ws.length>1){
+    const bs=ws.filter(function(w){return w.kg;}).map(function(w){ return {date:w.date, kg:bmiOf(w.kg,st.height)}; });
+    h+='<div class="tiny muted" style="margin:14px 0 2px">BMI over time</div>'+weightChart(bs,true);
+  }
+  h+='<p class="tiny muted" style="margin-top:12px; line-height:1.6">BMI knows your height and weight and nothing else. '+
+    'It cannot tell muscle from fat, so while you are lifting three times a week a rising number is not automatically the wrong direction. '+
+    'Read it next to the tape measure and the photos, not on its own.</p>';
+  return h+'</div>';
+}
+let BV='weight';   /* weight | bmi | meas | photos | entries */
+function bodyNav(){
+  const items=[['weight','Weight'],['bmi','BMI'],['meas','Measurements'],['photos','Photos'],['entries','Entries']];
+  return '<div class="subnav">'+items.map(function(it){
+    return '<button class="chip'+(BV===it[0]?' on':'')+'" onclick="goBV(\''+it[0]+'\')">'+it[1]+'</button>';
+  }).join('')+'</div>';
+}
+function goBV(v){ BV=v; renderBody(); window.scrollTo(0,0); }
+function bodyWeightHTML(ws,last,prev,st){
   let h='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Body weight</h2>';
   if(last){
     const d=prev? Math.round((last.kg-prev.kg)*10)/10 : 0;
-    let bmi='-';
-    if(st.height){ const mt=+st.height/100; bmi=Math.round(last.kg/(mt*mt)*10)/10; }
+    const bmi=st.height? bmiOf(last.kg,st.height) : '-';
     h+='<div class="statrow" style="margin-bottom:10px">'+
       '<div class="stat"><span class="tl">Current</span><div class="tv num">'+last.kg+'<span style="font-size:15px; color:var(--ink3)"> '+unit()+'</span></div></div>'+
       '<div class="stat"><span class="tl">Change</span><div class="tv num" style="color:'+(d>0?'var(--wk)':d<0?'var(--good)':'var(--ink2)')+'">'+(d>0?'+':'')+d+'</div></div>'+
@@ -3791,10 +3896,11 @@ function renderBody(){
       '<div class="tiny muted" style="margin-bottom:6px">Last logged '+fmtD(last.date)+(prev?' · change since '+fmtD(prev.date):'')+' · goal '+(st.goalWeight||'-')+' '+unit()+'</div>';
   } else h+='<div class="empty">Log your first weigh-in.</div>';
   if(ws.length>1) h+=weightChart(ws);
-  h+='<button class="btn body wide" style="margin-top:14px" onclick="weightForm()">Log weight</button></div>';
-  /* measurements */
+  return h+'<button class="btn body wide" style="margin-top:14px" onclick="weightForm()">Log weight</button></div>';
+}
+function bodyMeasHTML(){
   const mAll=S.measures, mLast=mAll[mAll.length-1], mPrev=mAll[mAll.length-2];
-  h+='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Measurements</h2>';
+  let h='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Measurements</h2>';
   if(mLast){
     h+='<div class="fields3" style="gap:12px">';
     MEAS.forEach(function(k){
@@ -3806,10 +3912,11 @@ function renderBody(){
     });
     h+='</div><div class="tiny muted" style="margin-top:10px">Updated '+fmtD(mLast.date)+'</div>';
   } else h+='<div class="empty">Chest, waist, arms and more. The scale misses what the tape sees.</div>';
-  h+='<button class="btn wide" style="margin-top:12px" onclick="measForm()">Update measurements</button></div>';
-  /* progress photos */
+  return h+'<button class="btn wide" style="margin-top:12px" onclick="measForm()">Update measurements</button></div>';
+}
+function bodyPhotosHTML(){
   const ph=S.photos||[];
-  h+='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Progress photos</h2>';
+  let h='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Progress photos</h2>';
   if(ph.length){
     h+='<div class="pgrid">'+ph.slice(-9).reverse().map(function(p){
       return '<button onclick="viewPhoto(\''+p.id+'\')" aria-label="photo from '+p.date+'"><img src="'+p.data+'" alt=""><span class="pdate">'+fmtD(p.date)+'</span></button>';
@@ -3825,17 +3932,28 @@ function renderBody(){
     const used=Math.round((localStorage.getItem(K)||'').length*2/1024/104.8576)/10;
     if(ph.length) h+='<div class="tiny muted" style="margin-top:10px">Using ~'+used+' MB of ~5 MB app storage. Photos never leave this phone.</div>';
   }catch(e){}
-  h+='</div>';
-  /* entries */
-  if(ws.length){
-    h+='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Entries</h2>';
-    ws.slice().reverse().slice(0,30).forEach(function(w){
-      h+='<div class="listrow"><span class="small">'+fmtD(w.date)+'</span><span class="row"><span class="small num"><b>'+w.kg+'</b> '+unit()+'</span>'+
-        '<button class="btn ghost sm" style="color:var(--ink3)" onclick="delWeight(\''+w.date+'\')">✕</button></span></div>';
-    });
-    h+='</div>';
-  }
-  $('#tab-body').innerHTML=h;
+  return h+'</div>';
+}
+function bodyEntriesHTML(ws){
+  if(!ws.length) return '<div class="osec"><div class="empty">No weigh-ins yet.</div></div>';
+  let h='<div class="osec"><h2><span class="dot" style="background:var(--bd)"></span>Entries</h2>';
+  ws.slice().reverse().slice(0,30).forEach(function(w){
+    h+='<div class="listrow"><span class="small">'+fmtD(w.date)+'</span><span class="row"><span class="small num"><b>'+w.kg+'</b> '+unit()+'</span>'+
+      '<button class="btn ghost sm" style="color:var(--ink3)" onclick="delWeight(\''+w.date+'\')">✕</button></span></div>';
+  });
+  return h+'</div>';
+}
+function renderBody(){
+  const ws=S.weights.slice().sort(function(a,b){ return a.date<b.date?-1:1; });
+  const last=ws[ws.length-1], prev=ws[ws.length-2];
+  const st=S.settings;
+  let h;
+  if(BV==='bmi') h=bmiHTML();
+  else if(BV==='meas') h=bodyMeasHTML();
+  else if(BV==='photos') h=bodyPhotosHTML();
+  else if(BV==='entries') h=bodyEntriesHTML(ws);
+  else h=bodyWeightHTML(ws,last,prev,st);
+  $('#tab-body').innerHTML=bodyNav()+h;
 }
 function weightForm(){
   const last=S.weights.length? S.weights[S.weights.length-1] : null;
@@ -3846,12 +3964,16 @@ function weightForm(){
     '<button class="btn body wide" onclick="addWeight()">Save</button>'+
     '<p class="tiny muted" style="margin-top:12px">Same morning routine each time: after the toilet, before food. Weekly is plenty. Daily weight is mostly noise.</p>');
 }
-function weightChart(ws){
+function weightChart(ws, bmiMode){
   const data=ws.slice(-30);
   const W=396, H=140, PL=34, PR=12, PT=12, PB=20;
   let mn=Math.min.apply(null,data.map(function(d){return d.kg;}));
   let mx=Math.max.apply(null,data.map(function(d){return d.kg;}));
-  const goal=+S.settings.goalWeight||null;
+  /* in BMI mode the series is BMI, so the goal has to be converted too or it
+     would draw a 68 kg line onto a scale that tops out around 25 */
+  const goal=bmiMode
+    ? (S.settings.height? bmiOf(+S.settings.goalWeight, S.settings.height) : null)
+    : (+S.settings.goalWeight||null);
   if(goal){ mn=Math.min(mn,goal); mx=Math.max(mx,goal); }
   const span=(mx-mn)||1; mn-=span*0.12; mx+=span*0.12;
   const X=function(i){ return PL+(W-PL-PR)*(data.length===1?0.5:i/(data.length-1)); };
