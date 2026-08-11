@@ -248,12 +248,15 @@ function check(name, cond, detail) {
     WV = 'home'; renderWorkout();
     return { target, pr: pr ? pr.txt : null };
   });
-  check('timed target phrased in seconds', /s, five seconds longer/.test(timedPR.target || ''), timedPR.target);
+  check('timed target prescribes a longer hold in seconds', /\d+s/.test(timedPR.target || '') && /five seconds longer/.test(timedPR.target || ''), timedPR.target);
   check('longest-hold PR detected', /300s: longest hold/.test(timedPR.pr || ''), timedPR.pr);
 
   console.log('coach logic');
   const coach = await page.evaluate(() => ({
-    comeback: /comeback/.test(targetFor(S.exercises.find((e) => e.name === 'Squat').id) || ''),
+    comeback: (function () {
+      const rx = prescribe(S.exercises.find((e) => e.name === 'Squat').id);
+      return rx.tag === 'comeback' && /days off/.test(rx.why) && /rebuild/.test(rx.why);
+    })(),
     est: est1RM(100, 10) === 100 * (1 + 10 / 30),
     plates: (function () { go('timers'); document.querySelector('#plW').value = '62.5'; plates(); return document.querySelector('#plOut').textContent; })(),
   }));
@@ -445,6 +448,90 @@ function check(name, cond, detail) {
   check('exercises without photos show their own diagram', thumbs.figures >= 5, thumbs.figures);
   check('photo thumbnails still render', thumbs.photos >= 20, thumbs.photos);
   check('every mobility move resolves to a visual', thumbs.mobilityUncovered.length === 0, thumbs.mobilityUncovered);
+
+  console.log('coaching engine: what to lift, and why');
+  const rxEngine = await page.evaluate(() => {
+    const saved = JSON.stringify(S.sessions);
+    const legId = S.exercises.find((e) => e.name === 'Leg press').id;
+    const latId = S.exercises.find((e) => e.name === 'Lateral raise').id;
+    const d = (n) => dShift(today(), -n);
+    const sess = (date, exId, sets) => ({ id: uid(), name: 'T', date, dur: 1, vol: 1, ex: [{ exId, sets }], prs: [] });
+    const run = (list) => { S.sessions = list; return null; };
+    const out = {};
+
+    // hit every set at the top of the range -> earn the increase
+    run([sess(d(3), legId, [{ w: 100, r: 12, done: true }, { w: 100, r: 12, done: true }, { w: 100, r: 12, done: true }])]);
+    let rx = prescribe(legId);
+    out.up = { tag: rx.tag, w: rx.sets[0].w, r: rx.sets[0].r, n: rx.sets.length, why: rx.why };
+
+    // same, but every set called easy -> jump twice the increment
+    run([sess(d(3), legId, [{ w: 100, r: 12, done: true, e: 'easy' }, { w: 100, r: 12, done: true, e: 'easy' }, { w: 100, r: 12, done: true, e: 'easy' }])]);
+    out.easy = { tag: prescribe(legId).tag, w: prescribe(legId).sets[0].w };
+
+    // top of range but the last set was a grind -> hold, don't add weight
+    run([sess(d(3), legId, [{ w: 100, r: 12, done: true }, { w: 100, r: 12, done: true }, { w: 100, r: 12, done: true, e: 'hard' }])]);
+    rx = prescribe(legId);
+    out.hard = { tag: rx.tag, w: rx.sets[0].w, why: rx.why };
+
+    // three sessions stuck at the same weight, never reaching the top -> deload
+    run([sess(d(21), legId, [{ w: 100, r: 8, done: true }]), sess(d(14), legId, [{ w: 100, r: 9, done: true }]), sess(d(7), legId, [{ w: 100, r: 8, done: true }])]);
+    rx = prescribe(legId);
+    out.deload = { tag: rx.tag, w: rx.sets[0].w, why: rx.why };
+
+    // reps collapsed across sets -> hold and say so
+    run([sess(d(3), legId, [{ w: 100, r: 10, done: true }, { w: 100, r: 6, done: true }, { w: 100, r: 3, done: true }])]);
+    rx = prescribe(legId);
+    out.fell = { tag: rx.tag, w: rx.sets[0].w, why: rx.why };
+
+    // increments are per-movement, not one number for everything
+    run([sess(d(3), legId, [{ w: 100, r: 12, done: true }, { w: 100, r: 12, done: true }, { w: 100, r: 12, done: true }])]);
+    const legJump = prescribe(legId).sets[0].w - 100;
+    run([sess(d(3), latId, [{ w: 10, r: 12, done: true }, { w: 10, r: 12, done: true }, { w: 10, r: 12, done: true }])]);
+    const latJump = prescribe(latId).sets[0].w - 10;
+    out.increments = { legJump, latJump };
+
+    // long layoff beats every other rule
+    run([sess(d(90), legId, [{ w: 100, r: 12, done: true }, { w: 100, r: 12, done: true }, { w: 100, r: 12, done: true }])]);
+    rx = prescribe(legId);
+    out.comeback = { tag: rx.tag, w: rx.sets[0].w };
+
+    S.sessions = JSON.parse(saved); save();
+    return out;
+  });
+  check('hitting every set at the top earns a load increase', rxEngine.up.tag === 'up' && rxEngine.up.w === 105 && rxEngine.up.r === 8, rxEngine.up);
+  check('prescribes the whole set scheme, not one set', rxEngine.up.n === 3, rxEngine.up.n);
+  check('all-easy jumps a double increment', rxEngine.easy.tag === 'up' && rxEngine.easy.w === 110, rxEngine.easy);
+  check('a hard set holds the weight instead of adding', rxEngine.hard.tag === 'reps' && rxEngine.hard.w === 100, rxEngine.hard);
+  check('three stalled sessions trigger a 10% deload', rxEngine.deload.tag === 'deload' && rxEngine.deload.w === 90, rxEngine.deload);
+  check('collapsing reps hold the weight and are named', rxEngine.fell.tag === 'reps' && /dropped off/.test(rxEngine.fell.why), rxEngine.fell);
+  check('increment differs by movement (legs 5, raise 1.25)', rxEngine.increments.legJump === 5 && rxEngine.increments.latJump === 1.25, rxEngine.increments);
+  check('a long layoff overrides progression', rxEngine.comeback.tag === 'comeback' && rxEngine.comeback.w === 60, rxEngine.comeback);
+
+  const planSafety = await page.evaluate(() => {
+    const before = S.sessions.length;
+    const r = S.routines.find((x) => /Push: wrist/.test(x.name));
+    startSession(r.id);
+    const prescribed = S.active.ex[0].sets.length;
+    const allPlanned = S.active.ex.every((e) => e.sets.every((s) => s.plan === true));
+    // perform only the first set of the first exercise
+    S.active.ex[0].sets[0].w = 12.5; S.active.ex[0].sets[0].r = 10;
+    toggleSet(0, 0);
+    const eff = () => S.active.ex[0].sets[0].e;
+    setEffort(0, 0, 'hard'); const setHard = eff();
+    setEffort(0, 0, 'hard'); const cleared = eff();
+    finishSession();
+    const s = S.sessions[S.sessions.length - 1];
+    const logged = s.ex.reduce((a, e) => a + e.sets.length, 0);
+    const out = { prescribed, allPlanned, logged, exCount: s.ex.length, vol: s.vol, setHard, cleared: cleared === undefined, added: S.sessions.length - before };
+    S.sessions.pop(); save(); closeSheet();
+    return out;
+  });
+  check('a routine starts with every set prescribed', planSafety.prescribed === 3, planSafety.prescribed);
+  check('prescribed sets are marked as plan, not performed', planSafety.allPlanned);
+  check('untouched prescriptions are never logged as lifts', planSafety.logged === 1, planSafety);
+  check('only the exercise actually trained is kept', planSafety.exCount === 1, planSafety.exCount);
+  check('volume counts only the performed set', planSafety.vol === 125, planSafety.vol);
+  check('effort tap records, and tapping again clears it', planSafety.setHard === 'hard' && planSafety.cleared, planSafety);
 
   console.log('plate builder: log a meal from its parts');
   const plate = await page.evaluate(() => {

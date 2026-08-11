@@ -89,11 +89,12 @@ function check(name, cond, detail) {
       water: waterToday() === 500,
       session: S.sessions.length === 1,
       target: targetFor(S.exercises.find((e) => e.name === 'Bench press').id),
+      rxTag: prescribe(S.exercises.find((e) => e.name === 'Bench press').id).tag,
       about: (function(){ aboutSheet(); const t=document.querySelector('#sheetIn').textContent; closeSheet(); return t.includes('not medical advice') && t.includes('malay@growleads.io'); })(),
     };
   });
   check('water/session logging works', use.water && use.session);
-  check('progression target (no comeback — fresh user)', /target:/.test(use.target || ''), use.target);
+  check('progression prescribes sets\u00d7weight\u00d7reps (fresh user, no comeback)', use.rxTag === 'reps' && /^3\u00d740\u00d7\d+/.test(use.target || ''), use.target);
   check('about + disclaimer present', use.about);
 
   // persistence
