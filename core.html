@@ -143,11 +143,17 @@
   .exlink:active{color:var(--wk)}
   /* routine cards: recognise the workout, don't read it */
   .exthumbs{display:inline-flex; gap:5px}
-  .exthumb{width:38px; height:38px; border-radius:9px; overflow:hidden; background:#fff;
+  .exthumb{width:54px; height:46px; border-radius:9px; overflow:hidden; background:#fff;
     display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto}
   .exthumb img{width:100%; height:100%; object-fit:cover; display:block}
   .exthumb.ph{background:var(--raised); color:var(--ink3); font-family:var(--fd-disp);
-    font-weight:700; font-size:15px}
+    font-weight:700; font-size:16px}
+  /* a 200-unit viewBox squeezed to 46px needs much heavier strokes to read,
+     and the dashed motion arrows just become noise at that size */
+  .exthumb.fig{background:var(--raised); padding:3px}
+  .exthumb.fig svg{width:100%; height:100%; display:block}
+  .exthumb.fig .fs,.exthumb.fig .fe{stroke-width:8}
+  .exthumb.fig .fa{display:none}
   .exthumb.more{background:var(--raised); color:var(--ink2); font-size:12px; font-weight:700}
   .gchip{font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
     color:var(--ink3); background:var(--raised); border-radius:99px; padding:3px 9px}
@@ -1428,6 +1434,15 @@ function patternSVG(p){
     '<line x1="8" y1="112" x2="192" y2="112" class="fg"/>'+d.svg+'</svg>'+
     '<div class="tiny muted" style="text-align:center; margin-bottom:12px">'+d.label+'</div>';
 }
+/* Same figure at thumbnail size: no caption, no ground line, no motion arrows,
+   since none of them survive being shrunk to 46px. */
+function patternThumb(p){
+  const d=PATTERNS[p]; if(!d) return '';
+  /* cropped in from 0 0 200 124: the figures sit mid-canvas and the full width
+     leaves the drawing tiny inside a thumbnail */
+  return '<svg viewBox="26 2 148 120" class="exfig" preserveAspectRatio="xMidYMid meet" '+
+    'role="img" aria-label="'+d.label+'">'+d.svg+'</svg>';
+}
 function activeBreak(d){
   return (S.breaks||[]).find(function(b){ return d>=b.from && d<=b.to; })||null;
 }
@@ -2232,8 +2247,11 @@ function agoTxt(iso){
 function exThumb(exId){
   const nm=exName(exId), im=(window.EXIMG||{})[nm];
   const initial=esc(nm.replace(/[^A-Za-z]/g,'').slice(0,1).toUpperCase()||'?');
-  if(!im) return '<span class="exthumb ph">'+initial+'</span>';
-  return '<span class="exthumb"><img src="img/ex/'+esc(im)+'_0.jpg" alt="" loading="lazy" onerror="thumbFail(this,\''+initial+'\')"></span>';
+  if(im) return '<span class="exthumb"><img src="img/ex/'+esc(im)+'_0.jpg" alt="" loading="lazy" onerror="thumbFail(this,\''+initial+'\')"></span>';
+  /* no photo: the movement's own drawing beats a grey letter */
+  const pat=patternOf(nm, exGroupOf(exId));
+  if(pat && PATTERNS[pat]) return '<span class="exthumb fig">'+patternThumb(pat)+'</span>';
+  return '<span class="exthumb ph">'+initial+'</span>';
 }
 function thumbFail(img, initial){ const p=img.parentNode; p.className='exthumb ph'; p.textContent=initial; }
 function thumbRow(exIds, max){
@@ -3234,7 +3252,7 @@ const FOODDB=[
 ['Papaya (bowl)',60,1,15,0.2],['Grapes (bowl)',100,1,26,0.2],['Watermelon (bowl)',45,1,11,0.2],
 ['Pomegranate / anaar (1)',105,2,26,1.5],['Guava (1)',60,2,14,1],['Chikoo (1)',80,0.5,20,1]
 ];
-let FDMEAL='s', FDRES=[], FDITEM=null, FDQ='';
+let FDMEAL='s', FDRES=[], FDITEM=null, FDQ='', PLATE=[];
 function fdbAllFoods(){
   return FOODDB.map(function(f){ return {name:f[0], kcal:f[1], p:f[2], c:f[3], f:f[4]}; })
     .concat((S.myFoods||[]).map(function(m){ return {name:m.name, kcal:m.kcal, p:m.p, c:m.c, f:m.f, mine:true, id:m.id}; }));
@@ -3261,8 +3279,81 @@ function fdbPick(i){
   $('#fdbRes').innerHTML='';
   $('#fdbSel').innerHTML='<div class="card" style="background:var(--raised); margin:8px 0 4px"><b class="small">'+esc(FDITEM.name)+'</b>'+
     '<div class="tiny muted num" style="margin:2px 0 10px">'+FDITEM.kcal+' kcal · P '+FDITEM.p+' · C '+FDITEM.c+' · F '+FDITEM.f+' (per unit)</div>'+
-    '<div class="row"><span class="small">Quantity</span><input id="fdbQty" type="number" inputmode="decimal" value="1" min="0.5" step="0.5" style="max-width:90px; text-align:center">'+
-    '<button class="btn food grow" onclick="fdbAdd()">Add</button></div></div>';
+    '<div class="row"><span class="small">Quantity</span><input id="fdbQty" type="number" inputmode="decimal" value="1" min="0.5" step="0.5" style="max-width:78px; text-align:center">'+
+    /* once a plate is being built everything joins it, so a stray Add can't
+       log one item and drop the rest on the floor */
+    (PLATE.length
+      ? '<button class="btn food grow" onclick="plateAdd()">+ Add to plate</button>'
+      : '<button class="btn grow" onclick="plateAdd()">+ Plate</button>'+
+        '<button class="btn food grow" onclick="fdbAdd()">Add</button>')+
+    '</div></div>';
+}
+/* ---- build a plate from parts, log it as one meal ---- */
+function plateAdd(){
+  const f=FDITEM; if(!f) return;
+  const n=Math.max(0.5, +$('#fdbQty').value||1);
+  const same=PLATE.find(function(x){ return x.name===f.name; });
+  if(same) same.n+=n;
+  else PLATE.push({name:f.name, kcal:f.kcal, p:f.p, c:f.c, f:f.f, n:n});
+  FDITEM=null; $('#fdbSel').innerHTML=''; $('#fdbRes').innerHTML='';
+  const q=$('#fdbQ'); if(q){ q.value=''; q.focus(); }
+  FDQ=''; renderPlate();
+}
+function plateQty(i,d){
+  const it=PLATE[i]; if(!it) return;
+  it.n=Math.round((it.n+d)*10)/10;
+  if(it.n<0.5) PLATE.splice(i,1);
+  renderPlate();
+}
+function plateDel(i){ PLATE.splice(i,1); renderPlate(); }
+function plateTotals(){
+  return PLATE.reduce(function(a,x){
+    a.kcal+=x.kcal*x.n; a.p+=x.p*x.n; a.c+=x.c*x.n; a.f+=x.f*x.n; return a;
+  },{kcal:0,p:0,c:0,f:0});
+}
+function plateName(){
+  const parts=PLATE.map(function(x){ return (x.n!==1? x.n+'× ':'')+x.name.replace(/\s*\([^)]*\)\s*$/,''); });
+  return parts.slice(0,3).join(' + ')+(parts.length>3? ' +'+(parts.length-3)+' more':'');
+}
+function renderPlate(){
+  const box=$('#fdbPlate'); if(!box) return;
+  if(!PLATE.length){ box.innerHTML=''; return; }
+  const t=plateTotals();
+  box.innerHTML='<div class="card" style="background:var(--raised); margin:10px 0 4px">'+
+    '<div class="spread" style="margin-bottom:8px"><b class="small">Your plate</b>'+
+      '<span class="tiny muted">'+PLATE.length+' item'+(PLATE.length>1?'s':'')+'</span></div>'+
+    PLATE.map(function(x,i){
+      return '<div class="listrow"><div style="min-width:0"><span class="small">'+esc(x.name)+'</span>'+
+        '<div class="tiny muted num">'+Math.round(x.kcal*x.n)+' kcal · P'+Math.round(x.p*x.n*10)/10+'</div></div>'+
+        '<span class="row" style="gap:4px">'+
+          '<button class="btn ghost sm" onclick="plateQty('+i+',-0.5)">−</button>'+
+          '<span class="tiny num" style="min-width:26px; text-align:center">'+x.n+'</span>'+
+          '<button class="btn ghost sm" onclick="plateQty('+i+',0.5)">+</button>'+
+          '<button class="btn ghost sm" style="color:var(--ink3)" onclick="plateDel('+i+')">✕</button>'+
+        '</span></div>';
+    }).join('')+
+    '<div class="num" style="margin:10px 0 2px; font-weight:700">'+Math.round(t.kcal)+' kcal'+
+      '<span class="tiny muted" style="font-weight:500"> · P '+Math.round(t.p)+' · C '+Math.round(t.c)+' · F '+Math.round(t.f)+'</span></div>'+
+    '<button class="btn food wide" style="margin-top:8px" onclick="plateLog()">Log plate as one meal</button>'+
+    '<button class="btn ghost wide" style="margin-top:6px" onclick="platesSave()">Save plate to My Foods ★</button>'+
+    '</div>';
+}
+function plateLog(){
+  if(!PLATE.length) return;
+  const t=plateTotals();
+  const e={id:uid(), name:plateName(), kcal:Math.round(t.kcal), p:Math.round(t.p*10)/10,
+    c:Math.round(t.c*10)/10, f:Math.round(t.f*10)/10};
+  const day=S.food[foodDate]=S.food[foodDate]||{};
+  (day[FDMEAL]=day[FDMEAL]||[]).push(e);
+  PLATE=[]; save(); closeSheet(); renderFood();
+  toast(e.kcal+' kcal logged as one meal');
+}
+function platesSave(){
+  if(!PLATE.length) return;
+  const t=plateTotals();
+  S.myFoods.push({id:uid(), name:plateName(), kcal:Math.round(t.kcal), p:Math.round(t.p*10)/10,
+    c:Math.round(t.c*10)/10, f:Math.round(t.f*10)/10});
+  save(); toast('Saved to My Foods ★, searchable next time');
 }
 function fdbAdd(){
   const f=FDITEM; if(!f) return;
@@ -3291,7 +3382,9 @@ function saveMyFood(){
   if(!k){ toast('Calories needed, even a rough guess beats a blank'); return; }
   const m={id:uid(), name:name, kcal:k, p:+$('#mfP').value||0, c:+$('#mfC').value||0, f:+$('#mfF').value||0};
   S.myFoods.push(m); save();
+  const keep=PLATE;                 /* addFoodForm resets the plate; don't lose one mid-build */
   addFoodForm(FDMEAL);
+  PLATE=keep; renderPlate();
   $('#fdbQ').value=name; fdbSearch(name);
   const idx=FDRES.findIndex(function(f){return f.id===m.id;});
   if(idx>-1) fdbPick(idx);
@@ -3334,11 +3427,12 @@ function renderFood(){
 }
 function foodNav(d){ const nx=dShift(foodDate,d); if(nx>today()) return; foodDate=nx; renderFood(); }
 function addFoodForm(meal){
-  FDMEAL=meal; FDSEL=-1;
+  FDMEAL=meal; FDSEL=-1; PLATE=[]; FDITEM=null; FDQ='';
   let h='<h3>Add food</h3>'+
-    '<div class="field"><label for="fdbQ">Search '+FOODDB.length+' Indian foods (per-piece dry fruits included)</label>'+
-    '<input id="fdbQ" placeholder="almond, dal, ghewar, chai, kachori…" oninput="fdbSearch(this.value)"></div>'+
-    '<div id="fdbRes"></div><div id="fdbSel"></div>'+
+    '<div class="field"><label for="fdbQ">Search '+FOODDB.length+' Indian foods (per piece, per packet, or just the parts)</label>'+
+    '<input id="fdbQ" placeholder="monaco, paneer, dal, almond, chai…" oninput="fdbSearch(this.value)"></div>'+
+    '<p class="tiny muted" style="margin:-6px 0 4px">Add sends one item straight in. + Plate collects several, then logs them as one meal.</p>'+
+    '<div id="fdbRes"></div><div id="fdbSel"></div><div id="fdbPlate"></div>'+
     '<hr style="border:0; border-top:1px solid var(--line); margin:12px 0">';
   if(S.quick.length){
     h+='<div class="tiny muted" style="margin-bottom:6px">Quick add</div><div class="row wrap" style="margin-bottom:14px">'+
