@@ -274,6 +274,67 @@ function check(name, cond, detail) {
   check('steam is not sold as the dry-sauna result', lev.steamHonest);
   check('the not-medical-advice line is on the protocols screen', lev.disclaimer);
 
+  console.log('integration audit: does every new field reach every path');
+  const audit = await page.evaluate(() => {
+    const g = {};
+    g.backfillRan = S.fiberBackfilled === 2;
+    g.quickAll = S.quick.every((q) => q.fb !== undefined);
+    g.suppAll = S.supps.every((s) => s.fb !== undefined);
+    g.myFoodAll = S.myFoods.every((m) => m.fb !== undefined);
+    g.entriesAll = Object.keys(S.food).every((d) => ['b', 'l', 'd', 's']
+      .every((m) => (S.food[d][m] || []).every((e) => e.fb !== undefined)));
+    // every write path carries fiber through
+    go('food'); addFoodForm('s');
+    document.querySelector('#fName').value = 'Audit food';
+    document.querySelector('#fK').value = '100';
+    document.querySelector('#fFb').value = '7';
+    document.querySelector('#fSaveQ').checked = true;
+    saveFood('s');
+    const manual = ((S.food[foodDate] || {}).s || []).slice(-1)[0];
+    const savedQuick = S.quick.slice(-1)[0];
+    g.manualFb = manual && manual.fb;
+    g.quickSaveFb = savedQuick && savedQuick.fb;
+    S.food[foodDate].s = S.food[foodDate].s.filter((x) => x.id !== manual.id);
+    S.quick = S.quick.filter((x) => x.id !== savedQuick.id);
+    quickAdd('s', S.quick[0].id);
+    const qe = ((S.food[foodDate] || {}).s || []).slice(-1)[0];
+    g.quickAddFb = qe && qe.fb !== undefined;
+    S.food[foodDate].s = S.food[foodDate].s.filter((x) => x.id !== qe.id);
+    const sp = S.supps.find((x) => x.logFood);
+    toggleSupp(sp.id);
+    const se = ((S.food[today()] || {}).s || []).slice(-1)[0];
+    g.suppFb = se && se.fb !== undefined;
+    toggleSupp(sp.id);
+    // the weekly report surfaces what the app now measures
+    S.vo2 = [{ date: today(), val: 42.7, method: 'Cooper run' }];
+    for (let i = 0; i < 14; i++) S.sleep[dShift(today(), -i)] = { bed: '23:15', wake: '07:10', hrs: 7.9, q: 'g' };
+    save();
+    openReport();
+    const rep = document.querySelector('#sheetIn').textContent;
+    closeSheet();
+    g.report = ['Fiber', 'VO2max', 'Zone 2', 'Regularity'].filter((k) => !new RegExp(k, 'i').test(rep));
+    S.vo2 = [];
+    g.z2Shown = /Z2/.test(fmtSet({ w: 10, r: 30, z: true }, 'Cardio', false));
+    g.z2Absent = !/Z2/.test(fmtSet({ w: 10, r: 30 }, 'Cardio', false));
+    const src = obFinish.toString();
+    g.onboarding = ['st.age', 'st.sex', 'fiberGoal'].filter((k) => !src.includes(k));
+    openExInfo(S.exercises.find((x) => x.name === 'Leg press').id);
+    g.cardLeads = /kg|reps|×/.test(document.querySelector('#sheetIn').textContent.slice(0, 220));
+    closeSheet();
+    save();
+    return g;
+  });
+  check('the fiber backfill runs at boot, not only when called', audit.backfillRan);
+  check('quick foods, supplements and my foods all carry fiber', audit.quickAll && audit.suppAll && audit.myFoodAll, audit);
+  check('every logged entry carries fiber after backfill', audit.entriesAll);
+  check('the manual add form saves fiber', audit.manualFb === 7, audit.manualFb);
+  check('saving that as a quick food keeps the fiber', audit.quickSaveFb === 7, audit.quickSaveFb);
+  check('quick-add and supplement logging carry fiber', audit.quickAddFb && audit.suppFb, audit);
+  check('the weekly report covers fiber, VO2max, zone 2 and regularity', audit.report.length === 0, audit.report);
+  check('zone 2 shows on a cardio set, and only when flagged', audit.z2Shown && audit.z2Absent, audit);
+  check('onboarding stores age, sex and a fiber goal', audit.onboarding.length === 0, audit.onboarding);
+  check('the exercise card leads with what to lift today', audit.cardLeads);
+
   console.log('section navigation');
   const nav = await page.evaluate(() => {
     const out = {};
@@ -489,11 +550,24 @@ function check(name, cond, detail) {
   check('restore brings the workout back intact', safety.restored && safety.leftTrash, safety);
   check('empty session is binned, not silently dropped', safety.emptyBinned);
 
+  // A snapshot is written when the stored schema differs from this build's, so
+  // exercise a real upgrade rather than relying on incidental save() timing.
+  await page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem('fitlog.v1'));
+    raw.schemaVersion = 12;
+    localStorage.setItem('fitlog.v1', JSON.stringify(raw));
+    localStorage.removeItem('fitlog.v1.bak');
+    localStorage.removeItem('fitlog.v1.bak.meta');
+  });
+  await page.reload(); await page.waitForTimeout(600);
   const snap = await page.evaluate(() => ({
     hasSnapshot: !!localStorage.getItem('fitlog.v1.bak'),
     meta: JSON.parse(localStorage.getItem('fitlog.v1.bak.meta') || 'null'),
+    stampedNow: S.schemaVersion,
+    persisted: (JSON.parse(localStorage.getItem('fitlog.v1') || '{}')).schemaVersion,
   }));
-  check('pre-update snapshot written', snap.hasSnapshot && snap.meta && snap.meta.to === 21, snap.meta);
+  check('an upgrade writes the pre-update snapshot', snap.hasSnapshot && snap.meta && snap.meta.to === 21 && snap.meta.from === 12, snap.meta);
+  check('the schema stamp is actually persisted, not left to chance', snap.persisted === 21 && snap.stampedNow === 21, snap);
 
   const past = await page.evaluate(() => {
     const d = dShift(today(), -3);
