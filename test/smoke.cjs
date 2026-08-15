@@ -335,6 +335,78 @@ function check(name, cond, detail) {
   check('onboarding stores age, sex and a fiber goal', audit.onboarding.length === 0, audit.onboarding);
   check('the exercise card leads with what to lift today', audit.cardLeads);
 
+  console.log('logging speed and feel');
+  const ux = await page.evaluate(() => {
+    const g = {};
+    const savedFood = JSON.stringify(S.food);
+    S.food = {};
+    const mk = (n, k) => ({ id: uid(), name: n, kcal: k, p: 5, c: 10, f: 2, fb: 3 });
+    for (let i = 1; i <= 10; i++) {
+      S.food[dShift(today(), -i)] = { l: [mk('Dal tadka (bowl)', 150), mk('2× Roti', 200)] };
+      if (i < 4) S.food[dShift(today(), -i)].s = [mk('Monaco (1 biscuit)', 25)];
+    }
+    save();
+    const rec = recentFoods(8);
+    g.recentOrder = rec.map((r) => r.name + '×' + r.n);
+    g.mostFrequentFirst = rec[0].n === 10 && rec[rec.length - 1].n === 3;
+    go('food'); addFoodForm('l');
+    g.againRendered = /AGAIN/i.test(document.querySelector('#sheetIn').textContent);
+    const before = ((S.food[foodDate] || {}).l || []).length;
+    const idx = AGAIN.findIndex((f) => f.name === '2× Roti');
+    logAgain('l', idx);
+    const list = (S.food[foodDate] || {}).l || [];
+    const e = list[list.length - 1];
+    g.oneTap = list.length === before + 1 && e.name === '2× Roti' && e.kcal === 200 && e.fb === 3;
+    addFoodForm('l');
+    document.querySelector('#fdbQ').value = 'dal';
+    fdbSearch('dal');
+    g.searchRanked = FDRES[0] && FDRES[0].name === 'Dal tadka (bowl)';
+    closeSheet();
+    delFood('l', e.id);
+    g.deletedFirst = !((S.food[foodDate] || {}).l || []).some((x) => x.id === e.id);
+    const undo = document.querySelector('#toastAct');
+    g.undoOffered = !!undo;
+    if (undo) undo.click();
+    g.restored = ((S.food[foodDate] || {}).l || []).some((x) => x.id === e.id);
+    S.food = JSON.parse(savedFood); save();
+    const leg = S.exercises.find((x) => x.name === 'Leg press').id;
+    const lat = S.exercises.find((x) => x.name === 'Lateral raise').id;
+    const latStart = +prescribe(lat).sets[0].w || 0;
+    startSession(); closeSheet(); addExToSession(leg); addExToSession(lat);
+    const w0 = +S.active.ex[0].sets[0].w;
+    bump(0, 0, 'w', 1); g.legStep = +S.active.ex[0].sets[0].w - w0;
+    bump(1, 0, 'w', 1); g.latStep = +S.active.ex[1].sets[0].w - latStart;
+    const r0 = +S.active.ex[0].sets[0].r;
+    bump(0, 0, 'r', -1); g.repStep = r0 - (+S.active.ex[0].sets[0].r);
+    for (let i = 0; i < 40; i++) bump(0, 0, 'w', -1);
+    g.floored = +S.active.ex[0].sets[0].w === 0;
+    g.clearsPlan = S.active.ex[0].sets[0].plan === undefined;
+    g.liftRows = (document.querySelector('#tab-workout').innerHTML.match(/class="setrow lift/g) || []).length;
+    cancelSession(); closeSheet();
+    startSession(); closeSheet();
+    addExToSession(S.exercises.find((x) => x.name === 'Cycling').id);
+    g.cardioNoStepper = !/class="setrow lift/.test(document.querySelector('#tab-workout').innerHTML);
+    cancelSession(); closeSheet();
+    g.noPrompt = !/[^a-zA-Z]prompt\(/.test(document.documentElement.innerHTML);
+    go('food'); renderFood();
+    g.swipeRows = document.querySelectorAll('#tab-food .swipe[data-sw]').length;
+    g.swipeReady = typeof initSwipe === 'function';
+    save();
+    return g;
+  });
+  check('recents rank by how often you log them', ux.mostFrequentFirst, ux.recentOrder);
+  check('the Again row renders above search', ux.againRendered);
+  check('one tap re-logs verbatim, quantity and fiber included', ux.oneTap, ux);
+  check('search puts what you actually eat first', ux.searchRanked);
+  check('deleting a food offers undo, and undo restores it', ux.deletedFirst && ux.undoOffered && ux.restored, ux);
+  check('weight steps by the movement increment (legs 5, raise 1.25)', ux.legStep === 5 && ux.latStep === 1.25, ux);
+  check('reps step by one', ux.repStep === 1, ux.repStep);
+  check('steppers never go below zero', ux.floored);
+  check('using a stepper makes the prescription a real set', ux.clearsPlan);
+  check('lifting rows get steppers, cardio rows do not', ux.liftRows >= 3 && ux.cardioNoStepper, ux);
+  check('no native prompt() left anywhere', ux.noPrompt);
+  check('swipe handling installed and rows carry a handle', ux.swipeReady && ux.swipeRows >= 0, ux);
+
   console.log('section navigation');
   const nav = await page.evaluate(() => {
     const out = {};

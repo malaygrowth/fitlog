@@ -160,7 +160,14 @@
   .bar i{display:block; height:100%; border-radius:99px}
 
   /* set table */
-  .sethead,.setrow{display:grid; grid-template-columns:42px 1fr 80px 68px 48px; gap:8px; align-items:center}
+  .sethead,.setrow{display:grid; grid-template-columns:34px 1fr 68px 48px; gap:7px; align-items:center}
+  /* lifting rows carry increment buttons so a set can be adjusted without the
+     keyboard covering half the screen */
+  .setrow.lift,.sethead.lift{grid-template-columns:30px 26px 1fr 26px 26px 54px 26px 42px; gap:4px}
+  .setrow.lift input{padding:12px 2px}
+  .stp{background:var(--raised); border:1px solid var(--line); border-radius:9px; color:var(--ink2);
+    font-size:17px; font-weight:700; height:46px; min-height:0; padding:0; line-height:1}
+  .stp:active{background:var(--wk); color:#191106}
   .sethead{font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--ink3); margin:10px 0 6px}
   .setrow{margin-bottom:6px; padding:3px 0; border-radius:10px}
   .setrow input{padding:12px 8px; text-align:center; font-size:16px; font-weight:600}
@@ -207,6 +214,11 @@
   .tline{display:flex; justify-content:space-between; gap:10px; padding:7px 0;
     border-bottom:1px solid var(--line)}
   .setrow .idx.z{background:var(--wk); color:#191106; font-weight:800}
+  /* swipe-left to delete, the gesture everything else uses. The buttons stay,
+     so the gesture is a shortcut rather than the only way through. */
+  .swipe{position:relative; touch-action:pan-y; transition:transform .18s ease, opacity .18s ease}
+  .swipe.sw{transition:none}
+  .swipe.gone{transform:translateX(-110%); opacity:0}
   .effrow{display:flex; align-items:center; gap:6px; padding:2px 0 9px 10px; white-space:nowrap}
   .effrow>.tiny{margin-right:auto}
   .eff{background:var(--raised); color:var(--ink2); border:0; border-radius:99px;
@@ -462,7 +474,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='1.7.1';
+const APP_VER='1.8.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -1838,9 +1850,20 @@ function waterPace(w,goal){
   return '<b style="color:var(--wk)">'+(Math.round((expect-w)/50)*50)+'ml behind pace</b> · ';
 }
 function customWater(){
-  const v=prompt('Millilitres to add (negative to correct):');
-  const n=Math.round(+v||0);
-  if(n) addWater(n);
+  openSheet('<h3>Add water</h3>'+
+    '<div class="row wrap" style="gap:8px; margin-bottom:14px">'+
+      [150,250,330,500,750,1000].map(function(n){
+        return '<button class="chip" onclick="addWater('+n+');closeSheet()">'+n+' ml</button>';
+      }).join('')+'</div>'+
+    '<div class="field"><label for="wCustom">Or an exact amount</label>'+
+    '<input id="wCustom" type="number" inputmode="numeric" step="50" placeholder="e.g. 400"></div>'+
+    '<button class="btn primary wide" onclick="waterFromSheet()">Add</button>'+
+    '<button class="btn ghost wide" style="margin-top:8px" onclick="waterFromSheet(-1)">Subtract instead</button>');
+}
+function waterFromSheet(sign){
+  const n=Math.round(+$('#wCustom').value||0);
+  if(!n){ toast('Enter an amount'); return; }
+  addWater(n*(sign||1)); closeSheet();
 }
 /* bar strips — seven days, stacked like plates */
 function barStrip(getVal, goal, color){
@@ -2083,13 +2106,23 @@ function saunaWeek(){
   return {n:n, mins:mins};
 }
 function logSauna(){
+  const cur=+S.sauna[today()]||0;
+  openSheet('<h3>Steam bath</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">Minutes today'+(cur?', currently '+cur:'')+'. Tap a number or type one.</p>'+
+    '<div class="row wrap" style="gap:8px; margin-bottom:14px">'+
+      [10,15,20,25,30].map(function(n){
+        return '<button class="chip'+(cur===n?' on':'')+'" onclick="saveSauna('+n+')">'+n+' min</button>';
+      }).join('')+'</div>'+
+    '<div class="field"><label for="saMin">Exact minutes</label>'+
+    '<input id="saMin" type="number" inputmode="numeric" value="'+(cur||'')+'" placeholder="20"></div>'+
+    '<button class="btn primary wide" onclick="saveSauna(+document.querySelector(\'#saMin\').value||0)">Save</button>'+
+    (cur? '<button class="btn ghost wide danger" style="margin-top:8px" onclick="saveSauna(0)">Clear today</button>':''));
+}
+function saveSauna(m){
   const d=today();
-  const cur=+S.sauna[d]||0;
-  const v=prompt('Steam bath minutes today', cur||'20');
-  if(v===null) return;
-  const m=+v||0;
   if(m>0) S.sauna[d]=m; else delete S.sauna[d];
-  save(); renderToday();
+  save(); vib(12); closeSheet(); renderToday();
+  toast(m>0? m+' min steam logged' : 'Cleared');
 }
 function toggleLight(){
   const d=today();
@@ -3213,20 +3246,28 @@ function sessionHTML(){
     }
     const tmd=isTimedEx(e.exId);
     const c1=tmd?'secs':(grp==='Cardio'?'km':unit()), c2=tmd?'timer':(grp==='Cardio'?'min':'reps');
-    h+='<div class="sethead"><span>Set</span><span></span><span style="text-align:center">'+c1+'</span><span style="text-align:center">'+c2+'</span><span></span></div>';
+    const liftRow=(!tmd && grp!=='Cardio');
+    h+= liftRow
+      ? '<div class="sethead lift"><span>Set</span><span></span><span style="text-align:center">'+c1+'</span><span></span><span></span><span style="text-align:center">'+c2+'</span><span></span><span></span></div>'
+      : '<div class="sethead"><span>Set</span><span></span><span style="text-align:center">'+c1+'</span><span style="text-align:center">'+c2+'</span><span></span></div>';
     e.sets.forEach(function(st,si){
       const ph=pa && pa[si] ? pa[si] : null;
       const cardioSet=(grp==='Cardio');
-      h+='<div class="setrow'+(st.done?' done':'')+(st.wu?' wu':'')+'">'+
+      h+='<div class="setrow'+(liftRow?' lift':'')+(st.done?' done':'')+(st.wu?' wu':'')+'">'+
         (cardioSet
           ? '<button class="idx'+(st.z?' z':'')+'" onclick="toggleZ2('+ei+','+si+')" aria-label="mark as zone 2, conversational pace" title="Zone 2">'+(st.z?'Z':(si+1))+'</button>'
           : '<button class="idx'+(st.wu?' wu':'')+'" onclick="toggleWU('+ei+','+si+')" aria-label="toggle warm-up set">'+(st.wu?'W':(si+1))+'</button>')+
-        '<span class="prev"></span>'+
+        (liftRow
+          ? '<button class="stp" onclick="bump('+ei+','+si+',\'w\',-1)" aria-label="less weight">\u2212</button>'
+          : '<span class="prev"></span>')+
         (tmd
         ? '<input type="number" inputmode="numeric" value="'+esc(st.r)+'" placeholder="'+(ph?esc(ph.r):'0')+'" onchange="setVal('+ei+','+si+',\'r\',this.value)">'+
           '<button class="btn sm" style="min-height:46px; font-size:15px" onclick="holdStart('+ei+','+si+')" aria-label="start hold timer">▶</button>'
         : '<input type="number" inputmode="decimal" step="'+(grp==='Cardio'?'0.1':'0.5')+'" value="'+esc(st.w)+'" placeholder="'+(ph?esc(ph.w):'0')+'" onchange="setVal('+ei+','+si+',\'w\',this.value)">'+
-          '<input type="number" inputmode="numeric" value="'+esc(st.r)+'" placeholder="'+(ph?esc(ph.r):'0')+'" onchange="setVal('+ei+','+si+',\'r\',this.value)">')+
+          (liftRow? '<button class="stp" onclick="bump('+ei+','+si+',\'w\',1)" aria-label="more weight">+</button>'+
+                    '<button class="stp" onclick="bump('+ei+','+si+',\'r\',-1)" aria-label="fewer reps">\u2212</button>' : '')+
+          '<input type="number" inputmode="numeric" value="'+esc(st.r)+'" placeholder="'+(ph?esc(ph.r):'0')+'" onchange="setVal('+ei+','+si+',\'r\',this.value)">'+
+          (liftRow? '<button class="stp" onclick="bump('+ei+','+si+',\'r\',1)" aria-label="more reps">+</button>' : ''))+
         '<button class="check'+(st.done?' on':'')+'" onclick="toggleSet('+ei+','+si+')" aria-label="set done">'+
         '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 10 18 19.5 6.5"/></svg></button></div>';
       /* one optional tap: it is what lets the next prescription know the
@@ -3254,7 +3295,18 @@ function sessionHTML(){
 function toggleZ2(ei,si){
   const st=S.active.ex[ei].sets[si];
   st.z=!st.z; if(!st.z) delete st.z;
-  delete st.plan; save(); renderWorkout();
+  delete st.plan; vib(14); save(); renderWorkout();
+}
+/* Step by what you could actually load: the same increment the coach uses for
+   this movement, so the buttons match the plates in front of you. */
+function bump(ei,si,k,dir){
+  const ex=S.active.ex[ei], st=ex.sets[si];
+  const step = k==='w' ? incFor(ex.exId) : 1;
+  const base = +st[k] || (k==='w' ? 0 : 0);
+  let v = base + dir*step;
+  if(v<0) v=0;
+  st[k] = String(Math.round(v*100)/100);
+  delete st.plan; vib(8); save(); renderWorkout();
 }
 function setVal(ei,si,k,v){ const st=S.active.ex[ei].sets[si]; st[k]=v; delete st.plan; save(); }
 function setEffort(ei,si,val){
@@ -3274,6 +3326,7 @@ function toggleSet(ei,si){
   }
   st.done=!st.done;
   if(st.done) delete st.plan;     /* ticking it makes the prescription a real set */
+  if(st.done) vib(14);            /* the most frequent action deserves confirmation */
   save(); renderWorkout();
   const g=exGroupOf(ex.exId);
   if(st.done && g!=='Cardio') startRest(exRest(ex.exId));
@@ -4006,6 +4059,37 @@ const FOODDB=[
 ['Pomegranate / anaar (1)',105,2,26,1.5,2.5],['Guava (1)',60,2,14,1,2.5],['Chikoo (1)',80,0.5,20,1,2.5]
 ];
 let FDMEAL='s', FDRES=[], FDITEM=null, FDQ='', PLATE=[];
+/* The leaders' logging-speed advantage comes almost entirely from not making
+   you search for the same food every day. Everything needed is already in the
+   log: re-log a previous entry verbatim, quantity and all, in one tap. */
+let AGAIN=[];
+function foodHistoryCounts(){
+  const seen={};
+  Object.keys(S.food||{}).sort().reverse().slice(0,90).forEach(function(d){
+    ['b','l','d','s'].forEach(function(m){
+      ((S.food[d]||{})[m]||[]).forEach(function(e){
+        if(!e.name) return;
+        if(!seen[e.name]) seen[e.name]={name:e.name, kcal:e.kcal, p:e.p, c:e.c, f:e.f, fb:e.fb||0, n:0, last:d};
+        seen[e.name].n++;
+        if(d>seen[e.name].last) seen[e.name].last=d;
+      });
+    });
+  });
+  return seen;
+}
+function recentFoods(limit){
+  const seen=foodHistoryCounts();
+  return Object.keys(seen).map(function(k){ return seen[k]; })
+    .sort(function(a,b){ return (b.n-a.n) || (a.last<b.last?1:-1); })
+    .slice(0, limit||8);
+}
+function logAgain(meal,i){
+  const f=AGAIN[i]; if(!f) return;
+  const day=S.food[foodDate]=S.food[foodDate]||{};
+  (day[meal]=day[meal]||[]).push({id:uid(), name:f.name, kcal:f.kcal, p:f.p, c:f.c, f:f.f, fb:f.fb||0});
+  save(); vib(12); closeSheet(); renderFood();
+  toast(f.name+': '+Math.round(f.kcal)+' kcal logged');
+}
 function fdbAllFoods(){
   return FOODDB.map(function(f){ return {name:f[0], kcal:f[1], p:f[2], c:f[3], f:f[4], fb:f[5]||0}; })
     .concat((S.myFoods||[]).map(function(m){ return {name:m.name, kcal:m.kcal, p:m.p, c:m.c, f:m.f, fb:m.fb||0, mine:true, id:m.id}; }));
@@ -4015,9 +4099,14 @@ function fdbSearch(q){
   const box=$('#fdbRes'); FDITEM=null; $('#fdbSel').innerHTML='';
   if(!FDQ){ box.innerHTML=''; return; }
   const toks=FDQ.toLowerCase().split(/\s+/);
+  const hist=foodHistoryCounts();
   FDRES=fdbAllFoods().filter(function(f){
     const n=f.name.toLowerCase();
     return toks.every(function(t){ return n.indexOf(t)>-1; });
+  }).sort(function(a,b){
+    /* what you log often should not be buried under what you never eat */
+    const ca=(hist[a.name]||{}).n||0, cb=(hist[b.name]||{}).n||0;
+    return cb-ca;
   }).slice(0,8);
   box.innerHTML = FDRES.map(function(f,i){
     return '<div class="listrow" style="cursor:pointer" onclick="fdbPick('+i+')"><span class="small">'+esc(f.name)+
@@ -4174,7 +4263,7 @@ function renderFood(){
     h+='<div class="osec"><h2><span class="dot" style="background:var(--fd)"></span>'+m[1]+
       '<span class="num" style="margin-left:auto; letter-spacing:0">'+(mk?Math.round(mk)+' kcal':'')+'</span></h2>';
     list.forEach(function(e){
-      h+='<div class="listrow"><div><span class="small">'+esc(e.name)+'</span>'+
+      h+='<div class="listrow swipe" data-sw="'+m[0]+':'+e.id+'"><div><span class="small">'+esc(e.name)+'</span>'+
         '<div class="tiny muted num">'+Math.round(e.kcal)+' kcal'+((+e.p)?' · P'+e.p:'')+((+e.c)?' · C'+e.c:'')+((+e.f)?' · F'+e.f:'')+((+e.fb)?' · Fib'+e.fb:'')+'</div></div>'+
         '<button class="btn ghost sm" style="color:var(--ink3)" onclick="delFood(\''+m[0]+'\',\''+e.id+'\')">✕</button></div>';
     });
@@ -4183,12 +4272,23 @@ function renderFood(){
   $('#tab-food').innerHTML=h;
 }
 function foodNav(d){ const nx=dShift(foodDate,d); if(nx>today()) return; foodDate=nx; renderFood(); }
+function againRow(meal){
+  AGAIN=recentFoods(8);
+  if(!AGAIN.length) return '';
+  return '<div class="tiny muted" style="margin:12px 0 6px; font-weight:700; letter-spacing:.06em; text-transform:uppercase">Again?</div>'+
+    '<div class="row wrap" style="gap:6px; margin-bottom:6px">'+
+    AGAIN.map(function(f,i){
+      return '<button class="chip" onclick="logAgain(\''+meal+'\','+i+')">'+esc(f.name)+
+        '<span class="tiny muted num"> '+Math.round(f.kcal)+'</span></button>';
+    }).join('')+'</div>';
+}
 function addFoodForm(meal){
   FDMEAL=meal; FDSEL=-1; PLATE=[]; FDITEM=null; FDQ='';
   let h='<h3>Add food</h3>'+
     '<div class="field"><label for="fdbQ">Search '+FOODDB.length+' Indian foods (per piece, per packet, or just the parts)</label>'+
     '<input id="fdbQ" placeholder="monaco, paneer, dal, almond, chai…" oninput="fdbSearch(this.value)"></div>'+
     '<p class="tiny muted" style="margin:-6px 0 4px">Add sends one item straight in. + Plate collects several, then logs them as one meal.</p>'+
+    againRow(meal)+
     '<div id="fdbRes"></div><div id="fdbSel"></div><div id="fdbPlate"></div>'+
     '<hr style="border:0; border-top:1px solid var(--line); margin:12px 0">';
   if(S.quick.length){
@@ -4221,8 +4321,18 @@ function quickAdd(meal,qid){
 }
 function delFood(meal,id){
   const day=S.food[foodDate]||{};
+  const gone=(day[meal]||[]).find(function(e){return e.id===id;});
+  const at=(day[meal]||[]).findIndex(function(e){return e.id===id;});
   day[meal]=(day[meal]||[]).filter(function(e){return e.id!==id;});
   save(); renderFood();
+  if(!gone) return;
+  const d=foodDate;
+  toastUndo(esc(gone.name)+' removed', function(){
+    const back=S.food[d]=S.food[d]||{};
+    back[meal]=back[meal]||[];
+    back[meal].splice(Math.max(0,at), 0, gone);
+    save(); renderFood();
+  });
 }
 
 /* ============ BODY ============ */
@@ -4770,10 +4880,49 @@ function phaseBegin(){
   render();
 }
 
+/* Swipe-left to delete on food rows. Deliberately conservative: it only starts
+   once the gesture is clearly horizontal, so it never fights the page scroll. */
+function initSwipe(){
+  let el=null, x0=0, y0=0, dx=0, locked='';
+  const root=document.body;
+  root.addEventListener('touchstart', function(e){
+    const t=e.target.closest && e.target.closest('.swipe[data-sw]');
+    if(!t || e.touches.length!==1){ el=null; return; }
+    el=t; x0=e.touches[0].clientX; y0=e.touches[0].clientY; dx=0; locked='';
+    el.classList.add('sw');
+  }, {passive:true});
+  root.addEventListener('touchmove', function(e){
+    if(!el) return;
+    const x=e.touches[0].clientX, y=e.touches[0].clientY;
+    if(!locked){
+      if(Math.abs(x-x0)>10 && Math.abs(x-x0)>Math.abs(y-y0)) locked='x';
+      else if(Math.abs(y-y0)>10){ locked='y'; el.classList.remove('sw'); el.style.transform=''; el=null; return; }
+    }
+    if(locked!=='x') return;
+    dx=Math.min(0, x-x0);
+    el.style.transform='translateX('+dx+'px)';
+    el.style.opacity=String(Math.max(0.35, 1+dx/220));
+  }, {passive:true});
+  root.addEventListener('touchend', function(){
+    if(!el) return;
+    const node=el, ref=node.dataset.sw;
+    node.classList.remove('sw');
+    if(dx < -90){
+      node.classList.add('gone'); vib(14);
+      const parts=ref.split(':');
+      setTimeout(function(){ delFood(parts[0], parts[1]); }, 160);
+    } else {
+      node.style.transform=''; node.style.opacity='';
+    }
+    el=null; dx=0; locked='';
+  }, {passive:true});
+}
+
 /* ============ boot ============ */
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSheet(); });
 applyTheme();
-fiberBackfill();   /* needs FOODDB, which is declared below the migration runner */
+fiberBackfill();
+initSwipe();   /* needs FOODDB, which is declared below the migration runner */
 setTimeout(function(){ const sp=$('#splash'); if(sp) sp.remove(); }, 1700);
 drawRestPresets();
 if(PUB && !S.settings.onboarded) setTimeout(obStart, 1500); else setTimeout(phaseMoment, 1900);
