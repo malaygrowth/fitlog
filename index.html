@@ -462,7 +462,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='1.6.0';
+const APP_VER='1.7.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -523,7 +523,7 @@ function defaults(){
       sleepRemind:'22:30', sleepGoal:8, breathGoal:15, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], caff:{}, light:{}, sauna:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
   };
 }
 let S;
@@ -2026,6 +2026,141 @@ function logSleepForm(){
     (cur.hrs?'<button class="btn ghost wide danger" style="margin-top:10px" onclick="delSleep()">Remove entry</button>':'')+
     '<p class="tiny muted" style="margin-top:12px">Logged against this morning’s date. 7–9 hours is where muscle recovery actually happens.</p>');
 }
+/* ---------- protocols ----------
+   Graded on published evidence rather than popularity. The headline finding is
+   that sleep REGULARITY beats sleep duration as a mortality predictor (UK
+   Biobank, ~61k people): the least regular sleepers carried 20-48% higher
+   all-cause mortality, independent of how long they slept. */
+
+/* Bedtimes cross midnight, so shift the small hours forward before averaging. */
+function bedMins(hhmm){
+  const m=+String(hhmm).slice(0,2)*60 + +String(hhmm).slice(3);
+  return m<720 ? m+1440 : m;
+}
+function wakeMins(hhmm){ return +String(hhmm).slice(0,2)*60 + +String(hhmm).slice(3); }
+function sd(arr){
+  if(arr.length<2) return 0;
+  const mean=arr.reduce(function(a,b){return a+b;},0)/arr.length;
+  return Math.sqrt(arr.reduce(function(a,b){return a+(b-mean)*(b-mean);},0)/arr.length);
+}
+/* A practical proxy for the Sleep Regularity Index: the published SRI needs
+   minute-by-minute actigraphy, which a phone log does not have. This scores the
+   variability of bed and wake times instead, and is labelled as a proxy. */
+function sleepRegularity(days){
+  const bed=[], wake=[];
+  for(let i=0;i<(days||14);i++){
+    const sl=S.sleep[dShift(today(),-i)];
+    if(sl && sl.bed && sl.wake){ bed.push(bedMins(sl.bed)); wake.push(wakeMins(sl.wake)); }
+  }
+  if(bed.length<3) return null;
+  const sb=sd(bed), sw=sd(wake);
+  const score=Math.max(0, Math.min(100, Math.round(100 - (sb+sw)/2 * (100/120))));
+  return {score:score, nights:bed.length, sdBed:Math.round(sb), sdWake:Math.round(sw)};
+}
+/* Coffee needs roughly 8.8h before bed to leave total sleep time alone, and the
+   disruption is not reliably perceptible, which is exactly why a cutoff helps. */
+const CAFF_LEAD=528;
+function caffCutoff(){
+  const bedStr=S.settings.sleepRemind||'22:30';
+  let m=+bedStr.slice(0,2)*60 + +bedStr.slice(3);
+  m=(m-CAFF_LEAD+1440)%1440;
+  return pad(Math.floor(m/60))+':'+pad(m%60);
+}
+function caffToday(){ return (S.caff[today()]||[]); }
+function caffMg(){ return caffToday().reduce(function(a,c){ return a+(+c.mg||0); },0); }
+function caffLate(){
+  const cut=caffCutoff();
+  return caffToday().filter(function(c){ return c.t>cut; });
+}
+function addCaff(name,mg){
+  const d=today();
+  const now=new Date();
+  S.caff[d]=(S.caff[d]||[]).concat([{t:pad(now.getHours())+':'+pad(now.getMinutes()), mg:mg, name:name}]);
+  save(); renderToday();
+  const late=caffLate().length;
+  toast(name+' logged'+(late?' · past your '+caffCutoff()+' cutoff':''));
+}
+function saunaWeek(){
+  let n=0, mins=0;
+  for(let i=0;i<7;i++){ const v=S.sauna[dShift(today(),-i)]; if(v){ n++; mins+=+v||0; } }
+  return {n:n, mins:mins};
+}
+function logSauna(){
+  const d=today();
+  const cur=+S.sauna[d]||0;
+  const v=prompt('Steam bath minutes today', cur||'20');
+  if(v===null) return;
+  const m=+v||0;
+  if(m>0) S.sauna[d]=m; else delete S.sauna[d];
+  save(); renderToday();
+}
+function toggleLight(){
+  const d=today();
+  if(S.light[d]) delete S.light[d]; else S.light[d]=true;
+  save(); renderToday();
+}
+function lightStreak(){
+  let n=0;
+  for(let i=0;i<60;i++){ if(S.light[dShift(today(),-i)]) n++; else if(i>0) break; }
+  return n;
+}
+const PROTOCOLS=[
+  ['Sleep regularity','strong','Same bed and wake time daily, within about half an hour.',
+   'The strongest finding here. In 61,000 UK Biobank participants, regularity of sleep timing predicted all-cause mortality better than sleep duration did: the least regular quintile carried 20-48% higher risk, independent of how long they slept. Worth more than an extra hour in bed.'],
+  ['Steam bath, 2-3+ times a week','moderate','15-20 minutes, as hot as is comfortable.',
+   'Worth doing, but the headline numbers you will have read do not transfer. The 24-63% mortality reductions come from a Finnish cohort using DRY sauna at 70-100C, where core temperature climbs enough to mimic light cardiovascular work. A steam room runs 40-50C at 100% humidity: heart rate rises, but core temperature rises much more modestly, and the direct research on steam is thin by comparison. Treat it as good heat exposure and good for the airways, not as the Finnish result.'],
+  ['Zone 2 and VO2max','strong','150-300 min a week easy, plus something hard.',
+   'Cardiorespiratory fitness tracks all-cause mortality more closely than blood pressure, cholesterol or smoking status. Moving off the bottom quartile is where most of the benefit sits.'],
+  ['10-20 hard sets per muscle, weekly','strong','Spread over 2-3 sessions, not one.',
+   'The dose-response meta-regressions (67 studies, 2,058 participants) put the productive weekly range at roughly 10-20 hard sets per muscle group, and splitting the same volume across two or three sessions beats cramming it into one. Your current split is on the Progress screen.'],
+  ['Two to three reps in reserve','strong','Stop with a couple of good reps left.',
+   'Sets taken close to failure drive growth; sets taken all the way to failure on everything add fatigue without adding much. Two to three in reserve on most sets, with the last set of an exercise the place to push. The Right button on a finished set is roughly this.'],
+  ['Progressive overload on compounds','strong','Add load or reps, and log it.',
+   'Consistent load progression on the big lifts is the single best predictor of growth, ahead of total volume, time under tension or rep-range variety. This is what the prescription engine is doing every session.'],
+  ['Full range of motion','strong','Especially the stretched position.',
+   'Training through a full range, and particularly loading the lengthened position, produces more growth than partials in the shortened range. Relevant to how deep you go on presses and squats once the joints allow.'],
+  ['Protein and fiber targets','strong','1.6-2.2 g/kg protein, 30 g fiber.',
+   'Protein for muscle retention while training; fiber has one of the most consistent dose-response relationships with all-cause mortality in the diet literature, and it is the easiest thing to get right on a vegetarian diet.'],
+  ['Caffeine cutoff','moderate','Roughly 8-9 hours before bed.',
+   'Coffee within about 8.8 hours of bedtime measurably shortens total sleep. The catch is that people cannot reliably feel it, so going by how you sleep is not a good guide: go by the clock.'],
+  ['Morning daylight','moderate','10-20 minutes outdoors, early.',
+   'Light in the morning advances circadian phase and consolidates sleep; the mechanism is well established and the sleep-timing effects are real. The specific claims about exact minute windows are extrapolated beyond what the trials show.'],
+  ['Breathwork for stress','moderate','A few minutes of slow exhale-biased breathing.',
+   'Short controlled-breathing practices beat passive rest for acute mood and arousal in head-to-head trials. Small studies, but the downside is nil.'],
+  ['Cold plunge after lifting','avoid','Not on training days.',
+   'This one is actively counterproductive for what you are doing. A meta-analysis found post-exercise cold water immersion attenuates resistance-training hypertrophy, and an MRI-controlled trial measured quadriceps growth of about +15% in controls against +2% with cold immersion over 12 weeks. If you want cold, keep it well away from lifting days.'],
+  ['Adaptogens, NMN, resveratrol','avoid','Skip.',
+   'Popular on podcasts, thin in the literature: largely untested or supported by low to very low quality evidence, often on surrogate markers rather than outcomes.']
+];
+function protocolsSheet(){
+  const reg=sleepRegularity(14), sa=saunaWeek();
+  const tier=function(t){
+    const c=t==='strong'?'var(--good)':t==='moderate'?'var(--wk)':'var(--bad)';
+    const lbl=t==='strong'?'Strong evidence':t==='moderate'?'Moderate evidence':'Not supported';
+    return '<span class="tiny" style="color:'+c+'; font-weight:800; letter-spacing:.04em; text-transform:uppercase">'+lbl+'</span>';
+  };
+  let h='<h3>Protocols, graded</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 14px">Ranked by what the research supports, not by how often it is talked about. Where a popular protocol does not hold up, it says so.</p>';
+  if(reg){
+    h+='<div class="card" style="background:var(--raised); margin-bottom:14px">'+
+      '<div class="spread"><b class="small">Your sleep regularity</b><span class="num" style="font-size:26px; font-family:var(--fd-disp); font-weight:700">'+reg.score+'</span></div>'+
+      '<div class="bar" style="margin:8px 0 6px"><i style="width:'+reg.score+'%; background:var(--sl)"></i></div>'+
+      '<div class="tiny muted">Bed varies by about '+reg.sdBed+' min, wake by '+reg.sdWake+' min, over '+reg.nights+' nights. '+
+      'A proxy: the published index needs minute-level actigraphy, this uses the times you log.</div></div>';
+  }
+  h+=PROTOCOLS.map(function(p){
+    const you = p[0]==='Steam bath, 2-3+ times a week'
+      ? '<div class="tiny num" style="color:var(--wk); margin-top:3px">You: '+sa.n+' session'+(sa.n===1?'':'s')+' this week</div>' : '';
+    return '<div style="border-bottom:1px solid var(--line); padding:11px 0">'+
+      '<div class="spread"><b class="small">'+p[0]+'</b>'+tier(p[1])+'</div>'+
+      '<div class="tiny" style="color:var(--ink2); margin-top:2px">'+p[2]+'</div>'+
+      you+
+      '<div class="tiny muted" style="line-height:1.55; margin-top:4px">'+p[3]+'</div></div>';
+  }).join('');
+  h+='<p class="tiny muted" style="margin:14px 0 4px; line-height:1.6">Evidence grades reflect published human research. '+
+    'Most of the strong findings here are observational, which shows association rather than cause. This is not medical advice.</p>';
+  openSheet(h);
+}
 function saveSleep(){
   const bed=$('#slBed').value, wake=$('#slWake').value;
   if(!bed||!wake){ toast('Set both times'); return; }
@@ -2430,11 +2565,30 @@ function renderToday(){
         : '<div class="tiny" style="margin-top:4px; color:var(--good)">All done ✓</div>')+
       '</button>';
   }
+  /* ===== daily protocols: the small, well-evidenced levers ===== */
+  const reg=sleepRegularity(14), sa=saunaWeek(), late=caffLate(), cut=caffCutoff();
+  h+='<div class="card"><div class="spread" style="margin-bottom:10px"><b class="small">Daily levers</b>'+
+    '<button class="btn ghost sm" onclick="protocolsSheet()">Why these</button></div>';
+  if(reg) h+='<div class="tline"><span class="small">Sleep regularity</span>'+
+    '<span class="tiny num" style="color:'+(reg.score>=75?'var(--good)':'var(--wk)')+'; font-weight:700">'+reg.score+'/100</span></div>';
+  h+='<div class="tline"><span class="small">Caffeine cutoff '+cut+'</span>'+
+    '<span class="tiny num" style="color:'+(late.length?'var(--bad)':'var(--ink3)')+'">'+
+    (caffToday().length? caffMg()+'mg'+(late.length?' · '+late.length+' late':'') : 'none logged')+'</span></div>'+
+    '<div class="row wrap" style="gap:6px; margin:8px 0 10px">'+
+      '<button class="chip" onclick="addCaff(\'Chai\',50)">+ Chai 50mg</button>'+
+      '<button class="chip" onclick="addCaff(\'Coffee\',95)">+ Coffee 95mg</button>'+
+    '</div>'+
+    '<div class="tline"><span class="small">Morning daylight</span>'+
+      '<button class="chip'+(S.light[today()]?' on':'')+'" onclick="toggleLight()">'+(S.light[today()]?'✓ done'+(lightStreak()>1?' · '+lightStreak()+'d':''):'tick when out')+'</button></div>'+
+    '<div class="tline" style="border:0"><span class="small">Steam bath this week</span>'+
+      '<button class="chip'+(sa.n>=2?' on':'')+'" onclick="logSauna()">'+sa.n+' of 2-3'+(sa.mins?' · '+sa.mins+'min':'')+'</button></div>'+
+    '</div>';
   /* ===== quick links ===== */
   h+='<div class="row wrap" style="gap:8px; margin-bottom:12px">'+
     '<button class="chip" onclick="openReport()">📊 Report</button>'+
     '<button class="chip num" onclick="go(\'body\')">⚖️ '+(lastW? lastW.kg+' '+unit() : 'Weight')+'</button>'+
     '<button class="chip" onclick="planEditor()">📅 Plan</button>'+
+    '<button class="chip" onclick="protocolsSheet()">🔬 Protocols</button>'+
     '<button class="chip" onclick="go(\'body\')">📸 Photos</button>'+
     '</div>';
   if(S.sessions.length>=3 && (!S.lastBackup || S.lastBackup<dShift(today(),-14))){
@@ -2922,8 +3076,44 @@ function vo2Save(kind){
   save(); closeSheet(); renderWorkout();
   toast('VO2max '+val+': '+vo2Band(val, +st.age, st.sex).label);
 }
+/* Weekly hard sets per muscle group. The dose-response meta-regressions put the
+   productive range at roughly 10-20 sets a week per muscle, with 2-3 sessions
+   beating one for the same volume. Warm-up sets do not count. */
+function weeklyVolume(days){
+  const from=dShift(today(), -(days||7));
+  const byGroup={};
+  (S.sessions||[]).forEach(function(s){
+    if(s.date<=from) return;
+    s.ex.forEach(function(e){
+      const g=exGroupOf(e.exId);
+      if(!g||g==='Cardio'||g==='Mobility') return;
+      const n=e.sets.filter(function(t){ return !t.wu && (t.done||t.w||t.r); }).length;
+      if(!n) return;
+      byGroup[g]=byGroup[g]||{sets:0, days:{}};
+      byGroup[g].sets+=n;
+      byGroup[g].days[s.date]=true;
+    });
+  });
+  return Object.keys(byGroup).map(function(g){
+    return {group:g, sets:byGroup[g].sets, freq:Object.keys(byGroup[g].days).length};
+  }).sort(function(a,b){ return b.sets-a.sets; });
+}
+function volumeHTML(){
+  const rows=weeklyVolume(7);
+  let h='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Weekly volume</h2>';
+  if(!rows.length){ return h+'<div class="empty">Train something and your weekly sets per muscle group appear here.</div></div>'; }
+  h+='<p class="tiny muted" style="margin:-4px 0 10px">Hard sets per muscle group over the last 7 days. The productive range is about 10-20, hit across 2-3 sessions rather than one.</p>';
+  rows.forEach(function(r){
+    const low=r.sets<10, high=r.sets>20;
+    const col=low?'var(--ink3)':high?'var(--wk)':'var(--good)';
+    h+='<div class="tline"><span class="small">'+esc(r.group)+
+      '<span class="tiny muted"> · '+r.freq+'×/week'+(r.freq<2?', once is less effective than twice':'')+'</span></span>'+
+      '<span class="tiny num" style="color:'+col+'; font-weight:700">'+r.sets+' sets'+(low?' · under 10':high?' · over 20':'')+'</span></div>';
+  });
+  return h+'</div>';
+}
 function progressHTML(){
-  let h='';
+  let h=volumeHTML();
   /* consistency heat map */
   h+='<div class="osec" style="margin-top:12px"><h2><span class="dot" style="background:var(--wk)"></span>Consistency: 16 weeks</h2>'+heatCalHTML()+'</div>';
   /* weekly volume — last 10 weeks */

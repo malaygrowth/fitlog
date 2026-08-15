@@ -192,6 +192,88 @@ function check(name, cond, detail) {
   check('omega-3 carries the algal caveat', supp.algal);
   check('the not-medical-advice line survives', supp.disclaimer);
 
+  console.log('protocols: regularity, caffeine, sauna, daylight, volume');
+  const lev = await page.evaluate(() => {
+    const savedSleep = JSON.stringify(S.sleep), savedSessions = S.sessions;
+    // a fortnight of near-identical timings should score high
+    S.sleep = {};
+    for (let i = 0; i < 14; i++) S.sleep[dShift(today(), -i)] = { bed: '23:15', wake: '07:10', hrs: 7.9, q: 'g' };
+    const tight = sleepRegularity(14);
+    // the same average, scattered, should score much lower
+    S.sleep = {};
+    for (let i = 0; i < 14; i++) {
+      const off = (i % 2) ? 90 : -90;
+      const bm = 23 * 60 + 15 + off, wm = 7 * 60 + 10 + off;
+      S.sleep[dShift(today(), -i)] = { bed: pad(Math.floor((bm % 1440) / 60)) + ':' + pad(bm % 60),
+        wake: pad(Math.floor(wm / 60)) + ':' + pad(wm % 60), hrs: 7.9, q: 'g' };
+    }
+    const loose = sleepRegularity(14);
+    // too little data to judge
+    S.sleep = {}; S.sleep[today()] = { bed: '23:00', wake: '07:00', hrs: 8, q: 'g' };
+    const thin = sleepRegularity(14);
+    S.sleep = JSON.parse(savedSleep);
+
+    // caffeine: cutoff is bedtime minus 8.8h, and lateness is flagged
+    const cut = caffCutoff();
+    S.caff[today()] = [{ t: '09:00', mg: 95, name: 'Coffee' }, { t: '18:00', mg: 50, name: 'Chai' }];
+    const mg = caffMg(), late = caffLate().length;
+    delete S.caff[today()];
+
+    // sauna and daylight
+    S.sauna[dShift(today(), -2)] = 20; S.sauna[dShift(today(), -5)] = 25; S.sauna[dShift(today(), -20)] = 30;
+    const sa = saunaWeek();
+    S.light[today()] = true; S.light[dShift(today(), -1)] = true;
+    const streak = lightStreak();
+    S.sauna = {}; S.light = {};
+
+    // weekly volume by muscle group, warm-ups excluded
+    const bench = S.exercises.find((e) => e.name === 'Bench press').id;
+    const cyc = S.exercises.find((e) => e.name === 'Cycling').id;
+    S.sessions = [
+      { id: 'v1', name: 'A', date: dShift(today(), -1), dur: 1, vol: 1, prs: [],
+        ex: [{ exId: bench, sets: [{ w: 60, r: 8, done: true }, { w: 60, r: 8, done: true }, { w: 20, r: 10, wu: true }] },
+             { exId: cyc, sets: [{ w: 10, r: 30, done: true }] }] },
+      { id: 'v2', name: 'B', date: dShift(today(), -3), dur: 1, vol: 1, prs: [],
+        ex: [{ exId: bench, sets: [{ w: 60, r: 8, done: true }] }] },
+      { id: 'v3', name: 'C', date: dShift(today(), -20), dur: 1, vol: 1, prs: [],
+        ex: [{ exId: bench, sets: [{ w: 60, r: 8, done: true }] }] },
+    ];
+    const vol = weeklyVolume(7);
+    const chest = vol.find((v) => v.group === 'Chest');
+    const hasCardio = vol.some((v) => v.group === 'Cardio');
+    S.sessions = savedSessions; save();
+
+    protocolsSheet();
+    const txt = document.querySelector('#sheetIn').textContent;
+    closeSheet();
+    return {
+      tight: tight.score, loose: loose.score, thin,
+      cut, mg, late,
+      sauna: sa, streak,
+      chestSets: chest && chest.sets, chestFreq: chest && chest.freq, hasCardio,
+      coldWarning: /cold plunge/i.test(txt) && /NOT SUPPORTED|blunt|attenuat/i.test(txt),
+      setsProtocol: /10-20 hard sets/i.test(txt),
+      rirProtocol: /reps in reserve/i.test(txt),
+      observational: /observational/i.test(txt),
+      steamHonest: /steam/i.test(txt) && /do not transfer/i.test(txt) && /DRY sauna/.test(txt),
+      disclaimer: /not medical advice/i.test(txt),
+    };
+  });
+  check('consistent sleep timing scores high', lev.tight >= 95, lev.tight);
+  check('scattered timing scores much lower, same average duration', lev.loose < 40 && lev.loose < lev.tight - 50, lev);
+  check('too few nights returns nothing rather than a fake score', lev.thin === null, lev.thin);
+  check('caffeine cutoff is bedtime minus 8.8h', lev.cut === '13:42', lev.cut);
+  check('caffeine totals, and flags what is past the cutoff', lev.mg === 145 && lev.late === 1, lev);
+  check('steam bath counts the week, not older sessions', lev.sauna.n === 2 && lev.sauna.mins === 45, lev.sauna);
+  check('daylight streak counts back from today', lev.streak === 2, lev.streak);
+  check('weekly sets exclude warm-ups and count frequency', lev.chestSets === 3 && lev.chestFreq === 2, lev);
+  check('cardio and mobility are not counted as lifting volume', !lev.hasCardio);
+  check('the cold plunge warning is present and unambiguous', lev.coldWarning);
+  check('training protocols are graded too', lev.setsProtocol && lev.rirProtocol, lev);
+  check('observational evidence is labelled as such', lev.observational);
+  check('steam is not sold as the dry-sauna result', lev.steamHonest);
+  check('the not-medical-advice line is on the protocols screen', lev.disclaimer);
+
   console.log('section navigation');
   const nav = await page.evaluate(() => {
     const out = {};
