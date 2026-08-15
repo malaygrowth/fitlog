@@ -335,6 +335,36 @@ function check(name, cond, detail) {
   check('onboarding stores age, sex and a fiber goal', audit.onboarding.length === 0, audit.onboarding);
   check('the exercise card leads with what to lift today', audit.cardLeads);
 
+  console.log('discoverability: can you actually find these screens');
+  const disc = await page.evaluate(() => {
+    go('today'); renderToday();
+    const html = document.querySelector('#tab-today').innerHTML;
+    const txt = document.querySelector('#tab-today').textContent;
+    // reachable straight from the dashboard, not buried behind a sheet
+    const supp = (html.match(/suppEditor\(\)/g) || []).length;
+    const proto = (html.match(/protocolsSheet\(\)/g) || []).length;
+    // and the labels say what they are
+    const labelled = /Stack & evidence/i.test(txt) && /What the research says/i.test(txt);
+    // the two screens link to each other
+    suppEditor();
+    const fromSupp = /protocolsSheet\(\)/.test(document.querySelector('#sheetIn').innerHTML);
+    closeSheet();
+    protocolsSheet();
+    const fromProto = /suppEditor\(\)/.test(document.querySelector('#sheetIn').innerHTML);
+    closeSheet();
+    // the old buried text link is gone
+    checklistSheet();
+    const checklistBtn = /suppEditor\(\)/.test(document.querySelector('#sheetIn').innerHTML);
+    const noTinyLink = !/>Edit list</.test(document.querySelector('#sheetIn').innerHTML);
+    closeSheet();
+    return { supp, proto, labelled, fromSupp, fromProto, checklistBtn, noTinyLink };
+  });
+  check('supplements reachable from the dashboard', disc.supp >= 2, disc.supp);
+  check('the protocols screen reachable from the dashboard', disc.proto >= 2, disc.proto);
+  check('both are labelled so you know what they are', disc.labelled);
+  check('the two screens link to each other', disc.fromSupp && disc.fromProto, disc);
+  check('the checklist offers a real button, not a tiny link', disc.checklistBtn && disc.noTinyLink, disc);
+
   console.log('logging speed and feel');
   const ux = await page.evaluate(() => {
     const g = {};
