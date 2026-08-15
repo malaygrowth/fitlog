@@ -185,6 +185,7 @@
   .prow:active{background:var(--raised)}
   .tline{display:flex; justify-content:space-between; gap:10px; padding:7px 0;
     border-bottom:1px solid var(--line)}
+  .setrow .idx.z{background:var(--wk); color:#191106; font-weight:800}
   .effrow{display:flex; align-items:center; gap:6px; padding:2px 0 9px 10px; white-space:nowrap}
   .effrow>.tiny{margin-right:auto}
   .eff{background:var(--raised); color:var(--ink2); border:0; border-radius:99px;
@@ -440,7 +441,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='1.5.0';
+const APP_VER='1.6.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -497,11 +498,11 @@ const SEED_QK=[
 function defaults(){
   return {
     settings:{name:'', unit:'kg', waterGoal:3000, calGoal:2600, proteinGoal:120, carbGoal:340, fatGoal:75,
-      rest:90, height:(PUB?'':'176'), goalWeight:(PUB?'':'68'), waterRemind:true, waterEvery:75, workoutRemind:'',
+      rest:90, fiberGoal:30, height:(PUB?'':'176'), goalWeight:(PUB?'':'68'), waterRemind:true, waterEvery:75, workoutRemind:'',
       sleepRemind:'22:30', sleepGoal:8, breathGoal:15, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
   };
 }
 let S;
@@ -963,12 +964,45 @@ function seedV20(){
   save();
 }
 
+/* v21: fiber, and the two facts the VO2max formulas need.
+   Past food entries store the name they were logged under, so match it back to
+   the database (allowing for the "2x " quantity prefix) and fill fiber in where
+   it resolves. Anything unmatched stays at zero rather than being guessed at. */
+function seedV21(){
+  if(S.seedV21) return; S.seedV21=true;
+  const st=S.settings;
+  if(st.fiberGoal===undefined) st.fiberGoal=30;
+  if(st.age===undefined) st.age=PUB?'':'31';
+  if(st.sex===undefined) st.sex=PUB?'':'m';
+  save();
+}
+/* The backfill needs FOODDB, which is declared far below the migration runner,
+   so it runs from boot instead. Its own flag keeps it single-shot. */
+function fiberBackfill(){
+  if(S.fiberBackfilled) return;
+  S.fiberBackfilled=true;
+  const byName={};
+  FOODDB.forEach(function(f){ byName[f[0]]=f[5]||0; });
+  (S.myFoods||[]).forEach(function(m){ if(m.fb===undefined) m.fb=0; });
+  Object.keys(S.food||{}).forEach(function(d){
+    ['b','l','d','s'].forEach(function(meal){
+      ((S.food[d]||{})[meal]||[]).forEach(function(e){
+        if(e.fb!==undefined) return;
+        const m=/^([\d.]+)×\s*(.+)$/.exec(e.name);
+        const qty=m? +m[1] : 1, nm=m? m[2] : e.name;
+        e.fb = byName[nm]!==undefined ? Math.round(byName[nm]*qty*10)/10 : 0;
+      });
+    });
+  });
+  save();
+}
+
 /* ============ migration runner ============
    Ordered and append-only — this list IS the execution order (it preserves
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
-const SCHEMA=20;
+const SCHEMA=21;
 /* Snapshot the store as it was BEFORE this build's migrations touch it, so a bad
    upgrade is recoverable instead of permanent. Written once per schema bump. */
 (function(){
@@ -980,7 +1014,7 @@ const SCHEMA=20;
   }catch(e){}
 })();
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
- seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20].forEach(function(step){ step(); });
+ seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20, seedV21].forEach(function(step){ step(); });
 S.schemaVersion=SCHEMA;
 
 /* ============ utils ============ */
@@ -1193,10 +1227,10 @@ const CD_BY_GROUP={
 /* ============ TODAY ============ */
 function waterToday(){ return S.water[today()]||0; }
 function foodTotals(date){
-  const day=S.food[date]||{}; let kcal=0,p=0,c=0,f=0;
+  const day=S.food[date]||{}; let kcal=0,p=0,c=0,f=0,fb=0;
   ['b','l','d','s'].forEach(function(m){ (day[m]||[]).forEach(function(e){
-    kcal+=+e.kcal||0; p+=+e.p||0; c+=+e.c||0; f+=+e.f||0; }); });
-  return {kcal:kcal,p:p,c:c,f:f};
+    kcal+=+e.kcal||0; p+=+e.p||0; c+=+e.c||0; f+=+e.f||0; fb+=+e.fb||0; }); });
+  return {kcal:kcal,p:p,c:c,f:f,fb:fb};
 }
 /* ============ coach ============ */
 /* tolerant of the old em-dash phase names still sitting in S.lastPhase */
@@ -1881,14 +1915,65 @@ function toggleSupp(id){
   save(); renderToday();
   if($('#sheet').classList.contains('on') && $('#sheetIn').textContent.indexOf('Daily checklist')>-1) checklistSheet();
 }
+/* ---------- what each supplement is for, and how good the evidence is.
+   Matched on name so it covers whatever you add yourself, not just the seeds.
+   Graded honestly rather than flattering the current stack. */
+const SUPP_INFO=[
+  [/creatine/i,'strong','Strength, lean mass and cognition. The best-evidenced supplement there is, and vegetarians respond more strongly because baseline muscle creatine sits lower.'],
+  [/whey|casein|protein/i,'strong','Hitting a daily protein target. Nothing magic beyond the protein itself, which is rather the point.'],
+  [/\bd3\b|vitamin d/i,'strong','Bone, immune and muscle function. Roughly 70-90% of Indians run low, so this is a real gap rather than insurance.'],
+  [/b12|cobalamin/i,'strong','Nerve function and red blood cells. Around 70% of Indian vegetarians are deficient and there is no reliable plant source, so this one is non-negotiable.'],
+  [/omega|epa|dha|fish oil|algal/i,'strong','Triglycerides and inflammation. Must be algal to be vegetarian: worth checking the bottle, since most omega-3 on the shelf is fish oil.'],
+  [/magnesium/i,'moderate','Sleep quality and cramps. Decent evidence when intake is low, thinner when it is not.'],
+  [/zinc/i,'moderate','Immune function and hormones when deficient. Vegetarian diets absorb less of it because of phytates.'],
+  [/calcium/i,'moderate','Bone density alongside D3 and K2. Worth it when dairy is low, less so on a dairy-heavy day.'],
+  [/\bk2\b|menaquinone/i,'moderate','Directs calcium to bone rather than arteries. Sensible paired with D3; standalone evidence is still developing.'],
+  [/theanine/i,'limited','Calm without sedation, usually paired with caffeine. Small short trials: harmless, but do not expect much.'],
+  [/iodine/i,'strong','Thyroid function, and a genuine vegetarian gap where iodised salt and dairy are low.'],
+  [/beta-?alanine/i,'strong','Buffers fatigue in efforts of one to four minutes, which is most of Hyrox. Vegetarians start lower on carnosine.'],
+  [/\biron\b|ferrous|ferritin/i,'test-first','Only after a ferritin test. Iron overload does real damage and is not something you feel early, so this is the one never to take blind.'],
+  [/nmn|nad|resveratrol|testosterone booster|longevity blend/i,'skip','Marketed hard, evidenced thinly: short trials on surrogate markers, nothing on the outcome you actually want.']
+];
+function suppInfo(name){
+  for(let i=0;i<SUPP_INFO.length;i++) if(SUPP_INFO[i][0].test(name||'')) return {tier:SUPP_INFO[i][1], why:SUPP_INFO[i][2]};
+  return null;
+}
+const TIER_LABEL={strong:'Strong evidence', moderate:'Moderate evidence', limited:'Limited evidence',
+  'test-first':'Test first', skip:'Not worth it'};
+function tierChip(t){
+  const c=t==='strong'?'var(--good)':t==='moderate'?'var(--wk)':t==='skip'?'var(--bad)':'var(--ink3)';
+  return '<span class="tiny" style="color:'+c+'; font-weight:800; letter-spacing:.04em; text-transform:uppercase">'+TIER_LABEL[t]+'</span>';
+}
+const SUPP_GAPS=[
+  ['Iodine','strong','Thyroid function, and a genuine vegetarian gap if you are not on iodised salt.'],
+  ['Beta-alanine','strong','Buffers the one-to-four-minute efforts Hyrox is built from. Vegetarians start lower on carnosine.'],
+  ['Iron','test-first','Get ferritin tested before touching it. Never supplement iron blind.']
+];
 function suppEditor(){
   openSheet('<h3>Supplements</h3>'+
     (S.supps.length? S.supps.map(function(sp){
-      return '<div class="listrow"><span class="small">'+esc(sp.name)+
+      const inf=suppInfo(sp.name);
+      return '<div style="border-bottom:1px solid var(--line); padding:10px 0">'+
+        '<div class="spread"><span class="small"><b>'+esc(sp.name)+'</b>'+
         (sp.p?' <span class="tiny muted num">· '+sp.kcal+' kcal / '+sp.p+'g P</span>':'')+
         (sp.logFood?' <span class="tiny muted">→ food log</span>':'')+'</span>'+
-        '<button class="btn ghost sm danger" onclick="delSupp(\''+sp.id+'\')">✕</button></div>';
+        '<button class="btn ghost sm danger" onclick="delSupp(\''+sp.id+'\')">✕</button></div>'+
+        (inf? '<div style="margin-top:3px">'+tierChip(inf.tier)+
+          '<div class="tiny muted" style="line-height:1.55; margin-top:2px">'+inf.why+'</div></div>' : '')+
+        '</div>';
     }).join('') : '<p class="tiny muted">Nothing yet.</p>')+
+    '<h3 style="margin-top:20px; font-size:15px">Worth considering</h3>'+
+    '<p class="tiny muted" style="margin:-8px 0 10px">Gaps for a vegetarian training hard. Not prescriptions.</p>'+
+    SUPP_GAPS.map(function(g){
+      return '<div style="border-bottom:1px solid var(--line); padding:9px 0">'+
+        '<b class="small">'+g[0]+'</b> '+tierChip(g[1])+
+        '<div class="tiny muted" style="line-height:1.55; margin-top:2px">'+g[2]+'</div></div>';
+    }).join('')+
+    '<div style="border-bottom:1px solid var(--line); padding:9px 0">'+
+      '<b class="small">NMN, resveratrol, testosterone boosters, longevity blends</b> '+tierChip('skip')+
+      '<div class="tiny muted" style="line-height:1.55; margin-top:2px">Heavily marketed, thinly evidenced. If the label says "supports" or "promotes", that is the tell.</div></div>'+
+    '<p class="tiny muted" style="margin:14px 0 4px; line-height:1.6">Tiers reflect published human research, not a doctor who knows you. '+
+    'This is not medical advice, and a blood test beats guessing for anything you are unsure about.</p>'+
     '<div class="field" style="margin-top:14px"><label for="spName">New supplement</label><input id="spName" placeholder="e.g. Vitamin D, Omega-3, Whey"></div>'+
     '<div class="fields3">'+
     '<div class="field"><label for="spK">kcal</label><input id="spK" type="number" inputmode="numeric" placeholder="0"></div>'+
@@ -2580,6 +2665,7 @@ function workoutNav(){
   items.slice(1).forEach(function(it){
     h+='<button class="chip'+(WV===it[0]?' on':'')+'" onclick="goWV(\''+it[0]+'\')">'+it[1]+'</button>';
   });
+  h+='<button class="chip'+(WV==='cardio'?' on':'')+'" onclick="goWV(\'cardio\')">Cardio</button>';
   return h+'<button class="chip" onclick="planEditor()">Plan</button></div>';
 }
 function goWV(v, anchor){
@@ -2596,6 +2682,7 @@ function renderWorkout(){
   if(WV==='history'){ el.innerHTML=nav+historyHTML(); return; }
   if(WV==='routine'){ el.innerHTML=routineHTML(); return; }
   if(WV==='progress'){ el.innerHTML=nav+progressHTML(); return; }
+  if(WV==='cardio'){ el.innerHTML=nav+cardioHTML(); return; }
   /* home */
   const planRt=todaysPlanRoutine();
   const trainedToday=S.sessions.some(function(s){return s.date===today();});
@@ -2713,6 +2800,107 @@ function heatCalHTML(){
   h+='</div><div class="spread tiny muted" style="margin-top:8px"><span>'+fmtD(dShift(mon,-7*15))+'</span><span>break = blue · deeper amber = bigger day</span></div>';
   return h;
 }
+/* ---------- cardio fitness ----------
+   VO2max is the metric most strongly associated with all-cause mortality, and
+   neither field test needs a lab: Cooper correlates with lab testing at about
+   r=0.90, Rockport is submaximal and kinder to a rebuilding knee. Both need age
+   and sex, which is why settings now carry them. */
+function vo2Cooper(metres){
+  if(!metres) return null;
+  return Math.round((0.0225*metres - 11.3)*10)/10;
+}
+function vo2Rockport(kg, age, sexM, minutes, hr){
+  if(!kg||!age||!minutes||!hr) return null;
+  const lb=kg*2.20462;
+  return Math.round((132.853 - 0.0769*lb - 0.3877*age + 6.315*(sexM?1:0) - 3.2649*minutes - 0.1565*hr)*10)/10;
+}
+/* ACSM-style bands: percentiles, not diagnoses */
+const VO2_BANDS={
+  m:[[29,[38,44,51,56]],[39,[36,42,49,54]],[49,[33,39,45,50]],[59,[30,36,42,46]],[200,[27,33,38,43]]],
+  f:[[29,[31,36,42,47]],[39,[29,34,40,45]],[49,[27,32,37,42]],[59,[24,29,34,39]],[200,[22,27,32,37]]]
+};
+function vo2Band(v, age, sex){
+  const rows=VO2_BANDS[sex==='f'?'f':'m'];
+  let cut=rows[rows.length-1][1];
+  for(let i=0;i<rows.length;i++) if(age<=rows[i][0]){ cut=rows[i][1]; break; }
+  if(v<cut[0]) return {label:'Below average', ok:false};
+  if(v<cut[1]) return {label:'Fair', ok:false};
+  if(v<cut[2]) return {label:'Good', ok:true};
+  if(v<cut[3]) return {label:'Very good', ok:true};
+  return {label:'Excellent', ok:true};
+}
+function lastVo2(){ const l=(S.vo2||[]); return l.length? l[l.length-1] : null; }
+/* Zone 2 is conversational pace: only sets flagged as such count. */
+function zone2Mins(days){
+  const from=dShift(today(), -(days||7));
+  let m=0;
+  (S.sessions||[]).forEach(function(s){
+    if(s.date<=from) return;
+    s.ex.forEach(function(e){
+      if(exGroupOf(e.exId)!=='Cardio') return;
+      e.sets.forEach(function(t){ if(t.z) m+=+t.r||0; });
+    });
+  });
+  return Math.round(m);
+}
+function cardioHTML(){
+  const st=S.settings, last=lastVo2();
+  let h='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Cardio fitness</h2>';
+  if(!st.age || !st.sex){
+    h+='<div class="empty">VO2max needs your age and sex to mean anything. Add them in Settings and this fills in.</div>'+
+      '<button class="btn wide" style="margin-top:12px" onclick="openSettings()">Open Settings</button>';
+  } else if(!last){
+    h+='<div class="empty">No estimate yet. The walk test is submaximal and the safer place to start.</div>';
+  } else {
+    const band=vo2Band(last.val, +st.age, st.sex);
+    h+='<div class="row" style="align-items:baseline; gap:10px; margin-bottom:2px">'+
+      '<span class="num" style="font-size:40px; font-family:var(--fd-disp); font-weight:700">'+last.val+'</span>'+
+      '<span class="small" style="color:'+(band.ok?'var(--good)':'var(--wk)')+'; font-weight:700">'+esc(band.label)+'</span></div>'+
+      '<div class="tiny muted" style="margin-bottom:12px">ml/kg/min · '+esc(last.method)+', '+fmtD(last.date)+
+      ' · banded for '+st.age+(st.sex==='f'?'F':'M')+'. A field estimate, not a lab measurement.</div>';
+    if((S.vo2||[]).length>1) h+=weightChart(S.vo2.map(function(v){ return {date:v.date, kg:v.val}; }), 'vo2');
+  }
+  h+='<div class="row" style="gap:8px; margin-top:10px">'+
+    '<button class="btn grow" onclick="vo2Form(\'rockport\')">Walk test</button>'+
+    '<button class="btn grow" onclick="vo2Form(\'cooper\')">Run test</button></div></div>';
+  const z=zone2Mins(7), lo=150, hi=300;
+  h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Zone 2 this week</h2>'+
+    '<div class="row" style="align-items:baseline; gap:8px"><span class="num" style="font-size:34px; font-family:var(--fd-disp); font-weight:700">'+z+'</span>'+
+    '<span class="small muted">of '+lo+'-'+hi+' min</span></div>'+
+    '<div class="bar" style="margin:8px 0 6px"><i style="width:'+Math.min(100,z/lo*100)+'%; background:var(--wk)"></i></div>'+
+    '<p class="tiny muted" style="line-height:1.6">Conversational pace: working, but able to hold a sentence. '+
+    'Tap Z on a cardio set to count it. Sessions of 45 minutes or more drive the adaptation best, shorter ones still maintain it.</p></div>';
+  return h;
+}
+function vo2Form(kind){
+  const st=S.settings, cooper=(kind==='cooper');
+  openSheet('<h3>'+(cooper?'Cooper 12-minute run':'Rockport 1-mile walk')+'</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">'+(cooper
+      ? 'Run as far as you can in exactly 12 minutes on a flat course, then enter the distance. Hard effort, so only when the knee is happy.'
+      : 'Walk one mile (1.61 km) as fast as you comfortably can, then enter your time and the heart rate you finish on.')+'</p>'+
+    (cooper
+      ? '<div class="field"><label for="v2d">Distance covered (metres)</label><input id="v2d" type="number" inputmode="numeric" placeholder="2400"></div>'
+      : '<div class="fields2"><div class="field"><label for="v2t">Time (minutes)</label><input id="v2t" type="number" inputmode="decimal" step="0.1" placeholder="13.5"></div>'+
+        '<div class="field"><label for="v2h">Finishing heart rate</label><input id="v2h" type="number" inputmode="numeric" placeholder="130"></div></div>')+
+    '<button class="btn primary wide" onclick="vo2Save(\''+kind+'\')">Save estimate</button>'+
+    '<p class="tiny muted" style="margin-top:12px">Uses your age ('+(st.age||'not set')+') and your latest weigh-in. Stop if anything hurts: an estimate is not worth an injury.</p>');
+}
+function vo2Save(kind){
+  const st=S.settings;
+  if(!st.age||!st.sex){ toast('Add age and sex in Settings first'); return; }
+  const ws=(S.weights||[]), kg=ws.length? +ws[ws.length-1].kg : null;
+  let val=null;
+  if(kind==='cooper') val=vo2Cooper(+$('#v2d').value||0);
+  else {
+    if(!kg){ toast('Log a weigh-in first, the walk test needs your weight'); return; }
+    val=vo2Rockport(kg, +st.age, st.sex!=='f', +$('#v2t').value||0, +$('#v2h').value||0);
+  }
+  if(!val || val<10 || val>90){ toast('Those numbers do not look right, check them'); return; }
+  S.vo2=(S.vo2||[]).concat([{date:today(), val:val, method:kind==='cooper'?'Cooper run':'Rockport walk'}]);
+  S.vo2.sort(function(a,b){ return a.date<b.date?-1:1; });
+  save(); closeSheet(); renderWorkout();
+  toast('VO2max '+val+': '+vo2Band(val, +st.age, st.sex).label);
+}
 function progressHTML(){
   let h='';
   /* consistency heat map */
@@ -2812,7 +3000,12 @@ function sessionHTML(){
     h+='<div class="sethead"><span>Set</span><span></span><span style="text-align:center">'+c1+'</span><span style="text-align:center">'+c2+'</span><span></span></div>';
     e.sets.forEach(function(st,si){
       const ph=pa && pa[si] ? pa[si] : null;
-      h+='<div class="setrow'+(st.done?' done':'')+(st.wu?' wu':'')+'"><button class="idx'+(st.wu?' wu':'')+'" onclick="toggleWU('+ei+','+si+')" aria-label="toggle warm-up set">'+(st.wu?'W':(si+1))+'</button><span class="prev"></span>'+
+      const cardioSet=(grp==='Cardio');
+      h+='<div class="setrow'+(st.done?' done':'')+(st.wu?' wu':'')+'">'+
+        (cardioSet
+          ? '<button class="idx'+(st.z?' z':'')+'" onclick="toggleZ2('+ei+','+si+')" aria-label="mark as zone 2, conversational pace" title="Zone 2">'+(st.z?'Z':(si+1))+'</button>'
+          : '<button class="idx'+(st.wu?' wu':'')+'" onclick="toggleWU('+ei+','+si+')" aria-label="toggle warm-up set">'+(st.wu?'W':(si+1))+'</button>')+
+        '<span class="prev"></span>'+
         (tmd
         ? '<input type="number" inputmode="numeric" value="'+esc(st.r)+'" placeholder="'+(ph?esc(ph.r):'0')+'" onchange="setVal('+ei+','+si+',\'r\',this.value)">'+
           '<button class="btn sm" style="min-height:46px; font-size:15px" onclick="holdStart('+ei+','+si+')" aria-label="start hold timer">▶</button>'
@@ -2839,8 +3032,13 @@ function sessionHTML(){
       '<li>Finish: 5 slow nasal breaths, recovery starts now</li></ul></details>';
   }
   h+='<button class="btn primary wide" style="margin-top:10px" onclick="finishSession()">Finish workout</button>'+
-     '<div class="tiny muted" style="text-align:center; margin-top:10px">Tick an empty set to auto-fill last time’s numbers · tap the set number for warm-up (W)</div>';
+     '<div class="tiny muted" style="text-align:center; margin-top:10px">Tick an empty set to auto-fill last time’s numbers · tap the set number for warm-up (W), or Z on cardio for zone 2</div>';
   return h;
+}
+function toggleZ2(ei,si){
+  const st=S.active.ex[ei].sets[si];
+  st.z=!st.z; if(!st.z) delete st.z;
+  delete st.plan; save(); renderWorkout();
 }
 function setVal(ei,si,k,v){ const st=S.active.ex[ei].sets[si]; st[k]=v; delete st.plan; save(); }
 function setEffort(ei,si,val){
@@ -3463,132 +3661,133 @@ function hiReset(){ clearInterval(hi.int); hi={run:false,phase:'ready',round:0,e
 
 /* ============ FOOD ============ */
 /* Indian vegetarian food database — [name, kcal, protein, carbs, fat] per stated unit */
+/* [name, kcal, protein, carbs, fat, fiber] — all grams, per the serving named */
 const FOODDB=[
 /* dry fruits & nuts — per piece, because that's how they're eaten */
-['Almond (1 piece)',7,0.3,0.2,0.6],['Cashew (1 piece)',9,0.3,0.5,0.7],['Raisin (1 piece)',2,0,0.5,0],
-['Walnut (1 half)',13,0.3,0.3,1.3],['Pistachio (1 piece)',4,0.2,0.2,0.3],['Date / khajur (1)',23,0.2,6,0],
-['Dried fig / anjeer (1)',10,0.1,2.5,0],['Dried apricot (1)',17,0.2,4,0],
-['Mixed dry fruits (small handful, 25g)',140,4,8,11],['Makhana ghee-roasted (bowl, 30g)',150,3.5,20,6],
-['Coconut dry (1 tbsp grated)',35,0.3,1.5,3],['Peanut chikki (1 small, 20g)',100,3,12,5],
+['Almond (1 piece)',7,0.3,0.2,0.6,0.2],['Cashew (1 piece)',9,0.3,0.5,0.7,0.1],['Raisin (1 piece)',2,0,0.5,0,0],
+['Walnut (1 half)',13,0.3,0.3,1.3,0.2],['Pistachio (1 piece)',4,0.2,0.2,0.3,0.1],['Date / khajur (1)',23,0.2,6,0,1.6],
+['Dried fig / anjeer (1)',10,0.1,2.5,0,1.5],['Dried apricot (1)',17,0.2,4,0,0.6],
+['Mixed dry fruits (small handful, 25g)',140,4,8,11,2.5],['Makhana ghee-roasted (bowl, 30g)',150,3.5,20,6,1.5],
+['Coconut dry (1 tbsp grated)',35,0.3,1.5,3,1.5],['Peanut chikki (1 small, 20g)',100,3,12,5,1],
 /* breakfast */
-['Poha (1 plate)',250,5,45,7],['Upma (1 bowl)',230,6,35,8],['Idli (1)',40,1.5,8,0.2],
-['Plain dosa (1)',130,3,20,4],['Masala dosa (1)',250,5,35,10],['Besan chilla (1)',130,6,12,6],
-['Plain paratha with ghee (1)',200,4,28,8],['Aloo paratha (1)',250,5,35,10],['Thepla (1)',120,3,17,5],
-['Bread slice (1)',70,2.5,13,1],['Bread + butter (1 slice)',115,2.5,13,6],['Daliya (bowl)',180,5,30,4],
-['Cornflakes + milk (bowl)',200,6,35,4],['Sprouts chaat (bowl)',130,9,18,1.5],['Sabudana khichdi (bowl)',300,3,50,10],
+['Poha (1 plate)',250,5,45,7,2],['Upma (1 bowl)',230,6,35,8,3],['Idli (1)',40,1.5,8,0.2,0.8],
+['Plain dosa (1)',130,3,20,4,1.5],['Masala dosa (1)',250,5,35,10,3],['Besan chilla (1)',130,6,12,6,3],
+['Plain paratha with ghee (1)',200,4,28,8,3],['Aloo paratha (1)',250,5,35,10,4],['Thepla (1)',120,3,17,5,3],
+['Bread slice (1)',70,2.5,13,1,1],['Bread + butter (1 slice)',115,2.5,13,6,1],['Daliya (bowl)',180,5,30,4,5],
+['Cornflakes + milk (bowl)',200,6,35,4,1.5],['Sprouts chaat (bowl)',130,9,18,1.5,6],['Sabudana khichdi (bowl)',300,3,50,10,1],
 /* rotis & rice */
-['Atta roti / chapati with ghee (1)',100,3,15,3],['Atta roti / phulka, no ghee (1)',80,3,15,0.5],
-['Bajra roti (1)',120,3.5,22,1.5],['Missi roti (1)',130,5,20,3],
-['Tandoori roti (1)',120,4,24,1],['Butter naan (1)',260,6,40,8],
-['Steamed rice (bowl)',200,4,44,1],['Jeera rice (bowl)',250,4,45,6],
-['Veg pulao (bowl)',280,6,45,8],['Khichdi (bowl)',220,8,35,5],['Curd rice (bowl)',240,7,38,7],
+['Atta roti / chapati with ghee (1)',100,3,15,3,3],['Atta roti / phulka, no ghee (1)',80,3,15,0.5,3],
+['Bajra roti (1)',120,3.5,22,1.5,4.5],['Missi roti (1)',130,5,20,3,4],
+['Tandoori roti (1)',120,4,24,1,2.5],['Butter naan (1)',260,6,40,8,1.5],
+['Steamed rice (bowl)',200,4,44,1,0.6],['Jeera rice (bowl)',250,4,45,6,0.8],
+['Veg pulao (bowl)',280,6,45,8,2.5],['Khichdi (bowl)',220,8,35,5,4],['Curd rice (bowl)',240,7,38,7,1],
 /* everyday basics */
-['Dal tadka (bowl)',150,9,22,3],['Moong dal boiled (bowl)',150,10,25,1],
-['Milk full-fat (250ml)',150,8,12,8],['Curd / dahi (bowl, 200g)',120,7,9,6],['Hung curd (150g)',130,15,6,5],
-['Paneer raw (100g)',265,18,4,20],['Peanut butter (1 tbsp)',95,4,3,8],['Banana (1)',105,1,27,0],
-['Oats with milk (bowl)',330,14,45,9],
+['Dal tadka (bowl)',150,9,22,3,8],['Moong dal boiled (bowl)',150,10,25,1,8],
+['Milk full-fat (250ml)',150,8,12,8,0],['Curd / dahi (bowl, 200g)',120,7,9,6,0],['Hung curd (150g)',130,15,6,5,0],
+['Paneer raw (100g)',265,18,4,20,0],['Peanut butter (1 tbsp)',95,4,3,8,1],['Banana (1)',105,1,27,0,3],
+['Oats with milk (bowl)',330,14,45,9,4],
 /* dals, sabzis & curries */
-['Dal makhani (bowl)',280,10,25,15],['Kadhi (bowl)',160,6,12,9],['Gatte ki sabzi (bowl)',250,8,20,15],
-['Ker sangri (bowl)',180,4,15,12],['Sev tamatar (bowl)',220,5,15,15],['Aloo sabzi (bowl)',150,3,20,7],
-['Bhindi sabzi (bowl)',120,2,10,8],['Mixed veg / gobi sabzi (bowl)',130,3,12,8],['Baingan bharta (bowl)',140,3,12,9],
-['Palak paneer (bowl)',240,12,10,17],['Paneer butter masala (bowl)',350,14,15,26],['Shahi paneer (bowl)',330,13,16,24],
-['Matar paneer (bowl)',280,12,18,18],['Paneer bhurji (bowl)',280,15,8,21],
-['Kaju paneer bhurji (bowl)',350,16,12,26],['Kaju curry / kaju masala (bowl)',380,9,18,30],
-['Malai kofta (bowl)',400,9,25,30],['Aloo gobi (bowl)',150,3,18,7],['Aloo matar (bowl)',160,5,20,7],
-['Jeera aloo (bowl)',160,3,20,8],['Dum aloo (bowl)',220,4,25,12],['Lauki sabzi (bowl)',90,2,10,5],
-['Karela sabzi (bowl)',110,2,10,7],['Tinda sabzi (bowl)',90,2,10,5],['Mushroom matar (bowl)',180,6,12,12],['Dal baati with ghee (1 baati)',250,6,35,10],['Churma (small bowl)',350,5,45,17],
-['Papad roasted (1)',40,2,7,0.3],['Papad fried (1)',80,2,7,4.5],['Salad: kheera/tamatar/pyaaz (plate)',40,2,8,0],
-['Ghee (1 tsp)',45,0,0,5],['Butter (1 tsp)',35,0,0,4],['Boiled potato (1 medium)',90,2,21,0],
+['Dal makhani (bowl)',280,10,25,15,9],['Kadhi (bowl)',160,6,12,9,2],['Gatte ki sabzi (bowl)',250,8,20,15,4],
+['Ker sangri (bowl)',180,4,15,12,6],['Sev tamatar (bowl)',220,5,15,15,3],['Aloo sabzi (bowl)',150,3,20,7,4.5],
+['Bhindi sabzi (bowl)',120,2,10,8,4.5],['Mixed veg / gobi sabzi (bowl)',130,3,12,8,4.5],['Baingan bharta (bowl)',140,3,12,9,4.5],
+['Palak paneer (bowl)',240,12,10,17,1],['Paneer butter masala (bowl)',350,14,15,26,1],['Shahi paneer (bowl)',330,13,16,24,1],
+['Matar paneer (bowl)',280,12,18,18,1],['Paneer bhurji (bowl)',280,15,8,21,1],
+['Kaju paneer bhurji (bowl)',350,16,12,26,1],['Kaju curry / kaju masala (bowl)',380,9,18,30,2],
+['Malai kofta (bowl)',400,9,25,30,3],['Aloo gobi (bowl)',150,3,18,7,4.5],['Aloo matar (bowl)',160,5,20,7,4.5],
+['Jeera aloo (bowl)',160,3,20,8,3],['Dum aloo (bowl)',220,4,25,12,3],['Lauki sabzi (bowl)',90,2,10,5,4.5],
+['Karela sabzi (bowl)',110,2,10,7,4.5],['Tinda sabzi (bowl)',90,2,10,5,4.5],['Mushroom matar (bowl)',180,6,12,12,4.5],['Dal baati with ghee (1 baati)',250,6,35,10,3],['Churma (small bowl)',350,5,45,17,2],
+['Papad roasted (1)',40,2,7,0.3,1],['Papad fried (1)',80,2,7,4.5,1],['Salad: kheera/tamatar/pyaaz (plate)',40,2,8,0,3],
+['Ghee (1 tsp)',45,0,0,5,0],['Butter (1 tsp)',35,0,0,4,0],['Boiled potato (1 medium)',90,2,21,0,2],
 /* snacks — Jaipur specials included */
-['Samosa (1)',260,4,30,14],['Pyaaz kachori (1)',300,5,30,18],['Dal kachori (1)',250,4,25,15],
-['Mirchi vada (1)',220,4,22,13],['Bhujia / namkeen (small bowl, 30g)',160,5,15,10],['Mathri (1)',90,1.5,10,5],
-['Dhokla (2 pieces)',120,4,20,3],['Pakora (4–5 pieces)',200,5,18,12],['Pav bhaji (plate)',400,10,55,15],
-['Papdi chaat (plate)',350,7,40,18],['Vada pav (1)',300,6,40,13],['Parle-G / Marie (2 biscuits)',55,1,10,1.5],
-['Rusk (1)',45,1,8,1],['Roasted chana (handful, 30g)',110,6,18,2],
+['Samosa (1)',260,4,30,14,2.5],['Pyaaz kachori (1)',300,5,30,18,2.5],['Dal kachori (1)',250,4,25,15,7],
+['Mirchi vada (1)',220,4,22,13,1.5],['Bhujia / namkeen (small bowl, 30g)',160,5,15,10,1.5],['Mathri (1)',90,1.5,10,5,0.5],
+['Dhokla (2 pieces)',120,4,20,3,2],['Pakora (4–5 pieces)',200,5,18,12,2.5],['Pav bhaji (plate)',400,10,55,15,2.5],
+['Papdi chaat (plate)',350,7,40,18,2.5],['Vada pav (1)',300,6,40,13,2.5],['Parle-G / Marie (2 biscuits)',55,1,10,1.5,0.4],
+['Rusk (1)',45,1,8,1,0.4],['Roasted chana (handful, 30g)',110,6,18,2,7],
 /* sweets */
-['Besan ladoo (1)',180,4,20,10],['Motichoor ladoo (1)',150,2,22,6],['Gulab jamun (1)',150,2,20,7],
-['Jalebi (2 pieces, 40g)',150,1,25,5],['Ghewar (1 slice, 50g)',220,3,28,11],['Barfi (1 piece)',120,3,15,6],
-['Rasgulla (1)',106,2,25,0.5],['Kheer (bowl)',250,7,35,9],['Sooji halwa (bowl)',300,4,40,14],
-['Gajar halwa (bowl)',280,5,35,13],['Dark chocolate (2 squares)',110,1,10,7],
-['Gond ke laddu (1)',220,4,22,13],['Atte ka laddu / pinni (1)',180,3,20,10],['Til laddu (1)',120,3,12,7],
-['Moong dal halwa (bowl)',400,8,40,24],['Mawa kachori (1)',350,5,40,18],['Rabri (bowl)',300,8,30,17],
-['Malpua (1)',220,3,30,10],['Shrikhand (bowl)',250,6,35,9],['Imarti (1)',130,1,22,4],
-['Kulfi (1)',200,5,22,11],['Ice cream (1 scoop)',140,2,17,7],['Aam ras (bowl)',180,1,45,0.5],
+['Besan ladoo (1)',180,4,20,10,1],['Motichoor ladoo (1)',150,2,22,6,1],['Gulab jamun (1)',150,2,20,7,1],
+['Jalebi (2 pieces, 40g)',150,1,25,5,1],['Ghewar (1 slice, 50g)',220,3,28,11,1],['Barfi (1 piece)',120,3,15,6,1],
+['Rasgulla (1)',106,2,25,0.5,1],['Kheer (bowl)',250,7,35,9,1],['Sooji halwa (bowl)',300,4,40,14,1],
+['Gajar halwa (bowl)',280,5,35,13,1],['Dark chocolate (2 squares)',110,1,10,7,1],
+['Gond ke laddu (1)',220,4,22,13,1.5],['Atte ka laddu / pinni (1)',180,3,20,10,2],['Til laddu (1)',120,3,12,7,1.5],
+['Moong dal halwa (bowl)',400,8,40,24,7],['Mawa kachori (1)',350,5,40,18,2.5],['Rabri (bowl)',300,8,30,17,1],
+['Malpua (1)',220,3,30,10,1],['Shrikhand (bowl)',250,6,35,9,1],['Imarti (1)',130,1,22,4,1],
+['Kulfi (1)',200,5,22,11,1],['Ice cream (1 scoop)',140,2,17,7,1],['Aam ras (bowl)',180,1,45,0.5,2],
 /* more local & street */
-['Panchmel dal (bowl)',180,10,25,4],['Bajre ki khichdi (bowl)',250,6,40,7],['Papad ki sabzi (bowl)',150,4,12,10],
-['Haldi ki sabzi (bowl)',200,4,10,17],['Gawar phali sabzi (bowl)',110,4,12,6],['Methi sabzi (bowl)',120,4,10,8],
-['Chana dal (bowl)',160,9,24,3],['Sambar (bowl)',130,6,20,3],['Raita (bowl)',90,3,8,5],
-['Boondi raita (bowl)',150,4,14,9],['Dahi vada (2)',220,7,25,10],['Poori (1)',120,2,15,6],
-['Chole bhature (plate)',650,14,75,30],['Bhutta / roasted corn (1)',120,4,25,2],
-['Maggi (1 pack, cooked)',350,7,50,14],['Veg fried rice (bowl)',300,6,45,10],['Veg noodles / chowmein (bowl)',320,7,45,12],
-['Veg sandwich (2 slices)',250,8,35,8],['Pizza (1 slice)',250,9,30,10],['Veg burger (1)',350,9,45,14],
+['Panchmel dal (bowl)',180,10,25,4,8],['Bajre ki khichdi (bowl)',250,6,40,7,1.5],['Papad ki sabzi (bowl)',150,4,12,10,4.5],
+['Haldi ki sabzi (bowl)',200,4,10,17,4.5],['Gawar phali sabzi (bowl)',110,4,12,6,4.5],['Methi sabzi (bowl)',120,4,10,8,4.5],
+['Chana dal (bowl)',160,9,24,3,9],['Sambar (bowl)',130,6,20,3,4],['Raita (bowl)',90,3,8,5,0.5],
+['Boondi raita (bowl)',150,4,14,9,0.5],['Dahi vada (2)',220,7,25,10,1],['Poori (1)',120,2,15,6,1],
+['Chole bhature (plate)',650,14,75,30,7],['Bhutta / roasted corn (1)',120,4,25,2,4],
+['Maggi (1 pack, cooked)',350,7,50,14,2.5],['Veg fried rice (bowl)',300,6,45,10,1.5],['Veg noodles / chowmein (bowl)',320,7,45,12,4.5],
+['Veg sandwich (2 slices)',250,8,35,8,4.5],['Pizza (1 slice)',250,9,30,10,2.5],['Veg burger (1)',350,9,45,14,4.5],
 /* street & junk */
-['Veg momos steamed (6)',200,6,30,5],['Veg momos fried (6)',300,6,32,15],['Momos red chutney (2 tbsp)',40,0.5,4,2.5],
-['Spring roll (2)',220,4,26,11],['Veg manchurian (bowl)',280,6,30,15],['Chilli paneer (bowl)',320,14,20,20],
-['Honey chilli potato (bowl)',350,3,45,18],['Pani puri / golgappa (6)',180,3,30,5],['Bhel puri (plate)',220,5,35,7],
-['Sev puri (6 pcs)',250,5,30,12],['Aloo tikki chaat (plate)',300,5,35,15],['French fries (medium)',340,4,44,16],
-['Garlic bread (2 slices)',200,5,24,9],['White sauce pasta (bowl)',400,10,45,18],['Red sauce pasta (bowl)',320,8,45,10],
-['Kathi roll / frankie (1)',300,8,40,12],['Grilled cheese sandwich (1)',300,10,30,15],['Cheese slice (1)',60,3,1,5],
-['Nachos with cheese (plate)',350,7,38,18],['Mayo dip (1 tbsp)',90,0,1,10],
-['Cold coffee with ice cream (glass)',250,6,35,9],['Milkshake (glass)',280,7,40,10],
+['Veg momos steamed (6)',200,6,30,5,4.5],['Veg momos fried (6)',300,6,32,15,4.5],['Momos red chutney (2 tbsp)',40,0.5,4,2.5,2.5],
+['Spring roll (2)',220,4,26,11,2.5],['Veg manchurian (bowl)',280,6,30,15,4.5],['Chilli paneer (bowl)',320,14,20,20,1],
+['Honey chilli potato (bowl)',350,3,45,18,3],['Pani puri / golgappa (6)',180,3,30,5,2.5],['Bhel puri (plate)',220,5,35,7,2.5],
+['Sev puri (6 pcs)',250,5,30,12,2.5],['Aloo tikki chaat (plate)',300,5,35,15,3],['French fries (medium)',340,4,44,16,4],
+['Garlic bread (2 slices)',200,5,24,9,2.5],['White sauce pasta (bowl)',400,10,45,18,2.5],['Red sauce pasta (bowl)',320,8,45,10,2.5],
+['Kathi roll / frankie (1)',300,8,40,12,2.5],['Grilled cheese sandwich (1)',300,10,30,15,2.5],['Cheese slice (1)',60,3,1,5,0],
+['Nachos with cheese (plate)',350,7,38,18,3],['Mayo dip (1 tbsp)',90,0,1,10,0],
+['Cold coffee with ice cream (glass)',250,6,35,9,1],['Milkshake (glass)',280,7,40,10,1],
 /* chocolates & sweet impulses */
-['Dairy Milk small (25g)',130,2,15,7],['5 Star (22g)',100,1,14,4.5],['KitKat 2-finger',105,1.5,13,5.5],
-['Ferrero Rocher (1)',73,1,6,5],['Chocolate spread (1 tbsp)',100,1,11,6],['Toffee / eclair (1)',25,0,5,0.5],
-['Chocolate pastry (1)',300,4,35,16],['Brownie (1)',330,4,40,17],['Donut (1)',250,3,30,13],
+['Dairy Milk small (25g)',130,2,15,7,1],['5 Star (22g)',100,1,14,4.5,0.3],['KitKat 2-finger',105,1.5,13,5.5,0.4],
+['Ferrero Rocher (1)',73,1,6,5,0.6],['Chocolate spread (1 tbsp)',100,1,11,6,1],['Toffee / eclair (1)',25,0,5,0.5,0],
+['Chocolate pastry (1)',300,4,35,16,1],['Brownie (1)',330,4,40,17,1],['Donut (1)',250,3,30,13,1.5],
 /* juice-shop shakes */
-['Kaju shake (glass)',350,9,40,17],['Anjeer shake (glass)',320,8,45,12],['Badam shake (glass)',300,9,35,13],
-['Banana shake (glass)',280,8,45,7],['Mango shake (glass)',300,7,50,8],['Chikoo shake (glass)',290,7,48,8],
-['Sitafal shake (glass)',320,7,52,9],['Dry fruit special shake (glass)',380,10,45,17],
-['Oreo shake (glass)',400,7,55,16],['Cold cocoa (glass)',350,9,45,14],['Rooh Afza milk (glass)',220,6,35,6],
-['Sattu drink (glass)',180,8,30,3],
+['Kaju shake (glass)',350,9,40,17,1],['Anjeer shake (glass)',320,8,45,12,1],['Badam shake (glass)',300,9,35,13,1],
+['Banana shake (glass)',280,8,45,7,1],['Mango shake (glass)',300,7,50,8,1],['Chikoo shake (glass)',290,7,48,8,1],
+['Sitafal shake (glass)',320,7,52,9,1],['Dry fruit special shake (glass)',380,10,45,17,1],
+['Oreo shake (glass)',400,7,55,16,0.4],['Cold cocoa (glass)',350,9,45,14,0.5],['Rooh Afza milk (glass)',220,6,35,6,1],
+['Sattu drink (glass)',180,8,30,3,4],
 /* ice cream & biscuits */
-['Softy cone (1)',160,3,25,5],['Choco bar (1)',180,2,18,11],['Cassata slice (1)',250,4,30,12],
-['Bourbon / Hide&Seek (2)',100,1,14,4.5],['Good Day (2)',90,1,12,4],['Cream biscuit (2)',130,1,18,6],
+['Softy cone (1)',160,3,25,5,1],['Choco bar (1)',180,2,18,11,1],['Cassata slice (1)',250,4,30,12,1],
+['Bourbon / Hide&Seek (2)',100,1,14,4.5,0.4],['Good Day (2)',90,1,12,4,0.4],['Cream biscuit (2)',130,1,18,6,0.4],
 /* plate components — log the parts when the whole dish doesn't match */
-['Paneer cubes (1 piece, ~15g)',40,2.7,0.3,3.2],['Paneer raw (50g)',132,9,1,10.5],
-['Dal plain boiled, no tadka (katori)',110,7,18,1],['Tadka only (1 tbsp ghee/masala)',110,0,1,12],
-['Rajma boiled (katori)',130,8,21,0.6],['Chole boiled (katori)',140,8,22,2.5],
-['Cooked rice (katori, 100g)',130,2.7,28,0.3],['Jeera rice (katori)',180,3,30,5],
-['Sabzi gravy only (katori)',120,2,8,9],['Dry sabzi (katori)',110,3,12,6],
-['Cooking oil (1 tsp)',40,0,0,4.5],['Cream / malai (1 tbsp)',52,0.4,0.8,5.5],
-['Curd (katori, 100g)',60,3.5,4.5,3],['Buttermilk / chaas (glass)',40,2,3,1.5],
-['Milk toned (250ml)',120,8,12,4],['Milk skimmed (250ml)',80,8,12,0.2],
+['Paneer cubes (1 piece, ~15g)',40,2.7,0.3,3.2,0],['Paneer raw (50g)',132,9,1,10.5,0],
+['Dal plain boiled, no tadka (katori)',110,7,18,1,7],['Tadka only (1 tbsp ghee/masala)',110,0,1,12,0],
+['Rajma boiled (katori)',130,8,21,0.6,7],['Chole boiled (katori)',140,8,22,2.5,8],
+['Cooked rice (katori, 100g)',130,2.7,28,0.3,0.6],['Jeera rice (katori)',180,3,30,5,0.8],
+['Sabzi gravy only (katori)',120,2,8,9,2],['Dry sabzi (katori)',110,3,12,6,4],
+['Cooking oil (1 tsp)',40,0,0,4.5,0],['Cream / malai (1 tbsp)',52,0.4,0.8,5.5,0],
+['Curd (katori, 100g)',60,3.5,4.5,3,0],['Buttermilk / chaas (glass)',40,2,3,1.5,0],
+['Milk toned (250ml)',120,8,12,4,0],['Milk skimmed (250ml)',80,8,12,0.2,0],
 /* branded biscuits — per piece AND per packet, because both are how you eat them */
-['Monaco (1 biscuit)',25,0.4,3.2,1.1],['Monaco (small packet, 63g)',330,5,42,15],
-['Krackjack (1 biscuit)',28,0.4,4,1.1],['Krackjack (small packet, 60g)',300,4,44,12],
-['Parle-G (1 biscuit)',27,0.4,4.5,0.8],['Parle-G (small packet, 55g)',250,4,41,8],
-['Marie Gold (1 biscuit)',21,0.4,3.8,0.5],['Marie Gold (packet, 75g)',330,6,60,8],
-['Good Day butter (1 biscuit)',45,0.6,6,2],['Good Day cashew (1 biscuit)',48,0.7,6,2.2],
-['Hide & Seek (1 biscuit)',48,0.6,6.5,2.2],['Bourbon (1 biscuit)',60,0.7,8.5,2.5],
-['50-50 / Maska Chaska (1 biscuit)',26,0.4,3.4,1.2],['Nice / coconut (1 biscuit)',33,0.4,4.6,1.4],
-['Milk Bikis (1 biscuit)',26,0.5,4.2,0.8],['Little Hearts (10 pieces)',110,1.5,15,4.5],
-['Oreo (1 biscuit)',48,0.5,7,2],['Digestive / NutriChoice (1 biscuit)',42,0.8,6,1.6],
-['Rusk / toast (1)',45,1,8,1],['Khari puff (1)',50,0.8,5,3],
+['Monaco (1 biscuit)',25,0.4,3.2,1.1,0.4],['Monaco (small packet, 63g)',330,5,42,15,0.4],
+['Krackjack (1 biscuit)',28,0.4,4,1.1,0.4],['Krackjack (small packet, 60g)',300,4,44,12,0.4],
+['Parle-G (1 biscuit)',27,0.4,4.5,0.8,0.4],['Parle-G (small packet, 55g)',250,4,41,8,0.4],
+['Marie Gold (1 biscuit)',21,0.4,3.8,0.5,0.4],['Marie Gold (packet, 75g)',330,6,60,8,0.4],
+['Good Day butter (1 biscuit)',45,0.6,6,2,0.4],['Good Day cashew (1 biscuit)',48,0.7,6,2.2,0.4],
+['Hide & Seek (1 biscuit)',48,0.6,6.5,2.2,0.4],['Bourbon (1 biscuit)',60,0.7,8.5,2.5,0.4],
+['50-50 / Maska Chaska (1 biscuit)',26,0.4,3.4,1.2,0.4],['Nice / coconut (1 biscuit)',33,0.4,4.6,1.4,0.4],
+['Milk Bikis (1 biscuit)',26,0.5,4.2,0.8,0.4],['Little Hearts (10 pieces)',110,1.5,15,4.5,0.4],
+['Oreo (1 biscuit)',48,0.5,7,2,0.4],['Digestive / NutriChoice (1 biscuit)',42,0.8,6,1.6,0.4],
+['Rusk / toast (1)',45,1,8,1,0.4],['Khari puff (1)',50,0.8,5,3,0.4],
 /* branded namkeen & chips */
-['Lays classic (small packet, 26g)',140,1.5,15,8],['Kurkure (small packet, 30g)',165,2,17,10],
-['Bingo Mad Angles (small pack)',150,2,17,8.5],['Uncle Chipps (small pack)',150,1.5,16,9],
-['Haldiram aloo bhujia (30g)',170,4,15,11],['Haldiram bhujia sev (30g)',165,5,14,10],
-['Moong dal namkeen (30g)',150,7,16,7],['Haldiram khatta meetha (30g)',150,3,18,8],
-['Peanuts masala (30g)',170,7,6,13],['Makhana roasted (30g)',105,3,17,0.5],
+['Lays classic (small packet, 26g)',140,1.5,15,8,1],['Kurkure (small packet, 30g)',165,2,17,10,1],
+['Bingo Mad Angles (small pack)',150,2,17,8.5,1],['Uncle Chipps (small pack)',150,1.5,16,9,1],
+['Haldiram aloo bhujia (30g)',170,4,15,11,1.5],['Haldiram bhujia sev (30g)',165,5,14,10,1.5],
+['Moong dal namkeen (30g)',150,7,16,7,2],['Haldiram khatta meetha (30g)',150,3,18,8,1.5],
+['Peanuts masala (30g)',170,7,6,13,2.5],['Makhana roasted (30g)',105,3,17,0.5,1.5],
 /* random snacks */
-['Popcorn (bowl)',120,3,20,4],['Frooti / Maaza (200ml)',90,0,22,0],
-['Meetha paan (1)',70,0.5,15,1],
-['Green chutney (1 tbsp)',15,0.5,2,0.5],['Coconut chutney (2 tbsp)',60,1,3,5],['Achar / pickle (1 tsp)',25,0,1,2],
-['Sugar (1 tsp)',20,0,5,0],['Jaggery / gud (10g)',38,0,10,0],['Honey (1 tsp)',20,0,6,0],
+['Popcorn (bowl)',120,3,20,4,3],['Frooti / Maaza (200ml)',90,0,22,0,0.3],
+['Meetha paan (1)',70,0.5,15,1,0.5],
+['Green chutney (1 tbsp)',15,0.5,2,0.5,0.5],['Coconut chutney (2 tbsp)',60,1,3,5,1],['Achar / pickle (1 tsp)',25,0,1,2,0.2],
+['Sugar (1 tsp)',20,0,5,0,0],['Jaggery / gud (10g)',38,0,10,0,0],['Honey (1 tsp)',20,0,6,0,0],
 /* drinks */
-['Chai with milk + sugar (1 cup)',90,2,12,3.5],['Chai no sugar (1 cup)',45,2,4,2.5],['Black coffee (1 cup)',5,0,0,0],
-['Nimbu pani with sugar (glass)',60,0,15,0],['Chaas / buttermilk (glass)',40,2,3,1.5],['Sweet lassi (glass)',220,6,30,8],
-['Coconut water (1)',45,1,10,0],['Fresh fruit juice (glass)',120,1,28,0],['Cold drink (300ml)',130,0,33,0],
-['Beer (330ml)',140,1,11,0],['Whisky (30ml peg)',65,0,0,0],
+['Chai with milk + sugar (1 cup)',90,2,12,3.5,1],['Chai no sugar (1 cup)',45,2,4,2.5,0],['Black coffee (1 cup)',5,0,0,0,0],
+['Nimbu pani with sugar (glass)',60,0,15,0,0.3],['Chaas / buttermilk (glass)',40,2,3,1.5,1],['Sweet lassi (glass)',220,6,30,8,1],
+['Coconut water (1)',45,1,10,0,0.3],['Fresh fruit juice (glass)',120,1,28,0,2.5],['Cold drink (300ml)',130,0,33,0,0],
+['Beer (330ml)',140,1,11,0,0],['Whisky (30ml peg)',65,0,0,0,0],
 /* fruits */
-['Apple (1)',80,0.4,21,0.3],['Mango (1 medium)',150,1.5,35,0.6],['Orange (1)',60,1,15,0.2],
-['Papaya (bowl)',60,1,15,0.2],['Grapes (bowl)',100,1,26,0.2],['Watermelon (bowl)',45,1,11,0.2],
-['Pomegranate / anaar (1)',105,2,26,1.5],['Guava (1)',60,2,14,1],['Chikoo (1)',80,0.5,20,1]
+['Apple (1)',80,0.4,21,0.3,2.5],['Mango (1 medium)',150,1.5,35,0.6,2.5],['Orange (1)',60,1,15,0.2,2.5],
+['Papaya (bowl)',60,1,15,0.2,2.5],['Grapes (bowl)',100,1,26,0.2,2.5],['Watermelon (bowl)',45,1,11,0.2,2.5],
+['Pomegranate / anaar (1)',105,2,26,1.5,2.5],['Guava (1)',60,2,14,1,2.5],['Chikoo (1)',80,0.5,20,1,2.5]
 ];
 let FDMEAL='s', FDRES=[], FDITEM=null, FDQ='', PLATE=[];
 function fdbAllFoods(){
-  return FOODDB.map(function(f){ return {name:f[0], kcal:f[1], p:f[2], c:f[3], f:f[4]}; })
-    .concat((S.myFoods||[]).map(function(m){ return {name:m.name, kcal:m.kcal, p:m.p, c:m.c, f:m.f, mine:true, id:m.id}; }));
+  return FOODDB.map(function(f){ return {name:f[0], kcal:f[1], p:f[2], c:f[3], f:f[4], fb:f[5]||0}; })
+    .concat((S.myFoods||[]).map(function(m){ return {name:m.name, kcal:m.kcal, p:m.p, c:m.c, f:m.f, fb:m.fb||0, mine:true, id:m.id}; }));
 }
 function fdbSearch(q){
   FDQ=(q||'').trim();
@@ -3627,7 +3826,7 @@ function plateAdd(){
   const n=Math.max(0.5, +$('#fdbQty').value||1);
   const same=PLATE.find(function(x){ return x.name===f.name; });
   if(same) same.n+=n;
-  else PLATE.push({name:f.name, kcal:f.kcal, p:f.p, c:f.c, f:f.f, n:n});
+  else PLATE.push({name:f.name, kcal:f.kcal, p:f.p, c:f.c, f:f.f, fb:f.fb||0, n:n});
   FDITEM=null; $('#fdbSel').innerHTML=''; $('#fdbRes').innerHTML='';
   const q=$('#fdbQ'); if(q){ q.value=''; q.focus(); }
   FDQ=''; renderPlate();
@@ -3641,8 +3840,8 @@ function plateQty(i,d){
 function plateDel(i){ PLATE.splice(i,1); renderPlate(); }
 function plateTotals(){
   return PLATE.reduce(function(a,x){
-    a.kcal+=x.kcal*x.n; a.p+=x.p*x.n; a.c+=x.c*x.n; a.f+=x.f*x.n; return a;
-  },{kcal:0,p:0,c:0,f:0});
+    a.kcal+=x.kcal*x.n; a.p+=x.p*x.n; a.c+=x.c*x.n; a.f+=x.f*x.n; a.fb+=(x.fb||0)*x.n; return a;
+  },{kcal:0,p:0,c:0,f:0,fb:0});
 }
 function plateName(){
   const parts=PLATE.map(function(x){ return (x.n!==1? x.n+'× ':'')+x.name.replace(/\s*\([^)]*\)\s*$/,''); });
@@ -3666,7 +3865,7 @@ function renderPlate(){
         '</span></div>';
     }).join('')+
     '<div class="num" style="margin:10px 0 2px; font-weight:700">'+Math.round(t.kcal)+' kcal'+
-      '<span class="tiny muted" style="font-weight:500"> · P '+Math.round(t.p)+' · C '+Math.round(t.c)+' · F '+Math.round(t.f)+'</span></div>'+
+      '<span class="tiny muted" style="font-weight:500"> · P '+Math.round(t.p)+' · C '+Math.round(t.c)+' · F '+Math.round(t.f)+' · Fib '+Math.round(t.fb)+'</span></div>'+
     '<button class="btn food wide" style="margin-top:8px" onclick="plateLog()">Log plate as one meal</button>'+
     '<button class="btn ghost wide" style="margin-top:6px" onclick="platesSave()">Save plate to My Foods ★</button>'+
     '</div>';
@@ -3675,7 +3874,7 @@ function plateLog(){
   if(!PLATE.length) return;
   const t=plateTotals();
   const e={id:uid(), name:plateName(), kcal:Math.round(t.kcal), p:Math.round(t.p*10)/10,
-    c:Math.round(t.c*10)/10, f:Math.round(t.f*10)/10};
+    c:Math.round(t.c*10)/10, f:Math.round(t.f*10)/10, fb:Math.round(t.fb*10)/10};
   const day=S.food[foodDate]=S.food[foodDate]||{};
   (day[FDMEAL]=day[FDMEAL]||[]).push(e);
   PLATE=[]; save(); closeSheet(); renderFood();
@@ -3685,13 +3884,13 @@ function platesSave(){
   if(!PLATE.length) return;
   const t=plateTotals();
   S.myFoods.push({id:uid(), name:plateName(), kcal:Math.round(t.kcal), p:Math.round(t.p*10)/10,
-    c:Math.round(t.c*10)/10, f:Math.round(t.f*10)/10});
+    c:Math.round(t.c*10)/10, f:Math.round(t.f*10)/10, fb:Math.round(t.fb*10)/10});
   save(); toast('Saved to My Foods ★, searchable next time');
 }
 function fdbAdd(){
   const f=FDITEM; if(!f) return;
   const n=Math.max(0.5, +$('#fdbQty').value||1);
-  const e={id:uid(), name:(n!==1? n+'× ':'')+f.name, kcal:Math.round(f.kcal*n), p:Math.round(f.p*n*10)/10, c:Math.round(f.c*n*10)/10, f:Math.round(f.f*n*10)/10};
+  const e={id:uid(), name:(n!==1? n+'× ':'')+f.name, kcal:Math.round(f.kcal*n), p:Math.round(f.p*n*10)/10, c:Math.round(f.c*n*10)/10, f:Math.round(f.f*n*10)/10, fb:Math.round((f.fb||0)*n*10)/10};
   const day=S.food[foodDate]=S.food[foodDate]||{};
   (day[FDMEAL]=day[FDMEAL]||[]).push(e);
   save(); closeSheet(); renderFood();
@@ -3707,13 +3906,14 @@ function myFoodForm(){
     '<div class="fields2">'+
     '<div class="field"><label for="mfC">Carbs g</label><input id="mfC" type="number" inputmode="decimal" placeholder="0"></div>'+
     '<div class="field"><label for="mfF">Fat g</label><input id="mfF" type="number" inputmode="decimal" placeholder="0"></div></div>'+
+    '<div class="field"><label for="mfFb">Fiber g (optional)</label><input id="mfFb" type="number" inputmode="decimal" placeholder="0"></div>'+
     '<button class="btn food wide" onclick="saveMyFood()">Save &amp; use</button>');
 }
 function saveMyFood(){
   const name=$('#mfName').value.trim(), k=+$('#mfK').value||0;
   if(!name){ toast('Name it first'); return; }
   if(!k){ toast('Calories needed, even a rough guess beats a blank'); return; }
-  const m={id:uid(), name:name, kcal:k, p:+$('#mfP').value||0, c:+$('#mfC').value||0, f:+$('#mfF').value||0};
+  const m={id:uid(), name:name, kcal:k, p:+$('#mfP').value||0, c:+$('#mfC').value||0, f:+$('#mfF').value||0, fb:+$('#mfFb').value||0};
   S.myFoods.push(m); save();
   const keep=PLATE;                 /* addFoodForm resets the plate; don't lose one mid-build */
   addFoodForm(FDMEAL);
@@ -3737,13 +3937,16 @@ function renderFood(){
     '<button class="btn" onclick="foodNav(1)" '+(foodDate>=today()?'disabled style="opacity:.35"':'')+'>›</button></div>';
   const over=ft.kcal>st.calGoal;
   const kp=Math.min(1, ft.kcal/st.calGoal), ppr=Math.min(1, ft.p/st.proteinGoal);
+  const fbGoal=+st.fiberGoal||30, fbr=Math.min(1, ft.fb/fbGoal);
   h+='<div class="osec"><div class="statrow" style="margin-bottom:14px">'+
     '<div class="stat"><span class="tl">Eaten</span><div class="tv num">'+Math.round(ft.kcal)+'</div></div>'+
     '<div class="stat"><span class="tl">'+(over?'Over by':'Left today')+'</span><div class="tv num" style="color:'+(over?'var(--bad)':'var(--good)')+'">'+Math.round(Math.abs(st.calGoal-ft.kcal))+'</div></div>'+
     '<div class="stat"><span class="tl">Protein</span><div class="tv num">'+Math.round(ft.p)+'<span style="font-size:15px; color:var(--ink3)"> /'+st.proteinGoal+'</span></div></div></div>'+
     '<div class="bar"><i style="width:'+(kp*100)+'%; background:'+(over?'var(--bad)':'var(--fd)')+'"></i></div>'+
     '<div class="bar" style="margin-top:5px"><i style="width:'+(ppr*100)+'%; background:var(--fd); opacity:.55"></i></div>'+
-    '<div class="tiny muted num" style="margin-top:8px">Carbs '+Math.round(ft.c)+' / '+st.carbGoal+'g · Fat '+Math.round(ft.f)+' / '+st.fatGoal+'g</div></div>';
+    '<div class="bar" style="margin-top:5px"><i style="width:'+(fbr*100)+'%; background:var(--good); opacity:.75"></i></div>'+
+    '<div class="tiny muted num" style="margin-top:8px">Fiber '+Math.round(ft.fb)+' / '+fbGoal+'g'+
+      (ft.fb>=fbGoal?' ✓':'')+' · Carbs '+Math.round(ft.c)+' / '+st.carbGoal+'g · Fat '+Math.round(ft.f)+' / '+st.fatGoal+'g</div></div>';
   MEALS.forEach(function(m){
     const list=day[m[0]]||[];
     const mk=list.reduce(function(a,e){return a+(+e.kcal||0);},0);
@@ -3751,7 +3954,7 @@ function renderFood(){
       '<span class="num" style="margin-left:auto; letter-spacing:0">'+(mk?Math.round(mk)+' kcal':'')+'</span></h2>';
     list.forEach(function(e){
       h+='<div class="listrow"><div><span class="small">'+esc(e.name)+'</span>'+
-        '<div class="tiny muted num">'+Math.round(e.kcal)+' kcal'+((+e.p)?' · P'+e.p:'')+((+e.c)?' · C'+e.c:'')+((+e.f)?' · F'+e.f:'')+'</div></div>'+
+        '<div class="tiny muted num">'+Math.round(e.kcal)+' kcal'+((+e.p)?' · P'+e.p:'')+((+e.c)?' · C'+e.c:'')+((+e.f)?' · F'+e.f:'')+((+e.fb)?' · Fib'+e.fb:'')+'</div></div>'+
         '<button class="btn ghost sm" style="color:var(--ink3)" onclick="delFood(\''+m[0]+'\',\''+e.id+'\')">✕</button></div>';
     });
     h+='<button class="btn sm wide ghost" style="border:1px dashed var(--line); margin-top:'+(list.length?'10px':'2px')+'" onclick="addFoodForm(\''+m[0]+'\')">+ Add</button></div>';
@@ -3951,9 +4154,10 @@ function weightChart(ws, bmiMode){
   let mx=Math.max.apply(null,data.map(function(d){return d.kg;}));
   /* in BMI mode the series is BMI, so the goal has to be converted too or it
      would draw a 68 kg line onto a scale that tops out around 25 */
-  const goal=bmiMode
-    ? (S.settings.height? bmiOf(+S.settings.goalWeight, S.settings.height) : null)
-    : (+S.settings.goalWeight||null);
+  const goal=(bmiMode==='vo2') ? null
+    : bmiMode
+      ? (S.settings.height? bmiOf(+S.settings.goalWeight, S.settings.height) : null)
+      : (+S.settings.goalWeight||null);
   if(goal){ mn=Math.min(mn,goal); mx=Math.max(mx,goal); }
   const span=(mx-mn)||1; mn-=span*0.12; mx+=span*0.12;
   const X=function(i){ return PL+(W-PL-PR)*(data.length===1?0.5:i/(data.length-1)); };
@@ -4056,6 +4260,11 @@ function openSettings(){
     '<div class="field"><label for="sUnit">Weight unit</label><select id="sUnit"><option'+(st.unit==='kg'?' selected':'')+'>kg</option><option'+(st.unit==='lb'?' selected':'')+'>lb</option></select></div>'+
     '<div class="field"><label for="sHeight">Height (cm, for BMI)</label><input id="sHeight" type="number" inputmode="numeric" value="'+esc(st.height)+'" placeholder="e.g. 175"></div></div>'+
     '<div class="fields2">'+
+    '<div class="field"><label for="sAge">Age (for VO2max bands)</label><input id="sAge" type="number" inputmode="numeric" value="'+esc(st.age||'')+'" placeholder="e.g. 31"></div>'+
+    '<div class="field"><label for="sSex">Sex (for VO2max bands)</label><select id="sSex">'+
+      '<option value="m"'+(st.sex!=='f'?' selected':'')+'>Male</option>'+
+      '<option value="f"'+(st.sex==='f'?' selected':'')+'>Female</option></select></div></div>'+
+    '<div class="fields2">'+
     '<div class="field"><label for="sWater">Water goal (ml/day)</label><input id="sWater" type="number" inputmode="numeric" value="'+st.waterGoal+'"></div>'+
     '<div class="field"><label for="sRest">Default rest (seconds)</label><input id="sRest" type="number" inputmode="numeric" value="'+st.rest+'"></div></div>'+
     '<div class="fields2">'+
@@ -4130,6 +4339,7 @@ function collectSettings(){
   const st=S.settings;
   st.name=$('#sName').value.trim(); st.unit=$('#sUnit').value;
   st.height=$('#sHeight').value; st.waterGoal=+$('#sWater').value||3000;
+  st.age=$('#sAge').value; st.sex=$('#sSex').value;
   st.rest=+$('#sRest').value||90; st.calGoal=+$('#sCal').value||2200;
   st.proteinGoal=+$('#sProt').value||130; st.carbGoal=+$('#sCarb').value||250; st.fatGoal=+$('#sFat').value||70;
   st.goalWeight=$('#sGoalW').value;
@@ -4311,7 +4521,8 @@ function applyTheme(){
   if(m) m.content = S.settings.theme==='light' ? '#f3f1ea' : '#0e1214';
 }
 function setTheme(t){
-  S.settings.theme=t; save(); applyTheme(); openSettings();
+  S.settings.theme=t; save(); applyTheme();
+fiberBackfill(); openSettings();
 }
 
 /* ============ phase transition moment ============ */

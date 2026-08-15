@@ -40,7 +40,7 @@ function check(name, cond, detail) {
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 20, boot.schema);
+  check('schemaVersion stamped', boot.schema === 21, boot.schema);
   check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
@@ -89,6 +89,109 @@ function check(name, cond, detail) {
   check('readiness does not hold it back on real data', aug10.held === false);
 
 
+  console.log('fiber');
+  const fib = await page.evaluate(() => {
+    const rows = FOODDB;
+    const bad = rows.filter((r) => r.length !== 6 || typeof r[5] !== 'number' || r[5] < 0 || r[5] > 20);
+    const by = (n) => (rows.find((r) => r[0] === n) || [])[5];
+    go('food'); addFoodForm('l');
+    const before = foodTotals(foodDate).fb;
+    function pick(q) { document.querySelector('#fdbQ').value = q; fdbSearch(q); fdbPick(0); }
+    pick('dal tadka'); plateAdd();
+    pick('atta roti / phulka'); document.querySelector('#fdbQty').value = '2'; plateAdd();
+    const plateFb = plateTotals().fb;
+    plateLog();
+    const list = (S.food[foodDate] || {}).l || [];
+    const e = list[list.length - 1];
+    const dayFb = foodTotals(foodDate).fb;
+    S.food[foodDate].l = list.filter((x) => x.id !== e.id);
+    // backfill: one entry whose name matches the DB, one that cannot
+    const d = dShift(today(), -40);
+    S.food[d] = { s: [{ id: 'bf1', name: '2× Dal tadka (bowl)', kcal: 1, p: 0, c: 0, f: 0 },
+                      { id: 'bf2', name: 'Something I typed myself', kcal: 1, p: 0, c: 0, f: 0 }] };
+    delete S.fiberBackfilled;
+    fiberBackfill();
+    const bf = S.food[d].s;
+    S.myFoods.push({ id: 'tfb', name: 'Test fib', kcal: 10, p: 1, c: 1, f: 0, fb: 4 });
+    save();
+    const custom = (fdbAllFoods().find((x) => x.id === 'tfb') || {}).fb;
+    S.myFoods = S.myFoods.filter((m) => m.id !== 'tfb');
+    delete S.food[d]; save(); closeSheet();
+    return {
+      rows: rows.length, bad: bad.map((r) => r[0]),
+      dal: by('Dal tadka (bowl)'), ghee: by('Ghee (1 tsp)'), milk: by('Milk full-fat (250ml)'),
+      plateFb, entryFb: e.fb, dayDelta: Math.round((dayFb - before) * 10) / 10,
+      backfilled: bf[0].fb, unmatched: bf[1].fb, custom, goal: S.settings.fiberGoal,
+    };
+  });
+  check('all 261 foods carry a sane fiber value', fib.rows === 261 && fib.bad.length === 0, fib.bad);
+  check('legumes high, fats and dairy zero', fib.dal === 8 && fib.ghee === 0 && fib.milk === 0, fib);
+  check('plate sums fiber from its parts (8 + 2×3)', fib.plateFb === 14, fib.plateFb);
+  check('the logged entry carries it, and the day total moves', fib.entryFb === 14 && fib.dayDelta === 14, fib);
+  check('backfill fills a pre-existing entry from its name', fib.backfilled === 16, fib.backfilled);
+  check('backfill leaves an unmatched entry at zero, not guessed', fib.unmatched === 0, fib.unmatched);
+  check('custom foods can carry fiber', fib.custom === 4, fib.custom);
+  check('a daily fiber goal exists', fib.goal === 30, fib.goal);
+
+  console.log('cardio fitness: VO2max and zone 2');
+  const cardio = await page.evaluate(() => {
+    const out = {};
+    out.cooper = vo2Cooper(2400);
+    out.rockport = vo2Rockport(63.9, 31, true, 13.5, 130);
+    out.bands = [vo2Band(30, 31, 'm').label, vo2Band(42.7, 31, 'm').label,
+                 vo2Band(58, 31, 'm').label, vo2Band(42.7, 31, 'f').label];
+    out.garbage = [vo2Cooper(0), vo2Rockport(63.9, 31, true, 0, 130)];
+    const savedAge = S.settings.age, savedVo2 = S.vo2, savedSessions = S.sessions;
+    S.settings.age = ''; S.vo2 = [];
+    out.noAge = /age and sex/i.test(cardioHTML()) && !/NaN/.test(cardioHTML());
+    S.settings.age = savedAge;
+    const cid = S.exercises.find((e) => e.name === 'Cycling').id;
+    S.sessions = [
+      { id: 'z1', name: 'A', date: dShift(today(), -2), dur: 1, vol: 0, prs: [],
+        ex: [{ exId: cid, sets: [{ w: 12, r: 45, done: true, z: true }, { w: 3, r: 10, done: true }] }] },
+      { id: 'z2', name: 'B', date: dShift(today(), -20), dur: 1, vol: 0, prs: [],
+        ex: [{ exId: cid, sets: [{ w: 20, r: 60, done: true, z: true }] }] },
+    ];
+    out.week = zone2Mins(7);
+    out.month = zone2Mins(30);
+    S.sessions = savedSessions; S.vo2 = savedVo2; save();
+    return out;
+  });
+  check('Cooper: 2400 m gives 42.7', cardio.cooper === 42.7, cardio.cooper);
+  check('Rockport: 63.9 kg, 31M, 13.5 min, 130 bpm gives 51.9', cardio.rockport === 51.9, cardio.rockport);
+  check('bands read by age and sex', cardio.bands.join('|') === 'Below average|Good|Excellent|Very good', cardio.bands);
+  check('missing inputs return null rather than a number', cardio.garbage.every((v) => v === null), cardio.garbage);
+  check('missing age prompts instead of rendering NaN', cardio.noAge);
+  check('zone 2 counts only flagged cardio sets', cardio.week === 45, cardio.week);
+  check('zone 2 respects the window', cardio.month === 105, cardio.month);
+
+  console.log('supplement evidence');
+  const supp = await page.evaluate(() => {
+    suppEditor();
+    const txt = document.querySelector('#sheetIn').textContent;
+    closeSheet();
+    return {
+      allResolve: S.supps.every((sp) => !!suppInfo(sp.name)),
+      tiers: S.supps.map((sp) => suppInfo(sp.name).tier),
+      creatine: suppInfo('Creatine 5g: GNC monohydrate').tier,
+      theanine: suppInfo('L-theanine: evening wind-down').tier,
+      iron: suppInfo('Iron bisglycinate').tier,
+      nmn: suppInfo('NMN 500mg').tier,
+      unknown: suppInfo('Something invented'),
+      algal: /algal/i.test(txt),
+      ironTestFirst: /ferritin/i.test(txt) && /never supplement iron blind/i.test(txt),
+      skipNamed: /NMN/.test(txt) && /resveratrol/i.test(txt),
+      disclaimer: /not medical advice/i.test(txt),
+    };
+  });
+  check('every supplement in the stack resolves to a tier', supp.allResolve, supp.tiers);
+  check('creatine strong, theanine limited', supp.creatine === 'strong' && supp.theanine === 'limited', supp);
+  check('iron is test-first, never a recommendation', supp.iron === 'test-first' && supp.ironTestFirst, supp.iron);
+  check('the hyped ones are named and marked skip', supp.nmn === 'skip' && supp.skipNamed, supp.nmn);
+  check('an unrecognised supplement gets no invented claim', supp.unknown === null);
+  check('omega-3 carries the algal caveat', supp.algal);
+  check('the not-medical-advice line survives', supp.disclaimer);
+
   console.log('section navigation');
   const nav = await page.evaluate(() => {
     const out = {};
@@ -100,7 +203,7 @@ function check(name, cond, detail) {
     out.todayActive = bar().querySelector('.chip.on').textContent;
     // every destination reachable, and each marks itself
     const reach = {};
-    ['progress', 'history', 'library'].forEach((v) => {
+    ['progress', 'history', 'library', 'cardio'].forEach((v) => {
       goWV(v);
       const b = document.querySelector('#tab-workout .subnav');
       reach[v] = !!b && document.querySelector('#tab-workout').innerHTML.length > 200
@@ -134,7 +237,7 @@ function check(name, cond, detail) {
     return out;
   });
   check('workout tab has a pinned section row', nav.onWorkout && nav.sticky === 'sticky', nav.sticky);
-  check('it lists every workout section', nav.labels.join('|') === 'Today|Routines|Progress|History|Exercises|Plan', nav.labels);
+  check('it lists every workout section', nav.labels.join('|') === 'Today|Routines|Progress|History|Exercises|Cardio|Plan', nav.labels);
   check('the current section is marked', nav.todayActive === 'Today', nav.todayActive);
   check('Progress, History and Exercises all reachable', Object.values(nav.reach).every(Boolean), nav.reach);
   check('the old buried buttons are gone', nav.noOldButtons);
@@ -308,7 +411,7 @@ function check(name, cond, detail) {
     hasSnapshot: !!localStorage.getItem('fitlog.v1.bak'),
     meta: JSON.parse(localStorage.getItem('fitlog.v1.bak.meta') || 'null'),
   }));
-  check('pre-update snapshot written', snap.hasSnapshot && snap.meta && snap.meta.to === 20, snap.meta);
+  check('pre-update snapshot written', snap.hasSnapshot && snap.meta && snap.meta.to === 21, snap.meta);
 
   const past = await page.evaluate(() => {
     const d = dShift(today(), -3);
@@ -477,7 +580,7 @@ function check(name, cond, detail) {
   check('steps state deleted by migration', migAfter.steps, migAfter);
   check('past ticks converted to logged minutes', migAfter.ticksConverted, migAfter.ticksConverted);
   check('breathwork supp retired from list + checklist', migAfter.suppGone && migAfter.checklistClean && migAfter.supps === mig.supps - 1, migAfter);
-  check('migration stamps schema 20', migAfter.schema === 20, migAfter.schema);
+  check('migration stamps schema 21', migAfter.schema === 21, migAfter.schema);
 
   console.log('em-dash removal: parsers + v17 migration');
   const dash = await page.evaluate(() => ({
@@ -532,7 +635,7 @@ function check(name, cond, detail) {
   check('user-authored routine renamed, wording kept', v17After.rt === 'Push: my own routine', v17After.rt);
   check('stored session + PR text renamed', v17After.ses === 'Return: full body (light)' && v17After.pr === '70×5: heaviest ever', v17After);
   check('S.lastPhase migrated (no false phase celebration)', v17After.lastPhase === 'Phase 0: Rebuild' && !v17After.celebrated, v17After);
-  check('migration stamps schema 20', v17After.schema === 20, v17After.schema);
+  check('migration stamps schema 21', v17After.schema === 21, v17After.schema);
 
   console.log('workout cards: preview before starting');
   const cards = await page.evaluate(() => {
