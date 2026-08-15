@@ -1,0 +1,137 @@
+<script>
+/* Optional sync layer.
+   Off unless the user fills in a URL, a key and an account tag in Settings.
+   The app is fully usable with this file removed: core.html only ever calls
+   window.Sync behind a truthiness check.
+
+   Wire protocol, one row per record:
+     { id, owner, coll, payload, updated_at, deleted }
+   Conflicts resolve last write wins on updated_at. Settings never leave the
+   device, so the sync key itself is never uploaded.
+
+   Default adapter speaks PostgREST, which is what Supabase exposes. See the
+   README for the table and the row level security policy. */
+'use strict';
+window.Sync = (function(){
+  var timer = null, running = false, SKEW = 60000;
+
+  function cfg(){
+    var s = (window.DB && DB.settings) || {};
+    return {
+      on: !!(s.syncOn && s.syncUrl && s.syncKey && s.syncOwner),
+      url: (s.syncUrl || '').replace(/\/$/, ''),
+      key: s.syncKey || '',
+      table: s.syncTable || 'moneyz_records',
+      owner: s.syncOwner || '',
+      since: s.lastSync || ''
+    };
+  }
+  function ts(x){ var n = Date.parse(x); return isNaN(n) ? 0 : n; }
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function head(c, extra){
+    var h = {
+      'apikey': c.key,
+      'Authorization': 'Bearer ' + c.key,
+      'Content-Type': 'application/json'
+    };
+    if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) h[k] = extra[k];
+    return h;
+  }
+  function check(r){
+    if (r.ok) return r;
+    return r.text().then(function(body){
+      var msg = 'HTTP ' + r.status;
+      if (r.status === 401 || r.status === 403) msg = 'Key rejected (' + r.status + ')';
+      else if (r.status === 404) msg = 'Table not found';
+      throw new Error(msg + (body ? ': ' + String(body).slice(0, 140) : ''));
+    });
+  }
+  function base(c){ return c.url + '/rest/v1/' + encodeURIComponent(c.table); }
+
+  function pull(c){
+    var q = base(c) + '?owner=eq.' + encodeURIComponent(c.owner) + '&select=*';
+    if (c.since) q += '&updated_at=gt.' + encodeURIComponent(new Date(ts(c.since) - SKEW).toISOString());
+    return fetch(q, {headers: head(c)}).then(check).then(function(r){ return r.json(); });
+  }
+  function push(c, rows){
+    if (!rows.length) return Promise.resolve(0);
+    return fetch(base(c) + '?on_conflict=id', {
+      method: 'POST',
+      headers: head(c, {'Prefer': 'resolution=merge-duplicates,return=minimal'}),
+      body: JSON.stringify(rows)
+    }).then(check).then(function(){ return rows.length; });
+  }
+
+  var COLLS = ['env', 'tx', 'fav'];
+
+  function localRows(c){
+    var out = [], cut = c.since ? ts(c.since) - SKEW : 0;
+    COLLS.forEach(function(coll){
+      var bag = DB[coll] || {};
+      for (var id in bag) {
+        if (!bag.hasOwnProperty(id)) continue;
+        var r = bag[id];
+        /* Untouched starter envelopes are defaults, not the user's data.
+           Uploading them would let a device that just booted overwrite real
+           budgets set elsewhere, so they stay home until they are edited. */
+        if (r.seed) continue;
+        if (ts(r.updatedAt) <= cut) continue;
+        out.push({
+          id: r.id, owner: c.owner, coll: coll,
+          payload: r, updated_at: r.updatedAt, deleted: !!r.deleted
+        });
+      }
+    });
+    return out;
+  }
+  function merge(rows){
+    var n = 0;
+    rows.forEach(function(row){
+      if (COLLS.indexOf(row.coll) < 0) return;
+      var local = DB[row.coll][row.id];
+      /* A remote record always beats an untouched seed, whatever the clocks say. */
+      if (local && !local.seed && ts(local.updatedAt) >= ts(row.updated_at)) return;
+      var rec = row.payload && typeof row.payload === 'object' ? row.payload : {};
+      rec.id = row.id;
+      rec.updatedAt = row.updated_at;
+      rec.deleted = !!row.deleted;
+      DB[row.coll][row.id] = rec;
+      n++;
+    });
+    return n;
+  }
+
+  function run(loud){
+    var c = cfg();
+    if (!c.on) return Promise.resolve(loud ? 'Sync is off. Fill in a URL, a key and an account tag.' : '');
+    if (running) return Promise.resolve('Already syncing.');
+    running = true;
+    var sent = 0, got = 0;
+    var mark = new Date().toISOString();
+    return pull(c)
+      .then(function(rows){ got = merge(rows || []); return push(c, localRows(c)); })
+      .then(function(n){
+        sent = n;
+        DB.settings.lastSync = mark;
+        persist();
+        return 'Synced. <b>' + sent + ' up, ' + got + ' down.</b>';
+      })
+      .catch(function(e){
+        return '<span class="err">Sync failed. <b>' + esc(String(e.message || e).slice(0, 120)) + '</b></span>';
+      })
+      .then(function(msg){ running = false; return msg; });
+  }
+
+  function schedule(){
+    if (!cfg().on) return;
+    clearTimeout(timer);
+    timer = setTimeout(function(){ run(false); }, 2500);
+  }
+
+  return {run: run, schedule: schedule, enabled: function(){ return cfg().on; }};
+})();
+</script>

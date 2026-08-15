@@ -1,0 +1,25 @@
+{
+  "name": "MoneyZ: envelope budgeting",
+  "short_name": "MoneyZ",
+  "description": "Envelopes, two-tap spend logging and a safe-to-spend-today number. Your money stays on your device unless you turn sync on.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1310",
+  "theme_color": "#0d1310",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
