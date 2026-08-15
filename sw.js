@@ -1,4 +1,4 @@
-const CACHE = 'fitlog-v12';
+const CACHE = 'fitlog-v13';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
