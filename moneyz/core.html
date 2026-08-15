@@ -773,6 +773,7 @@ function openSettings(){
 
   h += '<h3>Backup</h3>' +
     '<button class="btn sec" id="bExport">Export a JSON backup</button>' +
+    '<button class="btn sec" id="bText">Backup as text</button>' +
     '<button class="btn sec" id="bImport">Import a backup</button>' +
     '<input type="file" id="bFile" accept="application/json" style="display:none">' +
     '<button class="btn danger" id="bReset" style="margin-top:18px">Erase everything</button>' +
@@ -813,6 +814,9 @@ function openSettings(){
     a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
   };
+  /* Some hosts, an embedded viewer for instance, block file downloads outright.
+     The text route works everywhere and covers both directions. */
+  el('bText').onclick = openBackupText;
   el('bImport').onclick = function(){ el('bFile').click(); };
   el('bFile').onchange = function(ev){
     var f = ev.target.files[0];
@@ -834,6 +838,41 @@ function openSettings(){
     if (!confirm('Erase every envelope and entry on this device? This cannot be undone.')) return;
     DB = blank(); save(); closeSheet(); boot();
   };
+}
+
+/* Backup as text: works where file downloads are blocked, and restores from a
+   pasted backup just as the file route does. */
+function openBackupText(){
+  openSheet('<h2>Backup as text</h2>' +
+    '<div class="muted" style="margin-bottom:10px">Copy this somewhere safe. To restore, paste a backup over it and tap Restore.</div>' +
+    '<textarea id="bBox" rows="9" spellcheck="false" style="font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace"></textarea>' +
+    '<button class="btn" id="bCopy">Copy</button>' +
+    '<button class="btn danger" id="bRestore">Restore from this text</button>' +
+    '<button class="btn sec" id="bBack">Back to settings</button>');
+  var box = el('bBox');
+  box.value = JSON.stringify(DB);
+  box.focus();
+  box.setSelectionRange(0, box.value.length);
+  el('bCopy').onclick = function(){
+    box.select();
+    var done = function(){ toast('Backup copied.', null); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(box.value).then(done, function(){
+        toast('Copy blocked here. The text is selected, copy it by hand.', null);
+      });
+    } else {
+      toast('The text is selected, copy it by hand.', null);
+    }
+  };
+  el('bRestore').onclick = function(){
+    var d;
+    try { d = JSON.parse(box.value); } catch (e) { toast('That is not valid JSON.', null); return; }
+    if (!d || !d.settings || !d.env) { toast('That is not a MoneyZ backup.', null); return; }
+    if (!confirm('Replace everything on this device with this backup?')) return;
+    DB = d; save(); closeSheet(); boot();
+    toast('Backup restored.', null);
+  };
+  el('bBack').onclick = openSettings;
 }
 
 /* quick add favourite from the current draft */
