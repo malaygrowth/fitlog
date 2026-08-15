@@ -461,7 +461,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='1.7.0';
+const APP_VER='1.7.1';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -506,14 +506,14 @@ const SEED_RT=[
   {name:'Agility & conditioning', ex:['Jumping jacks','High knees','Mountain climbers','Cossack squat','Bear crawl','Burpees','Kettlebell swing']}
 ];
 const SEED_QK=[
-  {name:'Whey (1 scoop)',kcal:130,p:24,c:4,f:2},{name:'Casein (1 scoop)',kcal:120,p:24,c:4,f:1},
-  {name:'Milk 250ml',kcal:150,p:8,c:12,f:8},{name:'Curd (bowl, 200g)',kcal:120,p:7,c:9,f:6},
-  {name:'Paneer 100g',kcal:265,p:18,c:4,f:20},{name:'Dal (bowl)',kcal:150,p:9,c:22,f:3},
-  {name:'Roti (1)',kcal:100,p:3,c:18,f:2},{name:'Rice (bowl)',kcal:200,p:4,c:44,f:1},
-  {name:'Hung curd 150g',kcal:130,p:15,c:6,f:5},{name:'Moong sprouts (bowl)',kcal:120,p:9,c:18,f:1},
-  {name:'Peanuts 30g',kcal:170,p:8,c:5,f:14},
-  {name:'Rajma/chole (bowl)',kcal:210,p:11,c:33,f:4},{name:'Oats 50g + milk',kcal:330,p:14,c:45,f:9},
-  {name:'Peanut butter (tbsp)',kcal:95,p:4,c:3,f:8},{name:'Banana',kcal:105,p:1,c:27,f:0}
+  {name:'Whey (1 scoop)',kcal:130,p:24,c:4,f:2,fb:0},{name:'Casein (1 scoop)',kcal:120,p:24,c:4,f:1,fb:0},
+  {name:'Milk 250ml',kcal:150,p:8,c:12,f:8,fb:0},{name:'Curd (bowl, 200g)',kcal:120,p:7,c:9,f:6,fb:0},
+  {name:'Paneer 100g',kcal:265,p:18,c:4,f:20,fb:0},{name:'Dal (bowl)',kcal:150,p:9,c:22,f:3,fb:8},
+  {name:'Roti (1)',kcal:100,p:3,c:18,f:2,fb:3},{name:'Rice (bowl)',kcal:200,p:4,c:44,f:1,fb:0.6},
+  {name:'Hung curd 150g',kcal:130,p:15,c:6,f:5,fb:0},{name:'Moong sprouts (bowl)',kcal:120,p:9,c:18,f:1,fb:6},
+  {name:'Peanuts 30g',kcal:170,p:8,c:5,f:14,fb:2.5},
+  {name:'Rajma/chole (bowl)',kcal:210,p:11,c:33,f:4,fb:8},{name:'Oats 50g + milk',kcal:330,p:14,c:45,f:9,fb:5},
+  {name:'Peanut butter (tbsp)',kcal:95,p:4,c:3,f:8,fb:1},{name:'Banana',kcal:105,p:1,c:27,f:0,fb:3}
 ];
 function defaults(){
   return {
@@ -803,7 +803,7 @@ function save(){ try{ localStorage.setItem(K, JSON.stringify(S)); }catch(e){ toa
 function seedV10(){
   if(S.seedV10) return; S.seedV10=true;
   if(!S.quick.some(function(x){return /mass shake/i.test(x.name);}))
-    S.quick.push({id:uid(), name:'Mass shake (milk+oats+PB+banana+whey)', kcal:700, p:40, c:75, f:22});
+    S.quick.push({id:uid(), name:'Mass shake (milk+oats+PB+banana+whey)', kcal:700, p:40, c:75, f:22, fb:9});
   const bw=S.exercises.find(function(x){return x.name==='Breathwork';});
   if(bw) ['Rehab: knee & wrist (~15 min)','Mobility & flexibility (~20 min)'].forEach(function(n){
     const r=S.routines.find(function(x){return x.name===n;});
@@ -999,11 +999,13 @@ function seedV21(){
 /* The backfill needs FOODDB, which is declared far below the migration runner,
    so it runs from boot instead. Its own flag keeps it single-shot. */
 function fiberBackfill(){
-  if(S.fiberBackfilled) return;
-  S.fiberBackfilled=true;
+  if(S.fiberBackfilled===2) return;
+  S.fiberBackfilled=2;
   const byName={};
   FOODDB.forEach(function(f){ byName[f[0]]=f[5]||0; });
   (S.myFoods||[]).forEach(function(m){ if(m.fb===undefined) m.fb=0; });
+  (S.quick||[]).forEach(function(q){ if(q.fb===undefined) q.fb = byName[q.name]!==undefined ? byName[q.name] : 0; });
+  (S.supps||[]).forEach(function(sp){ if(sp.fb===undefined) sp.fb=0; });
   Object.keys(S.food||{}).forEach(function(d){
     ['b','l','d','s'].forEach(function(meal){
       ((S.food[d]||{})[meal]||[]).forEach(function(e){
@@ -1035,7 +1037,10 @@ const SCHEMA=21;
 })();
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
  seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20, seedV21].forEach(function(step){ step(); });
-S.schemaVersion=SCHEMA;
+/* Persist the stamp explicitly. It used to ride along on whatever happened to
+   call save() next, which made both the migration guards and the pre-upgrade
+   snapshot depend on timing rather than intent. */
+S.schemaVersion=SCHEMA; save();
 
 /* ============ utils ============ */
 function $(s){ return document.querySelector(s); }
@@ -1288,14 +1293,6 @@ function phaseInfo(){
   openSheet(h);
 }
 function round25(x){ return Math.round(x/2.5)*2.5; }
-function lastDateFor(exId){
-  for(let i=S.sessions.length-1;i>=0;i--){
-    if(S.sessions[i].id===editingId()) continue;
-    const ex=S.sessions[i].ex.find(function(e){ return e.exId===exId; });
-    if(ex && ex.sets.length) return S.sessions[i].date;
-  }
-  return null;
-}
 /* ---------- coaching engine ----------
    Everything below answers one question per exercise: what should you put on
    the bar right now, for how many sets and reps, and why. It reads the last
@@ -1925,7 +1922,7 @@ function toggleSupp(id){
     let fid=1;
     if(sp.logFood){
       /* store raw — escaping happens at render, never at write */
-      const e={id:uid(), name:sp.name, kcal:+sp.kcal||0, p:+sp.p||0, c:+sp.c||0, f:+sp.f||0};
+      const e={id:uid(), name:sp.name, kcal:+sp.kcal||0, p:+sp.p||0, c:+sp.c||0, f:+sp.f||0, fb:+sp.fb||0};
       const day=S.food[d]=S.food[d]||{};
       (day.s=day.s||[]).push(e); fid=e.id;
       toast(sp.p? '+'+sp.p+'g protein logged to snacks' : sp.name+' ✓');
@@ -2258,10 +2255,11 @@ function weekStats(ws){
     });
     if(inBest>0 && preBest>0 && inBest>preBest) pr++;
   });
-  let slS=0,slN=0,slG7=0, waS=0,waN=0,waHit=0, brS=0,brN=0,brHit=0, kcS=0,ptS=0,fdN=0;
+  let slS=0,slN=0,slG7=0, waS=0,waN=0,waHit=0, brS=0,brN=0,brHit=0, kcS=0,ptS=0,fbS=0,fdN=0;
   for(let i=0;i<7;i++){
     const d=dShift(ws,i);
     const sl=S.sleep[d]; if(sl){ slS+=sl.hrs; slN++; if(sl.q==='g'&&sl.hrs>=7) slG7++; }
+    fbS += foodTotals(d).fb||0;
     const w=S.water[d]||0; if(w>0){ waS+=w; waN++; if(w>=S.settings.waterGoal) waHit++; }
     const bm=breathMins(d); if(bm>0){ brS+=bm; brN++; if(bm>=breathGoalMins()) brHit++; }
     const ft=foodTotals(d); if(ft.kcal>0){ kcS+=ft.kcal; ptS+=ft.p; fdN++; }
@@ -2271,7 +2269,8 @@ function weekStats(ws){
     sleep: slN? Math.round(slS/slN*10)/10 :0, slN:slN, slG7:slG7,
     water: waN? Math.round(waS/waN) :0, waHit:waHit,
     breath: brS, brDays:brN, brHit:brHit,
-    kcal: fdN? Math.round(kcS/fdN) :0, prot: fdN? Math.round(ptS/fdN) :0, fdN:fdN,
+    kcal: fdN? Math.round(kcS/fdN) :0, prot: fdN? Math.round(ptS/fdN) :0,
+    fiber: fdN? Math.round(fbS/fdN) :0, fdN:fdN,
     wDelta: wts.length>1? Math.round((wts[wts.length-1].kg-wts[0].kg)*10)/10 : null,
     wLast: wts.length? wts[wts.length-1].kg : null};
 }
@@ -2332,19 +2331,25 @@ function openReport(ws){
     row('Time training', Math.round(cur.dur/60)+' min','')+
     row('New PRs', cur.pr,'')+
     (gtxt? '<div class="tiny muted num" style="padding:8px 2px">Working sets: '+gtxt+'</div>' : '');
+  const rv=lastVo2(), rz=zone2Mins(7);
   h+=sect('Cardio & breathwork')+
     row('Distance', cur.km+' km', dif(cur.km,prv.km,' km'))+
+    row('Zone 2', rz+' min', rz>=150?'target met':'of 150-300')+
+    (rv? row('VO2max', rv.val+'', esc(rv.method)+', '+fmtD(rv.date)) : '')+
     /* total, not an average over practised days — an average makes one long
        session look better than a consistent week and flips the delta arrow */
     row('Breathwork', cur.breath+' min', dif(cur.breath,prv.breath,' min'))+
     row('Days practised', cur.brDays+' / 7','')+
     row('Goal days', cur.brHit+' / 7','');
+  const rr=sleepRegularity(14);
   h+=sect('Sleep')+
+    (rr? row('Regularity', rr.score+' / 100','bed \u00b1'+rr.sdBed+'m, wake \u00b1'+rr.sdWake+'m') : '')+
     row('Average', cur.slN? cur.sleep+' h':'-', dif(cur.sleep,prv.sleep,' h'))+
     row('Nights logged', cur.slN+' / 7','');
   h+=sect('Nutrition & water')+
     row('Avg calories', cur.fdN? cur.kcal+' kcal':'-', dif(cur.kcal,prv.kcal,''))+
     row('Avg protein', cur.fdN? cur.prot+' g':'-', dif(cur.prot,prv.prot,' g'))+
+    row('Avg fiber', cur.fdN? cur.fiber+' g':'-', dif(cur.fiber,prv.fiber,' g'))+
     row('Water goal days', cur.waHit+' / 7','')+
     row('Avg water', cur.water? Math.round(cur.water/100)/10+' L':'-','');
   h+=sect('Body')+
@@ -2705,7 +2710,7 @@ function holdBest(exId){
   return best;
 }
 function fmtSet(s, grp, timed){
-  if(grp==='Cardio') return s.w+'km/'+s.r+'min';
+  if(grp==='Cardio') return s.w+'km/'+s.r+'min'+(s.z?' Z2':'');
   if(timed) return ((+s.w)? s.w+'kg · ':'')+(s.r||0)+'s';
   return s.w+'×'+s.r;
 }
@@ -3579,6 +3584,11 @@ function delExercise(id){ if(!confirm('Delete exercise? Past logs keep their dat
 function openExInfo(exId){
   const name=exName(exId), g=exGroupOf(exId);
   let h='<h3>'+esc(name)+'</h3><div class="tiny muted" style="margin:-8px 0 12px">'+esc(g)+'</div>';
+  /* the card is reached mid-workout and from routine previews, so lead with
+     the one thing you actually want from it */
+  const rxT=targetFor(exId);
+  if(rxT) h+='<div style="background:var(--raised); border-radius:10px; padding:9px 11px; margin-bottom:12px">'+
+    '<div class="tiny num" style="color:var(--wk); font-weight:700">'+esc(rxT)+'</div></div>';
   const pat=patternOf(name,g);
   const im=(window.EXIMG||{})[name];
   if(im){
@@ -4189,22 +4199,23 @@ function addFoodForm(meal){
     '<div class="field"><label for="fP">Protein (g)</label><input id="fP" type="number" inputmode="numeric" placeholder="0"></div></div>'+
     '<div class="fields2"><div class="field"><label for="fC">Carbs (g)</label><input id="fC" type="number" inputmode="numeric" placeholder="0"></div>'+
     '<div class="field"><label for="fF">Fat (g)</label><input id="fF" type="number" inputmode="numeric" placeholder="0"></div></div>'+
+    '<div class="field"><label for="fFb">Fiber (g)</label><input id="fFb" type="number" inputmode="decimal" placeholder="0"></div>'+
     '<label class="row small" style="margin:4px 0 14px; gap:8px; cursor:pointer"><input type="checkbox" id="fSaveQ" style="width:20px;height:20px;accent-color:var(--fd)">Save as quick food</label>'+
     '<button class="btn food wide" onclick="saveFood(\''+meal+'\')">Add</button>';
   openSheet(h);
 }
 function saveFood(meal){
   const name=$('#fName').value.trim(); if(!name){ toast('Name the food'); return; }
-  const e={id:uid(), name:name, kcal:+$('#fK').value||0, p:+$('#fP').value||0, c:+$('#fC').value||0, f:+$('#fF').value||0};
+  const e={id:uid(), name:name, kcal:+$('#fK').value||0, p:+$('#fP').value||0, c:+$('#fC').value||0, f:+$('#fF').value||0, fb:+$('#fFb').value||0};
   const day=S.food[foodDate]=S.food[foodDate]||{};
   (day[meal]=day[meal]||[]).push(e);
-  if($('#fSaveQ').checked) S.quick.push({id:uid(), name:e.name, kcal:e.kcal, p:e.p, c:e.c, f:e.f});
+  if($('#fSaveQ').checked) S.quick.push({id:uid(), name:e.name, kcal:e.kcal, p:e.p, c:e.c, f:e.f, fb:e.fb});
   save(); closeSheet(); renderFood();
 }
 function quickAdd(meal,qid){
   const q=S.quick.find(function(x){return x.id===qid;}); if(!q) return;
   const day=S.food[foodDate]=S.food[foodDate]||{};
-  (day[meal]=day[meal]||[]).push({id:uid(), name:q.name, kcal:q.kcal, p:q.p, c:q.c, f:q.f});
+  (day[meal]=day[meal]||[]).push({id:uid(), name:q.name, kcal:q.kcal, p:q.p, c:q.c, f:q.f, fb:+q.fb||0});
   save(); closeSheet(); renderFood(); toast(q.name+' added');
 }
 function delFood(meal,id){
@@ -4697,6 +4708,9 @@ function obFinish(planKey){
   const st=S.settings;
   st.name=OB.name||''; st.height=String(OB.h||''); st.unit='kg';
   const w=OB.w||65, hgt=OB.h||170, age=OB.age||27;
+  /* the onboarding already asks for these for the BMR maths; keep them, or
+     VO2max banding has nothing to work with later */
+  st.age=String(age); st.sex=(OB.sex==='f'?'f':'m'); st.fiberGoal=30;
   const bmr = 10*w + 6.25*hgt - 5*age + (OB.sex==='f' ? -161 : 5);
   const adj = OB.goal==='gain' ? 300 : (OB.goal==='lose' ? -350 : 0);
   st.calGoal = Math.round((bmr*1.5 + adj)/50)*50;
@@ -4731,8 +4745,7 @@ function applyTheme(){
   if(m) m.content = S.settings.theme==='light' ? '#f3f1ea' : '#0e1214';
 }
 function setTheme(t){
-  S.settings.theme=t; save(); applyTheme();
-fiberBackfill(); openSettings();
+  S.settings.theme=t; save(); applyTheme(); openSettings();
 }
 
 /* ============ phase transition moment ============ */
@@ -4759,6 +4772,7 @@ function phaseBegin(){
 /* ============ boot ============ */
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSheet(); });
 applyTheme();
+fiberBackfill();   /* needs FOODDB, which is declared below the migration runner */
 setTimeout(function(){ const sp=$('#splash'); if(sp) sp.remove(); }, 1700);
 drawRestPresets();
 if(PUB && !S.settings.onboarded) setTimeout(obStart, 1500); else setTimeout(phaseMoment, 1900);
