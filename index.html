@@ -1926,7 +1926,7 @@ function checklistSheet(){
         (sp.p?' <span class="tiny muted num">· '+sp.p+'g protein</span>':'')+'</span>'+
         '<input type="checkbox" '+(on?'checked':'')+' onchange="toggleSupp(\''+sp.id+'\')" style="width:23px; height:23px; accent-color:var(--fd)"></label>';
     }).join('')+
-    '<div class="row" style="margin-top:12px"><a href="#" class="tiny" style="color:var(--ink2)" onclick="suppEditor();return false">Edit list</a></div>');
+    '<button class="btn wide" style="margin-top:14px" onclick="suppEditor()">Stack &amp; evidence: what each one is for</button>');
 }
 /* ============ supplements ============ */
 /* "Casein: before bed" -> "Casein". Punctuation-agnostic on purpose: stores
@@ -2013,7 +2013,8 @@ function suppEditor(){
     '<div style="border-bottom:1px solid var(--line); padding:9px 0">'+
       '<b class="small">NMN, resveratrol, testosterone boosters, longevity blends</b> '+tierChip('skip')+
       '<div class="tiny muted" style="line-height:1.55; margin-top:2px">Heavily marketed, thinly evidenced. If the label says "supports" or "promotes", that is the tell.</div></div>'+
-    '<p class="tiny muted" style="margin:14px 0 4px; line-height:1.6">Tiers reflect published human research, not a doctor who knows you. '+
+    '<button class="btn ghost wide" style="margin:14px 0 4px" onclick="protocolsSheet()">🔬 The rest of the protocols, graded</button>'+
+    '<p class="tiny muted" style="margin:12px 0 4px; line-height:1.6">Tiers reflect published human research, not a doctor who knows you. '+
     'This is not medical advice, and a blood test beats guessing for anything you are unsure about.</p>'+
     '<div class="field" style="margin-top:14px"><label for="spName">New supplement</label><input id="spName" placeholder="e.g. Vitamin D, Omega-3, Whey"></div>'+
     '<div class="fields3">'+
@@ -2187,7 +2188,8 @@ function protocolsSheet(){
       you+
       '<div class="tiny muted" style="line-height:1.55; margin-top:4px">'+p[3]+'</div></div>';
   }).join('');
-  h+='<p class="tiny muted" style="margin:14px 0 4px; line-height:1.6">Evidence grades reflect published human research. '+
+  h+='<button class="btn ghost wide" style="margin:14px 0 4px" onclick="suppEditor()">💊 Your supplement stack, graded the same way</button>'+
+    '<p class="tiny muted" style="margin:12px 0 4px; line-height:1.6">Evidence grades reflect published human research. '+
     'Most of the strong findings here are observational, which shows association rather than cause. This is not medical advice.</p>';
   openSheet(h);
 }
@@ -2601,7 +2603,11 @@ function renderToday(){
       (pend.length
         ? '<div class="tiny muted" style="margin-top:4px">Pending: '+esc(pend.slice(0,4).join(', '))+(pend.length>4?' +'+(pend.length-4):'')+'</div>'
         : '<div class="tiny" style="margin-top:4px; color:var(--good)">All done ✓</div>')+
-      '</button>';
+      '</button>'+
+      '<div class="row" style="gap:8px; margin:-6px 0 14px">'+
+        '<button class="btn ghost sm grow" onclick="suppEditor()">💊 Stack &amp; evidence</button>'+
+        '<button class="btn ghost sm grow" onclick="protocolsSheet()">🔬 What the research says</button>'+
+      '</div>';
   }
   /* ===== daily protocols: the small, well-evidenced levers ===== */
   const reg=sleepRegularity(14), sa=saunaWeek(), late=caffLate(), cut=caffCutoff();
@@ -2626,7 +2632,8 @@ function renderToday(){
     '<button class="chip" onclick="openReport()">📊 Report</button>'+
     '<button class="chip num" onclick="go(\'body\')">⚖️ '+(lastW? lastW.kg+' '+unit() : 'Weight')+'</button>'+
     '<button class="chip" onclick="planEditor()">📅 Plan</button>'+
-    '<button class="chip" onclick="protocolsSheet()">🔬 Protocols</button>'+
+    '<button class="chip" onclick="protocolsSheet()">🔬 What the research says</button>'+
+    '<button class="chip" onclick="suppEditor()">💊 Supplements</button>'+
     '<button class="chip" onclick="go(\'body\')">📸 Photos</button>'+
     '</div>';
   if(S.sessions.length>=3 && (!S.lastBackup || S.lastBackup<dShift(today(),-14))){
