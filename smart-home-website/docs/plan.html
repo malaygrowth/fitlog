@@ -173,7 +173,7 @@ td .pct{font-family:'Oswald',sans-serif;font-variant-numeric:tabular-nums;color:
   margin-top:28px;border:1px solid var(--rule);
   background:#0E1116;color:#E8E6E1;
   display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);
-  --glow:#FFC978;--lvl:.62;--curtain:12%;
+  --glow:#FFC978;--lvl:.62;--curtain:46%;--sky:.45;
 }
 @media(max-width:760px){.demo{grid-template-columns:1fr}}
 .room{position:relative;min-height:322px;overflow:hidden;background:#0E1116}
@@ -182,10 +182,11 @@ td .pct{font-family:'Oswald',sans-serif;font-variant-numeric:tabular-nums;color:
    linear-gradient(#161A20,#0C0F13);
   transition:background 900ms ease}
 .window{position:absolute;left:12%;right:12%;top:16%;bottom:26%;background:linear-gradient(#20303F,#101A24);border:1px solid #2C3742;overflow:hidden}
-.sky{position:absolute;inset:0;background:linear-gradient(#3E5A72,#7E6A57);opacity:calc(1 - var(--lvl)*.5);transition:opacity 900ms ease}
+.sky{position:absolute;inset:0;background:linear-gradient(#3E5A72,#7E6A57);opacity:var(--sky);transition:opacity 900ms ease}
 .curt{position:absolute;top:0;bottom:0;width:52%;background:linear-gradient(90deg,#2A2721,#3A362D 40%,#242119);transition:transform 1100ms cubic-bezier(.4,0,.2,1)}
-.curt.l{left:0;transform:translateX(calc(-100% + var(--curtain)))}
-.curt.r{right:0;transform:translateX(calc(100% - var(--curtain)))}
+/* --curtain = how far the curtains are drawn back: 0% closed, 100% open */
+.curt.l{left:0;transform:translateX(calc(-1 * var(--curtain)))}
+.curt.r{right:0;transform:translateX(var(--curtain))}
 .lamp-fx{position:absolute;left:50%;top:0;width:58%;height:64%;transform:translateX(-50%);
   background:radial-gradient(50% 60% at 50% 0%, color-mix(in srgb, var(--glow) 70%, transparent), transparent 70%);
   opacity:var(--lvl);transition:opacity 900ms ease,background 900ms ease;pointer-events:none}
@@ -616,16 +617,16 @@ footer{padding:38px 0 60px}
 <script>
 (function(){
   var scenes = {
-    morning: {lvl:.12, curtain:'86%', glow:'#FFE7B8', light:'Off', curt:'Open',  temp:'26°C', stat:'Home',
+    morning: {lvl:.12, curtain:'86%', sky:1, glow:'#FFE7B8', light:'Off', curt:'Open',  temp:'26°C', stat:'Home',
               desc:'Curtains open at 6:40. Lights stay off — there is enough sun.',
               voice:'"Alexa, good morning"'},
-    evening: {lvl:.62, curtain:'46%', glow:'#FFC978', light:'60%', curt:'Half',  temp:'24°C', stat:'Home',
+    evening: {lvl:.62, curtain:'46%', sky:.45, glow:'#FFC978', light:'60%', curt:'Half',  temp:'24°C', stat:'Home',
               desc:'Warm light at sixty percent, curtains half drawn, AC holding twenty-four.',
               voice:'"Alexa, good evening"'},
-    movie:   {lvl:.20, curtain:'4%',  glow:'#FF9E5E', light:'20%', curt:'Closed',temp:'23°C', stat:'Do not disturb',
+    movie:   {lvl:.20, curtain:'4%',  sky:.1,  glow:'#FF9E5E', light:'20%', curt:'Closed',temp:'23°C', stat:'Do not disturb',
               desc:'Lights to twenty percent, curtains fully closed, AC down a degree.',
               voice:'"Alexa, movie time"'},
-    away:    {lvl:.03, curtain:'8%',  glow:'#7FA6C4', light:'Off', curt:'Closed',temp:'Off',  stat:'Armed',
+    away:    {lvl:.03, curtain:'8%',  sky:.18,  glow:'#7FA6C4', light:'Off', curt:'Closed',temp:'Off',  stat:'Armed',
               desc:'Every load off, curtains closed, sensors armed. One tap at the door.',
               voice:'"Alexa, I am leaving"'}
   };
@@ -641,6 +642,7 @@ footer{padding:38px 0 60px}
     var s = scenes[name]; if(!s) return;
     demo.style.setProperty('--lvl', s.lvl);
     demo.style.setProperty('--curtain', s.curtain);
+    demo.style.setProperty('--sky', s.sky);
     demo.style.setProperty('--glow', s.glow);
     el.light.textContent = s.light; el.curt.textContent = s.curt;
     el.temp.textContent  = s.temp;  el.stat.textContent = s.stat;

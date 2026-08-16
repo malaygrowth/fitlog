@@ -1,0 +1,176 @@
+---
+import Base from '../layouts/Base.astro';
+import SceneDemo from '../components/SceneDemo.astro';
+import { site, packages, whatsappLink } from '../data/site';
+import { services } from '../data/services';
+---
+
+<Base title={`${site.name} — ${site.tagline}`}>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <h1 class="dsp">
+        Wired for<br />the way you<br />actually live
+        <span class="accent-line">switches, curtains, scenes, climate, voice</span>
+      </h1>
+      <div class="measure" style="margin-top:26px">
+        <p class="lede">
+          We design your home room by room, install it in days rather than weeks,
+          and hand it over working — with the wall switches still doing exactly
+          what they always did.
+        </p>
+      </div>
+      <div class="cta">
+        <a class="btn btn--primary" href="#packages">See packages &amp; prices</a>
+        <a class="btn btn--ghost" href={whatsappLink()} rel="noopener">Ask on WhatsApp</a>
+      </div>
+      <div class="facts">
+        <span class="chip chip--brass">2BHK from ₹—</span>
+        <span class="chip">Most homes installed in 4 days</span>
+        <span class="chip chip--teal">Manual switches always work</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">Try a scene</h2></div>
+      <div class="measure" style="margin-top:16px">
+        <p class="lede">
+          Nobody wants a smart switch. They want the house to already know it is
+          evening. Tap one and watch the room.
+        </p>
+      </div>
+      <div style="margin-top:28px">
+        <SceneDemo />
+      </div>
+      <p class="small" style="margin-top:12px">
+        This is a real scene — lights, curtains and climate moving on one
+        instruction. In your home it runs on a tap, your voice, or by itself at
+        sunset.
+      </p>
+    </div>
+  </section>
+
+  <section class="band band--paper" id="services">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">What we install</h2></div>
+      <div class="grid grid--3" style="margin-top:28px">
+        {
+          services.map((s) => (
+            <a class="card" href={`/services/${s.slug}/`}>
+              <h3 class="dsp">{s.name}</h3>
+              <p>{s.thesis}</p>
+              <span class="price">Read more →</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="packages">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">Packages</h2></div>
+      <div class="measure" style="margin-top:16px">
+        <p class="lede">
+          Honest ranges, published. Your final number comes from the survey — but
+          you should not have to ring us to find out whether we are in your budget.
+        </p>
+      </div>
+      <div class="grid grid--3" style="margin-top:28px">
+        {
+          packages.map((p) => (
+            <div class="card">
+              <span class="eyebrow">{p.fits}</span>
+              <h3 class="dsp">{p.name}</h3>
+              <p>{p.blurb}</p>
+              <ul>
+                {p.includes.map((i) => (
+                  <li>{i}</li>
+                ))}
+              </ul>
+              <span class="price">{p.price}</span>
+            </div>
+          ))
+        }
+      </div>
+      <p class="small" style="margin-top:14px">
+        Prices are for the core scope and exclude civil work. An estimator that
+        prices your exact home is coming — until then, WhatsApp us your floor plan.
+      </p>
+    </div>
+  </section>
+
+  <section class="band band--paper">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">The honest answers</h2></div>
+      <div class="measure" style="margin-top:16px">
+        <p class="lede">
+          The five things people actually worry about before they buy. We would
+          rather answer them here than dodge them on a call.
+        </p>
+      </div>
+      <div class="worries" style="margin-top:26px">
+        <div class="worry">
+          <h3>What does it really cost to run and maintain?</h3>
+          <p>
+            Package ranges are published above. Beyond the warranty, an annual
+            service plan covers firmware, batteries, re-configuration and
+            call-outs, and we will quote it before you commit — not after
+            something breaks.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>Will it still be working in three years?</h3>
+          <p>
+            We lead with standards-based hardware, Matter first where it exists,
+            so your house does not depend on one company staying interested. Where
+            a product is proprietary we say so before you buy it.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>What happens when the internet or the power goes?</h3>
+          <p>
+            Every wall switch keeps working. Automations run locally wherever the
+            hardware allows. An outage costs you remote access, not your lights.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>Who can see inside my home?</h3>
+          <p>
+            You choose. Cameras can record locally with nothing leaving the house,
+            and voice assistants are optional room by room. We will configure the
+            private version by default if you ask.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>Is my family going to find this complicated?</h3>
+          <p>
+            This is the one we care most about. The switches on the wall work the
+            way they always have. Scenes run on schedule. Voice needs no screen.
+            The app is for whoever in the house enjoys it.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band--tight band">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Start with a survey</h2>
+        <p class="lede">
+          We come to your home, look at your wiring and your back boxes, and tell
+          you what is possible and what it costs. No obligation, and no quote
+          written before we have seen the place.
+        </p>
+        <div class="hero cta" style="padding:0;border:0;margin-top:8px">
+          <a class="btn btn--wa" href={whatsappLink()} rel="noopener">Book on WhatsApp</a>
+          <a class="btn btn--ghost" href={site.phoneHref}>{site.phone}</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

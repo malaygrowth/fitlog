@@ -1,0 +1,129 @@
+---
+import Base from '../../layouts/Base.astro';
+import { services } from '../../data/services';
+import { site, whatsappLink } from '../../data/site';
+
+export function getStaticPaths() {
+  return services.map((service) => ({
+    params: { slug: service.slug },
+    props: { service },
+  }));
+}
+
+const { service } = Astro.props;
+
+/** Turns **emphasis** in the copy into real markup. */
+const bold = (s: string) =>
+  s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+const others = services.filter((s) => s.slug !== service.slug);
+---
+
+<Base
+  title={`${service.name} — ${site.name}`}
+  description={service.lede}
+  waContext={service.name.toLowerCase()}
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">{service.name}</p>
+      <h1 class="dsp" style="font-size:clamp(2.2rem,5.4vw,4rem)">
+        {service.headline}
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">{service.lede}</p>
+      </div>
+      <div class="cta">
+        <a class="btn btn--wa" href={whatsappLink(service.name.toLowerCase())} rel="noopener">
+          Ask about {service.short.toLowerCase()}
+        </a>
+        <a class="btn btn--ghost" href="/#packages">See packages</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="measure">
+        <p
+          class="accent-line"
+          style="font-size:clamp(1.4rem,3vw,2.1rem);border-top:3px solid var(--brass);padding-top:24px"
+        >
+          {service.thesis}
+        </p>
+      </div>
+      <div class="prose" style="margin-top:32px">
+        {service.body.map((p) => <p set:html={bold(p)} />)}
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--paper">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">The specifics</h2></div>
+      <dl class="spec" style="margin-top:26px">
+        {
+          service.detail.map((d) => (
+            <div>
+              <dt>{d.label}</dt>
+              <dd>{d.value}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">What people ask</h2></div>
+      <div class="worries" style="margin-top:26px">
+        {
+          service.worries.map((w) => (
+            <div class="worry">
+              <h3>{w.q}</h3>
+              <p>{w.a}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--paper">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">Also worth seeing</h2></div>
+      <div class="grid grid--3" style="margin-top:26px">
+        {
+          others.map((s) => (
+            <a class="card" href={`/services/${s.slug}/`}>
+              <h3 class="dsp">{s.name}</h3>
+              <p>{s.thesis}</p>
+              <span class="price">Read more →</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Book a survey</h2>
+        <p class="lede">
+          Send us a photo of your switchboard and your floor plan on WhatsApp and
+          we will tell you what is possible before anyone visits.
+        </p>
+        <div class="cta" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn--wa" href={whatsappLink(service.name.toLowerCase())} rel="noopener">
+            Message us
+          </a>
+          <a class="btn btn--ghost" href={site.phoneHref}>{site.phone}</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

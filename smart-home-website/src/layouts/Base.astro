@@ -1,0 +1,118 @@
+---
+import '../styles/global.css';
+import { site, whatsappLink } from '../data/site';
+import { services } from '../data/services';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Pre-fills the WhatsApp message with what the visitor is reading */
+  waContext?: string;
+}
+
+const { title, description = site.description, waContext } = Astro.props;
+const path = Astro.url.pathname;
+const isCurrent = (href: string) =>
+  href === '/' ? path === '/' : path.startsWith(href);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={new URL(path, Astro.site)} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <link
+      rel="preload"
+      href="/fonts/oswald.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="wrap bar">
+        <a class="brand" href="/">{site.name}</a>
+        <nav class="nav" aria-label="Main">
+          {
+            services.slice(0, 4).map((s) => (
+              <a
+                class="nav-secondary"
+                href={`/services/${s.slug}/`}
+                aria-current={isCurrent(`/services/${s.slug}/`) ? 'page' : undefined}
+              >
+                {s.short}
+              </a>
+            ))
+          }
+          <a href={whatsappLink(waContext)} rel="noopener">Get an estimate</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="foot">
+      <div class="wrap">
+        <div class="cols">
+          <div>
+            <h4>Services</h4>
+            <ul>
+              {
+                services.map((s) => (
+                  <li>
+                    <a href={`/services/${s.slug}/`}>{s.name}</a>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+          <div>
+            <h4>Company</h4>
+            <ul>
+              <li><a href="/">Home</a></li>
+              <li><span style="color:var(--muted-on-night)">Projects — coming</span></li>
+              <li><span style="color:var(--muted-on-night)">How it works — coming</span></li>
+              <li><span style="color:var(--muted-on-night)">Service &amp; AMC — coming</span></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Talk to us</h4>
+            <ul>
+              <li><a href={whatsappLink(waContext)} rel="noopener">WhatsApp</a></li>
+              <li><a href={site.phoneHref}>{site.phone}</a></li>
+              <li><a href={`mailto:${site.email}`}>{site.email}</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Where we work</h4>
+            <ul>
+              {site.cities.map((c) => <li>{c}</li>)}
+            </ul>
+          </div>
+        </div>
+        <div class="base">
+          <span>&copy; {new Date().getFullYear()} {site.name}</span>
+          <span>Switches, curtains, scenes, climate and voice.</span>
+        </div>
+      </div>
+    </footer>
+
+    <a
+      class="btn btn--wa wa-float"
+      href={whatsappLink(waContext)}
+      rel="noopener"
+      aria-label="Message us on WhatsApp"
+    >
+      WhatsApp us
+    </a>
+  </body>
+</html>
