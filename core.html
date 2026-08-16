@@ -139,7 +139,7 @@
   .bar i{display:block; height:100%; border-radius:99px}
 
   /* set table */
-  .sethead,.setrow{display:grid; grid-template-columns:34px 1fr 68px 48px; gap:7px; align-items:center}
+  .sethead,.setrow{display:grid; grid-template-columns:38px 1fr 76px 64px 46px; gap:7px; align-items:center}
   /* lifting rows carry increment buttons so a set can be adjusted without the
      keyboard covering half the screen */
   .setrow.lift,.sethead.lift{grid-template-columns:30px 26px 1fr 26px 26px 54px 26px 42px; gap:4px}
@@ -453,7 +453,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='1.8.0';
+const APP_VER='1.9.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -478,6 +478,10 @@ const DEF_EX=[
   ['High knees','Conditioning'],['Kettlebell swing','Conditioning'],['Farmer’s carry','Conditioning'],
   ['Bear crawl','Conditioning'],['Broad jump','Conditioning'],
   ['Rowing (erg)','Cardio'],['SkiErg','Cardio'],
+  /* VO2max intervals, one per modality: bike km and SkiErg metres are not
+     comparable, so they must not share a history */
+  ['VO2max 4×4 (bike)','Cardio'],['VO2max 4×4 (rower)','Cardio'],
+  ['VO2max 4×4 (SkiErg)','Cardio'],['VO2max 4×4 (incline walk)','Cardio'],
   ['Wall balls','Conditioning'],['Burpee broad jump','Conditioning'],
   ['Sled push','Conditioning'],['Sled pull','Conditioning'],['Sandbag lunges','Conditioning'],
   ['Dumbbell bench press','Chest'],['Decline dumbbell press','Chest'],['Goblet squat','Legs'],
@@ -495,7 +499,8 @@ const SEED_RT=[
   {name:'Conditioning: joint-friendly', ex:['Cycling','Kettlebell swing','Farmer’s carry','Glute bridge','Plank']},
   {name:'Hyrox stations', ex:['Rowing (erg)','Wall balls','Burpee broad jump','Farmer’s carry','Sandbag lunges','Kettlebell swing']},
   {name:'Mobility & flexibility (~20 min)', ex:['Cat-cow','Downward dog to cobra',"World's greatest stretch",'90/90 hip switch','Deep squat hold','Couch stretch','Standing hamstring fold','Shoulder dislocates (stick)','Cossack squat','Dead hang']},
-  {name:'Agility & conditioning', ex:['Jumping jacks','High knees','Mountain climbers','Cossack squat','Bear crawl','Burpees','Kettlebell swing']}
+  {name:'Agility & conditioning', ex:['Jumping jacks','High knees','Mountain climbers','Cossack squat','Bear crawl','Burpees','Kettlebell swing']},
+  {name:'VO2max intervals (4×4)', ex:['VO2max 4×4 (bike)']}
 ];
 const SEED_QK=[
   {name:'Whey (1 scoop)',kcal:130,p:24,c:4,f:2,fb:0},{name:'Casein (1 scoop)',kcal:120,p:24,c:4,f:1,fb:0},
@@ -1011,12 +1016,37 @@ function fiberBackfill(){
   save();
 }
 
+/* v22: VO2max interval training. The app could measure VO2max and track zone 2
+   but had nothing that actually trained the top end. Thursday is reassigned
+   only if it still holds the seeded conditioning routine, so a hand-edited plan
+   is never overwritten. */
+function seedV22(){
+  if(PUB){ S.seedV22=true; return; }
+  if(S.seedV22) return; S.seedV22=true;
+  [['VO2max 4×4 (bike)','Cardio'],['VO2max 4×4 (rower)','Cardio'],
+   ['VO2max 4×4 (SkiErg)','Cardio'],['VO2max 4×4 (incline walk)','Cardio']].forEach(function(e){
+    if(!S.exercises.some(function(x){return x.name===e[0];}))
+      S.exercises.push({id:uid(), name:e[0], group:e[1]});
+  });
+  const RT='VO2max intervals (4×4)';
+  let rt=S.routines.find(function(r){return r.name===RT;});
+  if(!rt){
+    const bike=S.exercises.find(function(x){return x.name==='VO2max 4×4 (bike)';});
+    if(bike){ rt={id:uid(), name:RT, exIds:[bike.id]}; S.routines.push(rt); }
+  }
+  if(rt){
+    const cond=S.routines.find(function(r){return r.name==='Conditioning: joint-friendly';});
+    if(!S.plan[4] || (cond && S.plan[4]===cond.id)) S.plan[4]=rt.id;
+  }
+  save();
+}
+
 /* ============ migration runner ============
    Ordered and append-only — this list IS the execution order (it preserves
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
-const SCHEMA=21;
+const SCHEMA=22;
 /* Snapshot the store as it was BEFORE this build's migrations touch it, so a bad
    upgrade is recoverable instead of permanent. Written once per schema bump. */
 (function(){
@@ -1028,7 +1058,7 @@ const SCHEMA=21;
   }catch(e){}
 })();
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
- seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20, seedV21].forEach(function(step){ step(); });
+ seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20, seedV21, seedV22].forEach(function(step){ step(); });
 /* Persist the stamp explicitly. It used to ride along on whatever happened to
    call save() next, which made both the migration guards and the pre-upgrade
    snapshot depend on timing rather than intent. */
@@ -1291,7 +1321,7 @@ function round25(x){ return Math.round(x/2.5)*2.5; }
    three sessions rather than a single top set, so a session that fell apart
    and one that was comfortable no longer look identical. */
 
-const RXLABEL={up:'↑', deload:'↓', reps:'→', comeback:'⟲', first:'•', progress:'↑', steady:'→', hold:'='};
+const RXLABEL={up:'↑', deload:'↓', reps:'→', comeback:'⟲', first:'•', progress:'↑', steady:'→', hold:'=', intervals:'⚡'};
 /* One banner explaining any readiness hold, so a lighter day is never a
    mystery. Returns '' when nothing is being held back. */
 function readinessBanner(){
@@ -1306,6 +1336,8 @@ function readinessBanner(){
 function schemeFor(exId){
   const e=S.exercises.find(function(x){return x.id===exId;})||{};
   if(e.scheme) return e.scheme;
+  const iv=exIv(exId);
+  if(iv) return {sets:iv.rounds, lo:0, hi:0};
   const g=exGroupOf(exId);
   if(g==='Cardio') return {sets:1, lo:0, hi:0};
   if(g==='Mobility') return {sets:2, lo:30, hi:45};
@@ -1423,6 +1455,19 @@ function prescribe(exId){
   const hist=historyFor(exId,3);
   const mk=function(w,r,n){ const a=[]; for(let i=0;i<(n||sc.sets);i++) a.push({w:w,r:r}); return a; };
 
+  const iv=exIv(exId);
+  if(iv){
+    const hr=hrTarget();
+    const mins=Math.round(iv.work/60);
+    const prev=hist.length? hist[0].sets : null;
+    const best=prev? Math.max.apply(null, prev.map(function(t){return +t.w||0;})) : 0;
+    return {sets:mk('', mins, iv.rounds),
+      why: iv.rounds+' × '+mins+' min hard, '+Math.round(iv.rest/60)+' min easy between. '+
+        (hr? 'Aim for '+hr.lo+'-'+hr.hi+' bpm, about 85-95% of your estimated max of '+hr.max+'.'
+           : 'Hard enough that talking is down to a few words at a time; set your age in Settings for a heart-rate target.')+
+        (best? ' Best interval so far '+best+' km.' : ' Log the distance of each interval so the next one has something to beat.'),
+      tag:'intervals', iv:iv};
+  }
   if(g==='Cardio'){
     const cb=hist.length? hist[0].sets[0] : null;
     return {sets:mk(cb?cb.w:'', cb?cb.r:'', 1),
@@ -1612,6 +1657,22 @@ const PATTERN_STEPS={
 /* Movements with no honest photo in the public-domain set get their own drawing
    rather than a generic group diagram. Showing the wrong exercise on a rehab
    card is worse than showing none. */
+/* The Norwegian 4x4: four minutes hard, three easy, four times. Long intervals
+   rather than the fashionable 30/30, because 3-5 minute work bouts hold you
+   above 90% VO2max for considerably longer. */
+const EX_IV={
+  'VO2max 4×4 (bike)':        {work:240, rest:180, rounds:4},
+  'VO2max 4×4 (rower)':       {work:240, rest:180, rounds:4},
+  'VO2max 4×4 (SkiErg)':      {work:240, rest:180, rounds:4},
+  'VO2max 4×4 (incline walk)':{work:240, rest:180, rounds:4}
+};
+function exIv(exId){ return EX_IV[exName(exId)]||null; }
+/* Tanaka rather than 220-age: better fit in adults, and the app knows your age */
+function hrMax(){ const a=+S.settings.age||0; return a? Math.round(208 - 0.7*a) : null; }
+function hrTarget(){
+  const m=hrMax(); if(!m) return null;
+  return {lo:Math.round(m*0.85), hi:Math.round(m*0.95), max:m};
+}
 const PAT_EX={
   'Dead hang':'exhang', 'Wall sit (pain-free)':'exwall', 'Deep squat hold':'exdsquat',
   'Cossack squat':'excossack', 'Thoracic rotations':'exthor',
@@ -2119,6 +2180,8 @@ const PROTOCOLS=[
    'The strongest finding here. In 61,000 UK Biobank participants, regularity of sleep timing predicted all-cause mortality better than sleep duration did: the least regular quintile carried 20-48% higher risk, independent of how long they slept. Worth more than an extra hour in bed.'],
   ['Steam bath, 2-3+ times a week','moderate','15-20 minutes, as hot as is comfortable.',
    'Worth doing, but the headline numbers you will have read do not transfer. The 24-63% mortality reductions come from a Finnish cohort using DRY sauna at 70-100C, where core temperature climbs enough to mimic light cardiovascular work. A steam room runs 40-50C at 100% humidity: heart rate rises, but core temperature rises much more modestly, and the direct research on steam is thin by comparison. Treat it as good heat exposure and good for the airways, not as the Finnish result.'],
+  ['4x4 intervals, once or twice a week','strong','4 min hard, 3 min easy, four times.',
+   'The best-evidenced way to raise VO2max. A meta-analysis of 37 studies found 3-5 minute work bouts produce the largest gains, and one trial measured 46% more improvement than the same volume done at a steady moderate pace. Worth knowing that the popular 30/30 short intervals are the weaker choice: a 2025 study found they held people above 90% of VO2max for barely half as long as 3-minute intervals, despite feeling harder.'],
   ['Zone 2 and VO2max','strong','150-300 min a week easy, plus something hard.',
    'Cardiorespiratory fitness tracks all-cause mortality more closely than blood pressure, cholesterol or smoking status. Moving off the bottom quartile is where most of the benefit sits.'],
   ['10-20 hard sets per muscle, weekly','strong','Spread over 2-3 sessions, not one.',
@@ -2782,7 +2845,9 @@ function routineStats(exIds){
     /* Mobility flows straight through with no rest (toggleSet doesn't start a
        rest timer for it either), so charging it 90s a set made a 15-minute
        rehab block read as 47 */
-    if(g==='Cardio') secs += n*600;
+    const ivS=exIv(id);
+    if(ivS) secs += ivS.rounds*(ivS.work+ivS.rest);
+    else if(g==='Cardio') secs += n*600;
     else secs += n*((isTimedEx(id)?45:40) + exRest(id));
     if(prescribe(id).tag==='up') ready++;   /* only an earned load increase counts */
   });
@@ -3219,6 +3284,9 @@ function sessionHTML(){
       '<span class="row" style="gap:6px"><button class="btn ghost sm" onclick="restPicker(\''+e.exId+'\')">⏱ '+fmtRest(exRest(e.exId))+'</button>'+
       '<button class="btn ghost sm danger" onclick="rmSessionEx('+ei+')">✕</button></span></div>';
     const rx=prescribe(e.exId), tg=rx.why;
+    if(rx.tag==='intervals')
+      h+='<button class="btn primary wide" style="margin-top:10px" onclick="startIntervals(\''+e.exId+'\')">'+
+        '⚡ Start the '+rx.iv.rounds+' × '+Math.round(rx.iv.work/60)+' min timer</button>';
     if(pv||tg){
       h+='<div style="background:var(--raised); border-radius:10px; padding:8px 10px; margin-top:8px">';
       if(pv) h+='<div class="tiny muted num">prev &nbsp;'+pv+'</div>';
@@ -3277,6 +3345,21 @@ function sessionHTML(){
   h+='<button class="btn primary wide" style="margin-top:10px" onclick="finishSession()">Finish workout</button>'+
      '<div class="tiny muted" style="text-align:center; margin-top:10px">Tick an empty set to auto-fill last time’s numbers · tap the set number for warm-up (W), or Z on cardio for zone 2</div>';
   return h;
+}
+/* The HIIT timer already does exactly this job; preset it rather than making
+   the user dial 4 minutes and 3 minutes in by hand. */
+function startIntervals(exId){
+  const iv=exIv(exId); if(!iv) return;
+  const w=$('#hiWork'), r=$('#hiRest'), n=$('#hiRounds');
+  if(w) w.value=iv.work;
+  if(r) r.value=iv.rest;
+  if(n) n.value=iv.rounds;
+  S.settings.hiit={w:iv.work, r:iv.rest, n:iv.rounds}; save();
+  if(typeof hiReset==='function') hiReset();
+  go('timers');
+  if(typeof timerView==='function') timerView('hi');   /* the rounds timer, not the stopwatch */
+  vib(12);
+  toast(iv.rounds+' × '+Math.round(iv.work/60)+' min ready, hit start when you are');
 }
 function toggleZ2(ei,si){
   const st=S.active.ex[ei].sets[si];
