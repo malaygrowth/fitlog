@@ -40,7 +40,7 @@ function check(name, cond, detail) {
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 21, boot.schema);
+  check('schemaVersion stamped', boot.schema === 22, boot.schema);
   check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
@@ -334,6 +334,72 @@ function check(name, cond, detail) {
   check('zone 2 shows on a cardio set, and only when flagged', audit.z2Shown && audit.z2Absent, audit);
   check('onboarding stores age, sex and a fiber goal', audit.onboarding.length === 0, audit.onboarding);
   check('the exercise card leads with what to lift today', audit.cardLeads);
+
+  console.log('VO2max interval training');
+  const ivt = await page.evaluate(() => {
+    const g = {};
+    const rt = S.routines.find((r) => /VO2max intervals/.test(r.name));
+    g.routine = !!rt;
+    g.stats = routineStats(rt.exIds);
+    const id = rt.exIds[0];
+    const rx = prescribe(id);
+    g.tag = rx.tag; g.sets = rx.sets.length; g.mins = rx.sets[0].r;
+    g.hrInWhy = /158-177/.test(rx.why);
+    g.hrMax = hrMax();
+    // all four modalities carry the protocol
+    g.modalities = ['bike', 'rower', 'SkiErg', 'incline walk'].map((m) => {
+      const e = S.exercises.find((x) => x.name === 'VO2max 4×4 (' + m + ')');
+      return !!(e && exIv(e.id));
+    });
+    // a plain cardio exercise is untouched
+    g.plainCardio = prescribe(S.exercises.find((x) => x.name === 'Cycling').id).tag;
+    // no age: fall back to words, never NaN
+    const savedAge = S.settings.age; S.settings.age = '';
+    const noAge = prescribe(id).why;
+    g.noAgeSafe = !/NaN|undefined/.test(noAge) && /few words/.test(noAge);
+    S.settings.age = savedAge;
+    // the timer hand-off
+    startIntervals(id);
+    g.timer = document.querySelector('#hiWork').value + '/' + document.querySelector('#hiRest').value
+      + '/' + document.querySelector('#hiRounds').value;
+    g.subTab = (document.querySelector('[data-tv].on') || {}).dataset.tv;
+    // Thursday reassigned, and a hand-edited plan protected
+    g.thursday = (S.routines.find((r) => r.id === S.plan[4]) || {}).name;
+    const savedPlan = S.plan[4], pull = S.routines.find((r) => /Pull: wrist/.test(r.name));
+    S.plan[4] = pull.id; delete S.seedV22; seedV22();
+    g.planRespected = S.plan[4] === pull.id;
+    S.plan[4] = savedPlan; save();
+    // logging: four intervals, none of it counted as zone 2
+    const savedSessions = S.sessions;
+    S.sessions = [{ id: 'iv1', name: 'VO2max intervals (4×4)', date: today(), dur: 1, vol: 0, prs: [],
+      ex: [{ exId: id, sets: [{ w: 1.2, r: 4, done: true }, { w: 1.2, r: 4, done: true },
+                              { w: 1.1, r: 4, done: true }, { w: 1.1, r: 4, done: true }] }] }];
+    g.loggedSets = S.sessions[0].ex[0].sets.length;
+    g.notZone2 = zone2Mins(7) === 0;
+    S.sessions = savedSessions; save();
+    // the layout regression: non-lift rows need all five cells on one line
+    startSession(rt.id); closeSheet();
+    const row = document.querySelector('#tab-workout .setrow');
+    g.rowCols = row ? getComputedStyle(row).gridTemplateColumns.split(' ').length : 0;
+    g.rowChildren = row ? row.children.length : 0;
+    g.hasTimerButton = /startIntervals\(/.test(document.querySelector('#tab-workout').innerHTML);
+    cancelSession(); closeSheet();
+    return g;
+  });
+  check('the 4×4 routine exists', ivt.routine);
+  check('it estimates ~28 min over 4 intervals, not a flat cardio guess', ivt.stats.mins >= 25 && ivt.stats.mins <= 32 && ivt.stats.sets === 4, ivt.stats);
+  check('it prescribes 4 work bouts of 4 minutes', ivt.tag === 'intervals' && ivt.sets === 4 && ivt.mins === 4, ivt);
+  check('heart-rate target from Tanaka (186 max, 158-177 band)', ivt.hrMax === 186 && ivt.hrInWhy, ivt);
+  check('all four modalities carry the protocol', ivt.modalities.every(Boolean), ivt.modalities);
+  check('ordinary cardio still gets the steady prescription', ivt.plainCardio === 'steady', ivt.plainCardio);
+  check('no age falls back to words, never NaN', ivt.noAgeSafe);
+  check('the timer preloads 240/180/4 and opens on Rounds', ivt.timer === '240/180/4' && ivt.subTab === 'hi', ivt);
+  check('Thursday holds the interval session', /VO2max intervals/.test(ivt.thursday || ''), ivt.thursday);
+  check('a hand-edited plan day is never overwritten', ivt.planRespected);
+  check('four intervals log as four sets', ivt.loggedSets === 4, ivt.loggedSets);
+  check('interval work is not counted as zone 2', ivt.notZone2);
+  check('cardio set rows still fit on one line', ivt.rowCols === 5 && ivt.rowChildren === 5, ivt);
+  check('the session offers the interval timer', ivt.hasTimerButton);
 
   console.log('discoverability: can you actually find these screens');
   const disc = await page.evaluate(() => {
@@ -668,8 +734,8 @@ function check(name, cond, detail) {
     stampedNow: S.schemaVersion,
     persisted: (JSON.parse(localStorage.getItem('fitlog.v1') || '{}')).schemaVersion,
   }));
-  check('an upgrade writes the pre-update snapshot', snap.hasSnapshot && snap.meta && snap.meta.to === 21 && snap.meta.from === 12, snap.meta);
-  check('the schema stamp is actually persisted, not left to chance', snap.persisted === 21 && snap.stampedNow === 21, snap);
+  check('an upgrade writes the pre-update snapshot', snap.hasSnapshot && snap.meta && snap.meta.to === 22 && snap.meta.from === 12, snap.meta);
+  check('the schema stamp is actually persisted, not left to chance', snap.persisted === 22 && snap.stampedNow === 22, snap);
 
   const past = await page.evaluate(() => {
     const d = dShift(today(), -3);
@@ -838,7 +904,7 @@ function check(name, cond, detail) {
   check('steps state deleted by migration', migAfter.steps, migAfter);
   check('past ticks converted to logged minutes', migAfter.ticksConverted, migAfter.ticksConverted);
   check('breathwork supp retired from list + checklist', migAfter.suppGone && migAfter.checklistClean && migAfter.supps === mig.supps - 1, migAfter);
-  check('migration stamps schema 21', migAfter.schema === 21, migAfter.schema);
+  check('migration stamps schema 22', migAfter.schema === 22, migAfter.schema);
 
   console.log('em-dash removal: parsers + v17 migration');
   const dash = await page.evaluate(() => ({
@@ -893,7 +959,7 @@ function check(name, cond, detail) {
   check('user-authored routine renamed, wording kept', v17After.rt === 'Push: my own routine', v17After.rt);
   check('stored session + PR text renamed', v17After.ses === 'Return: full body (light)' && v17After.pr === '70×5: heaviest ever', v17After);
   check('S.lastPhase migrated (no false phase celebration)', v17After.lastPhase === 'Phase 0: Rebuild' && !v17After.celebrated, v17After);
-  check('migration stamps schema 21', v17After.schema === 21, v17After.schema);
+  check('migration stamps schema 22', v17After.schema === 22, v17After.schema);
 
   console.log('workout cards: preview before starting');
   const cards = await page.evaluate(() => {
@@ -967,8 +1033,10 @@ function check(name, cond, detail) {
     out.holdClearsPlan = S.active.ex[0].sets[1].plan === undefined;
     restSkip(); cancelSession(); closeSheet();
 
-    // today's plan is the all-mobility rehab block: it must rest now
-    const rt = todaysPlanRoutine();
+    // an all-mobility block must rest between moves. Pick it by name rather than
+    // by today's plan, which is empty on rest days and made this date-dependent.
+    const rt = S.routines.find((r) => /Rehab: knee/.test(r.name));
+    out.allMobility = rt.exIds.every((id) => exGroupOf(id) === 'Mobility');
     startSession(rt.id); closeSheet(); toggleSet(0, 0);
     out.todayPlan = rt.name;
     out.todayStarts = on();
@@ -984,7 +1052,7 @@ function check(name, cond, detail) {
   check('a mobility set now starts one too', rest.mobStarts);
   check('completing a hold starts a rest', rest.holdStarts);
   check('a completed hold leaves no plan flag behind', rest.holdClearsPlan);
-  check("today's all-mobility rehab block rests between moves", rest.todayStarts, rest.todayPlan);
+  check('an all-mobility block rests between moves', rest.todayStarts && rest.allMobility, rest.todayPlan);
   check('rehab still estimates near its ~15 min label', rest.stats['Rehab: knee & wrist (~15 min)'] <= 25, rest.stats);
   check('mobility block still estimates near its ~20 min label', rest.stats['Mobility & flexibility (~20 min)'] <= 32, rest.stats);
 
