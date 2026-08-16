@@ -1,0 +1,26 @@
+---
+import Base from '../layouts/Base.astro';
+import { site, whatsappLink } from '../data/site';
+---
+
+<Base title={`Page not found — ${site.name}`} description="That page does not exist.">
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">404</p>
+      <h1 class="dsp" style="font-size:clamp(2.2rem,5.4vw,4rem)">
+        Nothing wired<br />to this switch
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          That page does not exist. The things people usually want are below.
+        </p>
+      </div>
+      <div class="cta">
+        <a class="btn btn--primary" href="/estimate/">Get an estimate</a>
+        <a class="btn btn--ghost" href="/services/">See what we install</a>
+        <a class="btn btn--wa" href={whatsappLink()} rel="noopener">Ask on WhatsApp</a>
+      </div>
+    </div>
+  </section>
+</Base>

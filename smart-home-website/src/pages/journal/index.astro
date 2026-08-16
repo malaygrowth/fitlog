@@ -1,0 +1,109 @@
+---
+import Base from '../../layouts/Base.astro';
+import { articles } from '../../data/journal';
+import { site } from '../../data/site';
+
+const sorted = [...articles].sort((a, b) => b.updated.localeCompare(a.updated));
+const fmt = (d: string) =>
+  new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+---
+
+<Base
+  title={`Journal — ${site.name}`}
+  description="Cost guides and plain comparisons for anyone deciding whether to automate their home."
+  waContext="something you read in the journal"
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">Journal</p>
+      <h1 class="dsp" style="font-size:clamp(2.2rem,5.4vw,4rem)">
+        The questions<br />people ask us
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          Written to be the best answer to the question, not to sell you
+          something. If an article talks you out of spending money with us, it
+          has still done its job.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <ul class="posts">
+        {
+          sorted.map((a) => (
+            <li>
+              <a href={`/journal/${a.slug}/`}>
+                <span class="posts__meta">
+                  {fmt(a.updated)} · {a.readTime}
+                </span>
+                <h2 class="dsp">{a.title}</h2>
+                <p>{a.summary}</p>
+                <span class="posts__more">Read →</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="band band--paper band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Rather have a number?</h2>
+        <p class="lede">
+          The estimator prices your actual home in about a minute, with no phone
+          call first.
+        </p>
+        <div style="margin-top:8px">
+          <a class="btn btn--primary" href="/estimate/">Price your home</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .posts { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+  .posts li { border-bottom: 1px solid var(--rule-soft); }
+  .posts a {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 26px 0;
+    text-decoration: none;
+    color: inherit;
+  }
+  .posts a:hover h2 { color: var(--brass); }
+  .posts__meta {
+    font-family: var(--display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+  .posts h2 {
+    font-size: clamp(1.35rem, 2.8vw, 2rem);
+    transition: color 0.18s ease;
+  }
+  .posts p {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--ink-2);
+    max-width: 62ch;
+  }
+  .posts__more {
+    font-family: var(--display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+    font-size: 0.72rem;
+    color: var(--brass);
+  }
+</style>

@@ -1,0 +1,196 @@
+---
+import Base from '../layouts/Base.astro';
+import { site, whatsappLink } from '../data/site';
+
+/**
+ * WhatsApp first, phone second, form third — in that visual order, because in
+ * this market that is also the conversion order. The form exists for people who
+ * prefer it, not as the main door.
+ */
+---
+
+<Base
+  title={`Talk to us — ${site.name}`}
+  description="WhatsApp us a photo of your switchboard, call, or send a message. We answer with a real person."
+  waContext="booking a survey"
+  hideWaFloat
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">Contact</p>
+      <h1 class="dsp" style="font-size:clamp(2.2rem,5.4vw,4rem)">
+        Send us a photo<br />of your switchboard
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          Genuinely — that one photograph tells us more than a twenty-minute call.
+          Add your floor plan if you have it and we can usually tell you what is
+          possible before anyone visits.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="grid grid--3">
+        <a class="card contact-card" href={whatsappLink('booking a survey')} rel="noopener">
+          <span class="eyebrow" style="color:var(--teal)">Fastest</span>
+          <h2 class="dsp">WhatsApp</h2>
+          <p>Send photos, ask a question, book a survey. Usually answered the same day.</p>
+          <span class="price" style="color:var(--teal)">Open WhatsApp →</span>
+        </a>
+        <a class="card contact-card" href={site.phoneHref}>
+          <span class="eyebrow">Prefer to talk</span>
+          <h2 class="dsp">Call us</h2>
+          <p>A real person, not a call centre. If we are on site we will ring you back.</p>
+          <span class="price">{site.phone}</span>
+        </a>
+        <a class="card contact-card" href={`mailto:${site.email}`}>
+          <span class="eyebrow">For drawings</span>
+          <h2 class="dsp">Email</h2>
+          <p>Best for architects and designers sending layouts and specifications.</p>
+          <span class="price">{site.email}</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--paper">
+    <div class="wrap">
+      <div class="form-wrap">
+        <div>
+          <div class="sechead"><h2 class="dsp">Or write it down</h2></div>
+          <p class="lede" style="margin-top:16px">
+            Tell us the size of your home and what you are hoping to automate.
+            We will come back with a range and what we would do first.
+          </p>
+          <p class="small" style="margin-top:16px">
+            TODO — point <code>action</code> at a real form endpoint before
+            launch. Until one exists, the form falls back to opening WhatsApp
+            with the same details written out, so no enquiry is ever lost.
+          </p>
+        </div>
+
+        <form id="enquiry" class="form" novalidate data-whatsapp={site.whatsapp}>
+          <label>
+            <span class="eyebrow">Your name</span>
+            <input type="text" name="name" required autocomplete="name" />
+          </label>
+          <label>
+            <span class="eyebrow">Phone</span>
+            <input type="tel" name="phone" required autocomplete="tel" inputmode="tel" />
+          </label>
+          <label>
+            <span class="eyebrow">Your home</span>
+            <select name="home">
+              <option>1 BHK</option>
+              <option selected>2 BHK</option>
+              <option>3 BHK</option>
+              <option>4 BHK</option>
+              <option>Villa / duplex</option>
+              <option>Commercial space</option>
+            </select>
+          </label>
+          <label>
+            <span class="eyebrow">What are you after?</span>
+            <textarea name="message" rows="4" placeholder="Switches and curtains in two bedrooms, and something for the AC…"></textarea>
+          </label>
+          <button class="btn btn--primary" type="submit">Send enquiry</button>
+          <p class="form__note small" id="formNote"></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="wrap">
+      <div class="stack g12 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Where we work</h2>
+        <p class="lede">{site.cities.join(' · ')}</p>
+        <p class="small">
+          Outside these areas? Ask anyway — for a whole-home project we travel.
+        </p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .contact-card h2 { font-size: 1.5rem; }
+
+  .form-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 34px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .form-wrap { grid-template-columns: 1fr; }
+  }
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    padding: 24px;
+  }
+  .form label { display: flex; flex-direction: column; gap: 6px; }
+  .form input,
+  .form select,
+  .form textarea {
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 11px 13px;
+    border: 1px solid var(--rule);
+    background: var(--plaster);
+    color: var(--ink);
+    width: 100%;
+  }
+  .form textarea { resize: vertical; line-height: 1.5; }
+  .form button { align-self: flex-start; cursor: pointer; border: 0; }
+  .form__note:empty { display: none; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--plaster-deep);
+    padding: 1px 5px;
+  }
+</style>
+
+<script>
+  const form = document.getElementById('enquiry') as HTMLFormElement | null;
+  const note = document.getElementById('formNote');
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      const name = String(data.get('name') ?? '').trim();
+      const phone = String(data.get('phone') ?? '').trim();
+
+      if (!name || !phone) {
+        if (note) note.textContent = 'We need a name and a phone number to get back to you.';
+        (name ? form.phone : form.name).focus();
+        return;
+      }
+
+      // No endpoint yet — hand the enquiry to WhatsApp rather than lose it.
+      const msg =
+        `Hi, I'd like an estimate.\n\n` +
+        `Name: ${name}\n` +
+        `Phone: ${phone}\n` +
+        `Home: ${data.get('home')}\n` +
+        `Looking for: ${String(data.get('message') ?? '').trim() || '—'}`;
+      const target = form.dataset.whatsapp;
+      if (!target) {
+        if (note) note.textContent = 'Something went wrong — please WhatsApp or call us instead.';
+        return;
+      }
+      window.location.href = `https://wa.me/${target}?text=${encodeURIComponent(msg)}`;
+    });
+  }
+</script>

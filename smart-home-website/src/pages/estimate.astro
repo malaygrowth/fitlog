@@ -1,0 +1,393 @@
+---
+import Base from '../layouts/Base.astro';
+import { site } from '../data/site';
+import { homeSizes, items, installShare, amcShare } from '../data/pricing';
+
+/**
+ * Answers the number-one objection — cost — before anyone has to ring us.
+ *
+ * No backend. The maths runs in the browser and the finished estimate is
+ * handed to WhatsApp as a pre-written message, which is both the highest
+ * converting path in this market and the one with nothing to maintain.
+ */
+const config = { homeSizes, items, installShare, amcShare, whatsapp: site.whatsapp };
+---
+
+<Base
+  title={`What will it cost? — ${site.name}`}
+  description="Estimate your smart home in about a minute. Pick your home, tick what you want, and get an honest range — no phone call first."
+  waContext="the cost estimator"
+  hideWaFloat
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">Estimator</p>
+      <h1 class="dsp" style="font-size:clamp(2.2rem,5.4vw,4rem)">
+        What will it<br />cost in your home?
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          About a minute. Pick your home, tick what you want, and you will get an
+          honest range — not a single number pretending to be a quote before
+          anyone has seen your switchboard.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap est" id="estimator" data-config={JSON.stringify(config)}>
+      <div class="est__form">
+        <fieldset>
+          <legend class="eyebrow">Your home</legend>
+          <div class="sizes" role="radiogroup" aria-label="Home size">
+            {
+              homeSizes.map((h, i) => (
+                <button
+                  type="button"
+                  class="sizebtn"
+                  data-size={h.id}
+                  role="radio"
+                  aria-checked={i === 1 ? 'true' : 'false'}
+                >
+                  {h.label}
+                </button>
+              ))
+            }
+          </div>
+          <div class="counts">
+            <label>
+              <span class="eyebrow">Rooms to automate</span>
+              <input type="number" id="rooms" min="1" max="30" value="4" />
+            </label>
+            <label>
+              <span class="eyebrow">Windows for curtains</span>
+              <input type="number" id="windows" min="0" max="40" value="5" />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend class="eyebrow">What you want</legend>
+          <div class="picks">
+            {
+              items.map((it) => (
+                <label class="pick">
+                  <input type="checkbox" data-item={it.id} checked={it.default} />
+                  <span>
+                    <b>{it.label}</b>
+                    <em>{it.note}</em>
+                  </span>
+                </label>
+              ))
+            }
+          </div>
+        </fieldset>
+      </div>
+
+      <aside class="est__out" aria-live="polite">
+        <p class="eyebrow">Your estimate</p>
+        <p class="est__range" id="range">—</p>
+        <p class="est__sub" id="subline">Pick what you want and this updates.</p>
+
+        <table class="est__lines">
+          <thead>
+            <tr><th>Item</th><th>Qty</th><th>Range</th></tr>
+          </thead>
+          <tbody id="lines"></tbody>
+        </table>
+
+        <p class="est__amc" id="amc"></p>
+
+        <a class="btn btn--wa" id="waSend" href="#" rel="noopener">
+          Send this on WhatsApp
+        </a>
+        <p class="small" style="margin-top:10px">
+          Nothing is submitted anywhere until you tap that button. It opens
+          WhatsApp with your estimate written out — edit it before sending.
+        </p>
+      </aside>
+    </div>
+
+    <div class="wrap" style="margin-top:26px">
+      <p class="small measure">
+        <strong>What this includes:</strong> hardware, design, installation,
+        commissioning and handover. <strong>What it excludes:</strong> civil and
+        electrical work, false ceiling, and any rewiring your home turns out to
+        need. Your final number comes from the survey.
+      </p>
+    </div>
+  </section>
+
+  <section class="band band--paper band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Rather just ask?</h2>
+        <p class="lede">
+          Send a photo of your switchboard and your floor plan. We will come back
+          with a number and tell you what we would do first if the whole thing is
+          more than you want to spend at once.
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn--primary" href="/contact/">Talk to us</a>
+          <a class="btn btn--ghost" href={site.phoneHref}>{site.phone}</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .est {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 26px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .est { grid-template-columns: 1fr; }
+  }
+
+  fieldset {
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    padding: 20px;
+    margin: 0 0 16px;
+  }
+  legend { padding: 0 8px; }
+
+  .sizes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .sizebtn {
+    font-family: var(--display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    font-size: 0.76rem;
+    padding: 10px 15px;
+    background: transparent;
+    border: 1px solid var(--rule);
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  }
+  .sizebtn:hover { border-color: var(--brass); color: var(--brass); }
+  .sizebtn[aria-checked='true'] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+
+  .counts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-top: 18px;
+  }
+  .counts label { display: flex; flex-direction: column; gap: 6px; }
+  .counts input {
+    font-family: var(--display);
+    font-size: 1.2rem;
+    font-variant-numeric: tabular-nums;
+    padding: 9px 12px;
+    border: 1px solid var(--rule);
+    background: var(--plaster);
+    color: var(--ink);
+    width: 100%;
+  }
+
+  .picks { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+  .pick {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    cursor: pointer;
+  }
+  .pick:last-child { border-bottom: 0; }
+  .pick input { margin-top: 4px; width: 17px; height: 17px; accent-color: var(--brass); }
+  .pick span { display: flex; flex-direction: column; gap: 2px; }
+  .pick b { font-weight: 620; font-size: 0.98rem; }
+  .pick em {
+    font-style: normal;
+    font-size: 0.87rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+
+  .est__out {
+    background: var(--night);
+    color: var(--ink-on-night);
+    border: 1px solid var(--rule-night);
+    padding: 22px;
+    position: sticky;
+    top: 84px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  @media (max-width: 900px) {
+    .est__out { position: static; }
+  }
+  .est__out .eyebrow { color: var(--muted-on-night); }
+  .est__range {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.7rem, 4vw, 2.5rem);
+    line-height: 1.05;
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+    color: #f0b65f;
+  }
+  .est__sub { font-size: 0.9rem; line-height: 1.5; color: var(--muted-on-night); }
+
+  .est__lines {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .est__lines th {
+    text-align: left;
+    font-family: var(--display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.62rem;
+    color: var(--muted-on-night);
+    padding: 8px 0;
+    border-bottom: 1px solid var(--rule-night);
+  }
+  .est__lines th:last-child, .est__lines td:last-child { text-align: right; }
+  .est__lines td {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--rule-night);
+    color: #cdd2d8;
+  }
+  .est__amc {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--muted-on-night);
+    padding-top: 4px;
+  }
+</style>
+
+<script>
+  type Item = {
+    id: string; label: string; unit: 'room' | 'window' | 'home';
+    low: number; high: number; default: boolean;
+  };
+  type Config = {
+    homeSizes: { id: string; label: string; rooms: number; windows: number }[];
+    items: Item[];
+    installShare: { low: number; high: number };
+    amcShare: { low: number; high: number };
+    whatsapp: string;
+  };
+
+  const root = document.getElementById('estimator');
+  if (root) {
+    const cfg: Config = JSON.parse(root.dataset.config ?? '{}');
+    const inr = (n: number) =>
+      '₹' + Math.round(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+    const roomsEl = root.querySelector<HTMLInputElement>('#rooms')!;
+    const windowsEl = root.querySelector<HTMLInputElement>('#windows')!;
+    const sizeBtns = root.querySelectorAll<HTMLButtonElement>('.sizebtn');
+    const picks = root.querySelectorAll<HTMLInputElement>('.pick input');
+    const rangeEl = root.querySelector<HTMLElement>('#range')!;
+    const subEl = root.querySelector<HTMLElement>('#subline')!;
+    const linesEl = root.querySelector<HTMLElement>('#lines')!;
+    const amcEl = root.querySelector<HTMLElement>('#amc')!;
+    const waEl = root.querySelector<HTMLAnchorElement>('#waSend')!;
+
+    const clamp = (el: HTMLInputElement) => {
+      const n = Number(el.value);
+      const min = Number(el.min), max = Number(el.max);
+      return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : min;
+    };
+
+    const currentSize = () =>
+      Array.from(sizeBtns).find((b) => b.getAttribute('aria-checked') === 'true');
+
+    const render = () => {
+      const rooms = clamp(roomsEl);
+      const windows = clamp(windowsEl);
+      const chosen = Array.from(picks)
+        .filter((p) => p.checked)
+        .map((p) => p.dataset.item);
+
+      let hwLow = 0, hwHigh = 0;
+      linesEl.replaceChildren();
+
+      for (const item of cfg.items) {
+        if (!chosen.includes(item.id)) continue;
+        const qty = item.unit === 'room' ? rooms : item.unit === 'window' ? windows : 1;
+        if (qty <= 0) continue;
+        const low = item.low * qty, high = item.high * qty;
+        hwLow += low; hwHigh += high;
+
+        const tr = document.createElement('tr');
+        const name = document.createElement('td');
+        name.textContent = item.label;
+        const q = document.createElement('td');
+        q.textContent = item.unit === 'home' ? '1' : String(qty);
+        const r = document.createElement('td');
+        r.textContent = `${inr(low)}–${inr(high)}`;
+        tr.append(name, q, r);
+        linesEl.append(tr);
+      }
+
+      if (hwHigh === 0) {
+        rangeEl.textContent = '—';
+        subEl.textContent = 'Tick at least one thing above.';
+        amcEl.textContent = '';
+        waEl.removeAttribute('href');
+        waEl.setAttribute('aria-disabled', 'true');
+        return;
+      }
+
+      const totalLow = hwLow + Math.round(hwLow * cfg.installShare.low);
+      const totalHigh = hwHigh + Math.round(hwHigh * cfg.installShare.high);
+      const amcLow = Math.round(totalLow * cfg.amcShare.low);
+      const amcHigh = Math.round(totalHigh * cfg.amcShare.high);
+
+      rangeEl.textContent = `${inr(totalLow)} – ${inr(totalHigh)}`;
+      subEl.textContent =
+        `${currentSize()?.textContent?.trim() ?? 'Your home'} · ${rooms} rooms` +
+        (chosen.includes('curtains') ? ` · ${windows} windows` : '') +
+        ' · includes design, installation and handover.';
+      amcEl.textContent =
+        `Optional annual service plan afterwards: ${inr(amcLow)}–${inr(amcHigh)} a year.`;
+
+      const msg =
+        `Hi, I used the estimator on your site.\n\n` +
+        `Home: ${currentSize()?.textContent?.trim() ?? '—'}\n` +
+        `Rooms: ${rooms}\n` +
+        (chosen.includes('curtains') ? `Windows: ${windows}\n` : '') +
+        `Wanted: ${cfg.items.filter((i) => chosen.includes(i.id)).map((i) => i.label).join(', ')}\n` +
+        `Estimate shown: ${inr(totalLow)}–${inr(totalHigh)}\n\n` +
+        `Can we book a survey?`;
+      waEl.href = `https://wa.me/${cfg.whatsapp}?text=${encodeURIComponent(msg)}`;
+      waEl.removeAttribute('aria-disabled');
+    };
+
+    sizeBtns.forEach((b) =>
+      b.addEventListener('click', () => {
+        sizeBtns.forEach((o) => o.setAttribute('aria-checked', String(o === b)));
+        const size = cfg.homeSizes.find((h) => h.id === b.dataset.size);
+        if (size) {
+          roomsEl.value = String(size.rooms);
+          windowsEl.value = String(size.windows);
+        }
+        render();
+      }),
+    );
+    [roomsEl, windowsEl].forEach((el) => el.addEventListener('input', render));
+    picks.forEach((p) => p.addEventListener('change', render));
+
+    render();
+  }
+</script>

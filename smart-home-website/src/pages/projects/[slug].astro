@@ -1,0 +1,125 @@
+---
+import Base from '../../layouts/Base.astro';
+import Placeholder from '../../components/Placeholder.astro';
+import { projects } from '../../data/projects';
+import { site, whatsappLink } from '../../data/site';
+
+export function getStaticPaths() {
+  return projects.map((project) => ({
+    params: { slug: project.slug },
+    props: { project },
+  }));
+}
+
+const { project } = Astro.props;
+const others = projects.filter((p) => p.slug !== project.slug);
+---
+
+<Base
+  title={`${project.name} — ${site.name}`}
+  description={project.brief}
+  waContext={`the ${project.name.toLowerCase()} project`}
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">{project.homeType} · {project.area}</p>
+      <h1 class="dsp" style="font-size:clamp(2.1rem,5vw,3.6rem)">{project.name}</h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">{project.brief}</p>
+      </div>
+    </div>
+  </section>
+
+  {
+    project.placeholder && (
+      <section class="band band--tight">
+        <div class="wrap">
+          <Placeholder what="This is a case-study template, not a finished job." />
+        </div>
+      </section>
+    )
+  }
+
+  <section class="band">
+    <div class="wrap">
+      <dl class="spec">
+        <div><dt>Home</dt><dd>{project.homeType}</dd></div>
+        <div><dt>Spend</dt><dd>{project.spend}</dd></div>
+        <div><dt>On site</dt><dd>{project.duration}</dd></div>
+        <div><dt>Scenes</dt><dd>{project.scenes.length} configured</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="band band--paper">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">What went in</h2></div>
+      <div class="grid grid--2" style="margin-top:26px">
+        <div class="card">
+          <span class="tag eyebrow">Installed</span>
+          <ul>
+            {project.installed.map((i) => <li>{i}</li>)}
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag eyebrow">Scenes</span>
+          <ul>
+            {
+              project.scenes.map((s) => (
+                <li>
+                  <strong>{s.name}</strong> — {s.what}
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="measure">
+        <div class="sechead"><h2 class="dsp">Afterwards</h2></div>
+        <p class="lede" style="margin-top:20px">{project.outcome}</p>
+      </div>
+    </div>
+  </section>
+
+  {
+    others.length > 0 && (
+      <section class="band band--paper">
+        <div class="wrap">
+          <div class="sechead"><h2 class="dsp">Other homes</h2></div>
+          <div class="grid grid--2" style="margin-top:26px">
+            {others.map((p) => (
+              <a class="card" href={`/projects/${p.slug}/`}>
+                <span class="eyebrow">{p.homeType}</span>
+                <h3 class="dsp">{p.name}</h3>
+                <span class="price">
+                  {p.spend} · {p.duration}
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="band band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Start with a survey</h2>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn--wa" href={whatsappLink('a project like this')} rel="noopener">
+            Message us
+          </a>
+          <a class="btn btn--ghost" href="/estimate/">Estimate your home</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

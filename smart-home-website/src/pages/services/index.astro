@@ -1,0 +1,67 @@
+---
+import Base from '../../layouts/Base.astro';
+import { services } from '../../data/services';
+import { site, packages } from '../../data/site';
+---
+
+<Base
+  title={`Services — ${site.name}`}
+  description="Smart switches, motorised curtains, voice and app control, room scenes, climate and environment sensing, security and entry."
+  waContext="your services"
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">Services</p>
+      <h1 class="dsp" style="font-size:clamp(2.2rem,5.4vw,4rem)">
+        Six things we do,<br />properly
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          Each of these can be done on its own. Most homes start with two and add
+          the rest over a couple of years, which is a perfectly sensible way to
+          go about it.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="grid grid--2">
+        {
+          services.map((s) => (
+            <a class="card" href={`/services/${s.slug}/`}>
+              <h2 class="dsp" style="font-size:1.5rem">{s.name}</h2>
+              <p class="accent-line" style="font-size:1.05rem">{s.thesis}</p>
+              <p>{s.lede}</p>
+              <span class="price">Read more →</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--paper">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">Or take a package</h2></div>
+      <div class="grid grid--3" style="margin-top:26px">
+        {
+          packages.map((p) => (
+            <div class="card">
+              <span class="eyebrow">{p.fits}</span>
+              <h3 class="dsp">{p.name}</h3>
+              <p>{p.blurb}</p>
+              <span class="price">{p.price}</span>
+            </div>
+          ))
+        }
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:24px">
+        <a class="btn btn--primary" href="/estimate/">Price your home</a>
+        <a class="btn btn--ghost" href="/how-it-works/">See how it works</a>
+      </div>
+    </div>
+  </section>
+</Base>

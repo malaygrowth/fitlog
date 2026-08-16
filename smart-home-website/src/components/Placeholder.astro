@@ -1,0 +1,46 @@
+---
+/**
+ * A visible, deliberately loud marker for content that is scaffolding rather
+ * than truth. It exists so nobody ever ships an invented case study by
+ * accident — the banner only disappears when the data says the content is real.
+ */
+interface Props {
+  what: string;
+}
+const { what } = Astro.props;
+---
+
+<div class="ph" role="note">
+  <span class="ph__tag">Placeholder</span>
+  <p><strong>{what}</strong> Nothing here is a real customer, quote or photograph. Replace before this page goes live.</p>
+</div>
+
+<style>
+  .ph {
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
+    flex-wrap: wrap;
+    border: 1px solid var(--brass);
+    background: var(--brass-wash);
+    padding: 14px 16px;
+  }
+  .ph__tag {
+    font-family: var(--display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.66rem;
+    color: var(--paper);
+    background: var(--brass);
+    padding: 4px 9px;
+    white-space: nowrap;
+  }
+  .ph p {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--ink-2);
+    flex: 1;
+    min-width: 220px;
+  }
+</style>

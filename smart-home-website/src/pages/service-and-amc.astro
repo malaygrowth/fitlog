@@ -1,0 +1,139 @@
+---
+import Base from '../layouts/Base.astro';
+import { site, whatsappLink } from '../data/site';
+import { amcShare } from '../data/pricing';
+
+const pct = `${amcShare.low * 100}–${amcShare.high * 100}%`;
+---
+
+<Base
+  title={`Service & AMC — ${site.name}`}
+  description="What the warranty covers, what the annual service plan covers, and what it costs. Written down before you need it."
+  waContext="the service plan"
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">Service</p>
+      <h1 class="dsp" style="font-size:clamp(2.2rem,5.4vw,4rem)">
+        What happens<br />when something<br />stops working
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          A smart home does not fail all at once. It drifts — a firmware update
+          changes an app, a battery dies, an ISP swaps your router and half the
+          house forgets its own name. This page is what we do about that.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="measure">
+        <p
+          class="accent-line"
+          style="font-size:clamp(1.4rem,3vw,2.1rem);border-top:3px solid var(--brass);padding-top:24px"
+        >
+          The second year is when you find out who installed your house.
+        </p>
+      </div>
+
+      <div class="grid grid--2" style="margin-top:34px">
+        <div class="card">
+          <span class="eyebrow">Included · first year</span>
+          <h3 class="dsp">Warranty</h3>
+          <ul>
+            <li>Manufacturer warranty on every device, handled by us — you never chase a brand</li>
+            <li>Faulty hardware replaced, labour included</li>
+            <li>Scene and automation changes, remotely, at no charge</li>
+            <li>Help when your router or internet provider changes</li>
+          </ul>
+          <span class="price">Included in every install</span>
+        </div>
+
+        <div class="card">
+          <span class="eyebrow">Optional · year two onward</span>
+          <h3 class="dsp">Annual service plan</h3>
+          <ul>
+            <li>A preventive visit once a year — firmware, batteries, network health</li>
+            <li>Remote monitoring, so we usually see a fault before you do</li>
+            <li>Priority call-outs with a response time in writing</li>
+            <li>Unlimited scene changes and re-configuration</li>
+            <li>Labour on out-of-warranty repairs</li>
+          </ul>
+          <span class="price">{pct} of installed value per year</span>
+        </div>
+      </div>
+
+      <p class="small measure" style="margin-top:16px">
+        The {pct} figure is the industry benchmark for integrator service
+        contracts, and it is what we price against. Your exact number is on your
+        handover sheet. TODO: confirm the client's actual AMC pricing and
+        response-time commitments before launch.
+      </p>
+    </div>
+  </section>
+
+  <section class="band band--paper">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">The honest bits</h2></div>
+      <div class="worries" style="margin-top:26px">
+        <div class="worry">
+          <h3>Do I have to take the plan?</h3>
+          <p>
+            No. Plenty of homes run for years without one and just call us when
+            something breaks, paid per visit. The plan is worth it if you have
+            curtains, locks or more than about twenty devices — those are the
+            things with batteries and moving parts.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>What if a brand discontinues my device?</h3>
+          <p>
+            It happens, and standards-based hardware is our main defence — a
+            Matter device keeps working with your hub even if its own app is
+            retired. Where something genuinely cannot be saved, the plan covers
+            the labour to swap it; you pay for the replacement device.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>How fast do you actually turn up?</h3>
+          <p>
+            TODO — put the real committed response time here, split by "house is
+            usable" and "house is not". A specific number is worth more than the
+            word "prompt", which every competitor uses and nobody believes.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>What if I move house?</h3>
+          <p>
+            The plan moves with you, and we will help the new owners take over the
+            system rather than leaving them with a house full of devices and no
+            logins. Handing over cleanly is part of the job.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Already have a system?</h2>
+        <p class="lede">
+          We take on homes somebody else installed. Send us a list of what you
+          have and we will tell you what can be rescued, consolidated, or needs
+          replacing — before quoting anything.
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn--wa" href={whatsappLink('taking over an existing system')} rel="noopener">
+            Send us your kit list
+          </a>
+          <a class="btn btn--ghost" href={site.phoneHref}>{site.phone}</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

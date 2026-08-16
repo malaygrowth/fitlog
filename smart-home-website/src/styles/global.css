@@ -482,3 +482,11 @@ a.card:hover {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* nav CTA — the one link in the bar that is a button */
+.nav-cta {
+  color: var(--brass) !important;
+  border: 1px solid var(--rule);
+  padding: 7px 13px;
+}
+.nav-cta:hover { border-color: var(--brass); background: var(--brass-wash); }

@@ -1,0 +1,175 @@
+---
+import Base from '../layouts/Base.astro';
+import { site, whatsappLink } from '../data/site';
+
+/** A genuine sequence, so the numbering carries information rather than decoration. */
+const steps = [
+  {
+    title: 'Survey',
+    when: 'Day 0 · about an hour',
+    body: 'We come to your home and open a switch box. What is possible depends on your back boxes, your neutral wire and your curtain tracks — not on a catalogue. You get a straight answer about what will and will not work, on the spot.',
+  },
+  {
+    title: 'Design',
+    when: 'Within 3 days',
+    body: 'A room-by-room plan with the scenes written out in plain language, the hardware named, and a fixed price. If the whole thing is more than you want to spend now, this is where we tell you what to do first and what can wait a year.',
+  },
+  {
+    title: 'Install',
+    when: '1–4 days on site',
+    body: 'Most homes are done in a day or two; a full villa takes about four. We work around you, we clean up, and your power is off for as little of it as we can manage. Nothing gets chiselled without you agreeing to it first.',
+  },
+  {
+    title: 'Commission',
+    when: 'Same day as install ends',
+    body: 'Every circuit tested, every scene run in front of you, every room and scene renamed to whatever your family actually calls it. We do not leave with anything on the list unfinished.',
+  },
+  {
+    title: 'Handover',
+    when: 'About an hour',
+    body: 'We sit with whoever will use it — including the people who did not ask for any of this — until they can run the house without the app. Then we leave you a one-page sheet with what to say and who to call.',
+  },
+  {
+    title: 'Afterwards',
+    when: 'Warranty, then optional AMC',
+    body: 'Scene changes are free and remote for the first year. Beyond warranty, an annual service plan covers firmware, batteries, re-configuration and call-outs — priced up front, not after something breaks.',
+  },
+];
+---
+
+<Base
+  title={`How it works — ${site.name}`}
+  description="Survey, design, install, commission, handover. What happens on each day and how long it takes."
+  waContext="how the process works"
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">Process</p>
+      <h1 class="dsp" style="font-size:clamp(2.2rem,5.4vw,4rem)">
+        Six steps,<br />and you know<br />the days
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          The most common complaint about home automation is not the price. It is
+          not knowing how long the house will be a building site. So here is the
+          whole thing with days attached.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <ol class="steps">
+        {
+          steps.map((s, i) => (
+            <li class="step">
+              <span class="step__no">{String(i + 1).padStart(2, '0')}</span>
+              <div class="step__body">
+                <h2 class="dsp">{s.title}</h2>
+                <p>{s.body}</p>
+              </div>
+              <span class="step__when">{s.when}</span>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section class="band band--paper">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">What we will not do</h2></div>
+      <div class="worries" style="margin-top:26px">
+        <div class="worry">
+          <h3>Quote before we have seen the place</h3>
+          <p>
+            Anyone who gives you a firm number over the phone is guessing, and the
+            guess gets corrected on install day when it is too late to argue.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>Sell you the whole house at once</h3>
+          <p>
+            Starting with the lighting in two rooms is a perfectly good way to
+            begin. If phasing it makes more sense for you, we will say so even
+            though it is a smaller invoice.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>Leave you with something only one person can operate</h3>
+          <p>
+            If the family cannot run it without the person who wanted it, we have
+            not finished. That is what the handover hour is for.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Book the survey</h2>
+        <p class="lede">
+          It is the only step that has to happen in person, and it is where you
+          find out what your home can actually do.
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn--wa" href={whatsappLink('booking a survey')} rel="noopener">
+            Book on WhatsApp
+          </a>
+          <a class="btn btn--ghost" href="/estimate/">Estimate it first</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 62px minmax(0, 1fr) 190px;
+    gap: 22px;
+    padding: 26px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    align-items: start;
+  }
+  @media (max-width: 720px) {
+    .step { grid-template-columns: 48px 1fr; gap: 14px; }
+    .step__when { grid-column: 2; text-align: left; }
+  }
+  .step__no {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 1.9rem;
+    line-height: 1;
+    color: var(--brass);
+    font-variant-numeric: tabular-nums;
+  }
+  .step__body h2 { font-size: clamp(1.3rem, 2.4vw, 1.75rem); margin: 0 0 8px; }
+  .step__body p {
+    font-size: 1rem;
+    line-height: 1.62;
+    color: var(--ink-2);
+    max-width: 58ch;
+  }
+  .step__when {
+    font-family: var(--display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-align: right;
+    padding-top: 0.5em;
+  }
+</style>

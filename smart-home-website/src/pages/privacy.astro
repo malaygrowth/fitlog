@@ -1,0 +1,150 @@
+---
+import Base from '../layouts/Base.astro';
+import { site, whatsappLink } from '../data/site';
+---
+
+<Base
+  title={`Privacy, plainly — ${site.name}`}
+  description="What runs inside your house, what leaves it, and what we can and cannot see. In plain language, not legal boilerplate."
+  waContext="privacy"
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">Privacy</p>
+      <h1 class="dsp" style="font-size:clamp(2.2rem,5.4vw,4rem)">
+        What leaves<br />your house
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          Around a third of people who decide against a smart home say privacy is
+          why. That is a reasonable worry and it deserves a real answer rather
+          than a policy nobody reads.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="measure">
+        <p
+          class="accent-line"
+          style="font-size:clamp(1.4rem,3vw,2.1rem);border-top:3px solid var(--brass);padding-top:24px"
+        >
+          You should be able to have the automation without the surveillance.
+        </p>
+      </div>
+
+      <div class="grid grid--3" style="margin-top:34px">
+        <div class="card">
+          <span class="eyebrow">Stays in the house</span>
+          <h3 class="dsp">Local by default</h3>
+          <ul>
+            <li>Switch and scene logic, wherever the hardware supports running it locally</li>
+            <li>Camera recording, if you choose local storage</li>
+            <li>Sensor readings driving automations in the same house</li>
+            <li>Everything, during an internet outage — the house keeps working</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="eyebrow">Leaves the house</span>
+          <h3 class="dsp">Only what has to</h3>
+          <ul>
+            <li>Remote access when you open the app away from home</li>
+            <li>Voice commands, if you install voice — processed by Amazon or Google, not us</li>
+            <li>Cloud clips, only if you ask for them</li>
+            <li>Firmware checks</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="eyebrow">What we can see</span>
+          <h3 class="dsp">Us, specifically</h3>
+          <ul>
+            <li>Nothing, unless you are on a service plan with remote monitoring</li>
+            <li>On a plan: device health — online, offline, battery, firmware</li>
+            <li>Never your camera feeds</li>
+            <li>Never your voice recordings</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--paper">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">Choices you get to make</h2></div>
+      <div class="worries" style="margin-top:26px">
+        <div class="worry">
+          <h3>Voice is optional, room by room</h3>
+          <p>
+            No microphone goes into a room you did not ask for one in. A house with
+            no voice at all still does everything through the wall switches, the
+            app and the schedules.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>Cameras can be local-only</h3>
+          <p>
+            We will happily configure recording to a drive in your house with
+            nothing going to a cloud service. You lose remote viewing; you keep
+            the footage entirely.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>The devices get their own network</h3>
+          <p>
+            As standard, we put smart home hardware on a separate network from
+            your phones and laptops. It is the single most effective thing anyone
+            can do about connected-device risk, and it costs nothing extra.
+          </p>
+        </div>
+        <div class="worry">
+          <h3>The accounts are yours</h3>
+          <p>
+            Every account is created in your name, with your email, and you hold
+            the credentials. We do not keep a back door into houses we have
+            finished, and we will remove our access on request at any time.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="measure stack g16">
+        <div class="sechead"><h2 class="dsp">This site</h2></div>
+        <p style="color:var(--ink-2);margin-top:6px">
+          The estimator runs entirely in your browser. Nothing you enter is sent
+          anywhere until you tap the WhatsApp button, and at that point you can
+          see and edit the message before it goes.
+        </p>
+        <p class="small">
+          TODO — before launch, add the legal notice covering analytics, contact
+          form storage and applicable data protection law. This page is the plain
+          language version and should stay short; the formal notice can sit
+          underneath it.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--paper band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Ask us something specific</h2>
+        <p class="lede">
+          If there is a particular thing you do not want in your house, say so
+          before the survey. It is far easier to design around than to remove.
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn--wa" href={whatsappLink('a privacy question')} rel="noopener">
+            Ask on WhatsApp
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

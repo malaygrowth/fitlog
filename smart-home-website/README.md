@@ -34,15 +34,33 @@ Cloudflare Pages or any static host.
 ```
 src/
   data/site.ts        brand, contact, packages, scene definitions
-  data/services.ts    all six service pages, copy and objection answers
+  data/services.ts    the six service pages, copy and objection answers
+  data/pricing.ts     the estimator's price model
+  data/projects.ts    case studies
+  data/journal.ts     cost guides and comparisons
   layouts/Base.astro  head, header, footer, floating WhatsApp
-  components/         SceneDemo — the interactive room
+  components/
+    SceneDemo.astro   the interactive room
+    Placeholder.astro loud marker for scaffolding content
   pages/
-    index.astro
-    services/[slug].astro   generates all six service pages from data
+    index.astro            homepage
+    estimate.astro         cost estimator
+    contact.astro          WhatsApp / call / form
+    how-it-works.astro     survey to handover, with days
+    service-and-amc.astro  warranty and service plan
+    for-designers.astro    the architect and builder channel
+    privacy.astro          plain-language privacy
+    404.astro
+    sitemap.xml.ts         built from the data, never stale
+    services/[slug].astro  six service pages
+    projects/[slug].astro  case studies
+    journal/[slug].astro   articles
+    areas/[city].astro     one per service area
   styles/global.css   the Switchplate design system
 public/fonts/         Oswald + Instrument Serif Italic, self-hosted
 ```
+
+23 routes build in about a second.
 
 **Content lives in `src/data`, not in templates.** Changing a price, a phone
 number or a paragraph of service copy never means editing markup.
@@ -63,6 +81,16 @@ the design research section of the plan for why.
 The one dark surface is `--night`, used for the scene demo and the footer,
 where a room at dusk genuinely belongs.
 
+### The estimator
+
+`src/pages/estimate.astro` answers the objection that blocks most purchases —
+cost — before anyone has to ring you. The maths runs in the browser from
+`src/data/pricing.ts` and the finished estimate is handed to WhatsApp as a
+pre-written message, so there is no backend and nothing to maintain.
+
+**Every rate in `pricing.ts` is a placeholder** derived from published market
+benchmarks. Replace them all before launch.
+
 ### The scene demo
 
 `src/components/SceneDemo.astro` is the differentiator: a visitor taps Morning
@@ -82,10 +110,19 @@ Waiting on client input (see the plan's closing section):
 - [ ] Real package prices, currently `from ₹—`
 - [ ] Project photography — the highest-value missing asset
 
-Built but not yet started:
+Built, and needing real content before launch:
 
-- [ ] Cost estimator with email capture and PDF
-- [ ] Projects / case studies
-- [ ] How it works, Service & AMC, Privacy
-- [ ] For architects & interior designers
-- [ ] City landing pages, journal / cost guides
+- [ ] Replace every rate in `src/data/pricing.ts` — all placeholders
+- [ ] Replace the three case studies in `src/data/projects.ts` with real installs; they render a loud Placeholder banner until you do
+- [ ] Fill the TODOs on `for-designers` with your real installation standards, and offer the spec as a downloadable PDF
+- [ ] Put a real response-time commitment on `service-and-amc`
+- [ ] Give each city page local specifics — a thin page per city hurts more than it helps
+- [ ] Point the contact form at a real endpoint (it falls back to WhatsApp until then, so no enquiry is lost)
+- [ ] Add the formal legal notice under the plain-language privacy page
+- [ ] Set the real domain in `astro.config.mjs` and `public/robots.txt`
+
+Not started:
+
+- [ ] Emailed PDF of the estimate
+- [ ] Analytics and call tracking
+- [ ] More journal articles — the two here are the highest-intent queries

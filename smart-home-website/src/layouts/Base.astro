@@ -8,9 +8,12 @@ interface Props {
   description?: string;
   /** Pre-fills the WhatsApp message with what the visitor is reading */
   waContext?: string;
+  /** Pages with their own prominent WhatsApp CTA suppress the floating one,
+   *  so it never sits on top of the thing it duplicates. */
+  hideWaFloat?: boolean;
 }
 
-const { title, description = site.description, waContext } = Astro.props;
+const { title, description = site.description, waContext, hideWaFloat = false } = Astro.props;
 const path = Astro.url.pathname;
 const isCurrent = (href: string) =>
   href === '/' ? path === '/' : path.startsWith(href);
@@ -41,17 +44,25 @@ const isCurrent = (href: string) =>
         <a class="brand" href="/">{site.name}</a>
         <nav class="nav" aria-label="Main">
           {
-            services.slice(0, 4).map((s) => (
+            [
+              { href: '/services/', label: 'Services' },
+              { href: '/projects/', label: 'Projects' },
+              { href: '/how-it-works/', label: 'How it works' },
+              { href: '/service-and-amc/', label: 'Service' },
+              { href: '/journal/', label: 'Journal' },
+            ].map((l) => (
               <a
                 class="nav-secondary"
-                href={`/services/${s.slug}/`}
-                aria-current={isCurrent(`/services/${s.slug}/`) ? 'page' : undefined}
+                href={l.href}
+                aria-current={isCurrent(l.href) ? 'page' : undefined}
               >
-                {s.short}
+                {l.label}
               </a>
             ))
           }
-          <a href={whatsappLink(waContext)} rel="noopener">Get an estimate</a>
+          <a class="nav-cta" href="/estimate/" aria-current={isCurrent('/estimate/') ? 'page' : undefined}>
+            Get an estimate
+          </a>
         </nav>
       </div>
     </header>
@@ -78,24 +89,36 @@ const isCurrent = (href: string) =>
           <div>
             <h4>Company</h4>
             <ul>
-              <li><a href="/">Home</a></li>
-              <li><span style="color:var(--muted-on-night)">Projects — coming</span></li>
-              <li><span style="color:var(--muted-on-night)">How it works — coming</span></li>
-              <li><span style="color:var(--muted-on-night)">Service &amp; AMC — coming</span></li>
+              <li><a href="/projects/">Projects</a></li>
+              <li><a href="/how-it-works/">How it works</a></li>
+              <li><a href="/service-and-amc/">Service &amp; AMC</a></li>
+              <li><a href="/for-designers/">For architects &amp; designers</a></li>
+              <li><a href="/journal/">Journal</a></li>
+              <li><a href="/privacy/">Privacy, plainly</a></li>
             </ul>
           </div>
           <div>
             <h4>Talk to us</h4>
             <ul>
+              <li><a href="/estimate/">Get an estimate</a></li>
               <li><a href={whatsappLink(waContext)} rel="noopener">WhatsApp</a></li>
               <li><a href={site.phoneHref}>{site.phone}</a></li>
               <li><a href={`mailto:${site.email}`}>{site.email}</a></li>
+              <li><a href="/contact/">Contact</a></li>
             </ul>
           </div>
           <div>
             <h4>Where we work</h4>
             <ul>
-              {site.cities.map((c) => <li>{c}</li>)}
+              {
+                site.cities.map((c) => (
+                  <li>
+                    <a href={`/areas/${c.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}/`}>
+                      {c}
+                    </a>
+                  </li>
+                ))
+              }
             </ul>
           </div>
         </div>
@@ -106,13 +129,17 @@ const isCurrent = (href: string) =>
       </div>
     </footer>
 
-    <a
-      class="btn btn--wa wa-float"
-      href={whatsappLink(waContext)}
-      rel="noopener"
-      aria-label="Message us on WhatsApp"
-    >
-      WhatsApp us
-    </a>
+    {
+      !hideWaFloat && (
+        <a
+          class="btn btn--wa wa-float"
+          href={whatsappLink(waContext)}
+          rel="noopener"
+          aria-label="Message us on WhatsApp"
+        >
+          WhatsApp us
+        </a>
+      )
+    }
   </body>
 </html>

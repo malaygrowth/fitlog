@@ -1,0 +1,202 @@
+---
+import Base from '../layouts/Base.astro';
+import { site, whatsappLink } from '../data/site';
+
+/**
+ * The cheapest page on the site and probably the highest earning. Designers and
+ * builders specify automation before the homeowner ever searches for it, and
+ * they specify whoever makes them look good.
+ */
+const specs = [
+  { label: 'Back boxes', value: 'TODO — depth in mm for touch panels vs retrofit modules' },
+  { label: 'Neutral wire', value: 'Required at every switch position for panels' },
+  { label: 'Curtain pockets', value: 'TODO — clear internal depth and power point position' },
+  { label: 'Network', value: 'One CAT6 run to a central rack, plus an access point per floor' },
+  { label: 'Conduit', value: 'TODO — spare capacity to specify at first fix' },
+  { label: 'Rack space', value: 'TODO — dimensions and ventilation' },
+];
+
+const stages = [
+  {
+    title: 'Concept',
+    ask: 'A layout and a rough brief.',
+    give: 'A written scope with indicative costs your client can react to, inside three days. No charge.',
+  },
+  {
+    title: 'First fix',
+    ask: 'Two weeks notice before the electrician starts.',
+    give: 'A marked-up drawing: back box positions and depths, conduit routes, curtain pocket details, network points.',
+  },
+  {
+    title: 'Second fix',
+    ask: 'Access once plastering and painting are done.',
+    give: 'Install and commissioning, working to your finishes schedule and your plate style.',
+  },
+  {
+    title: 'Handover',
+    ask: 'Half an hour with the client, ideally with you there.',
+    give: 'A working house, the family trained, and a one-page sheet. You get the credit.',
+  },
+];
+---
+
+<Base
+  title={`For architects & interior designers — ${site.name}`}
+  description="Spec sheets, drawing mark-ups and a coordination timeline for specifying home automation on your projects."
+  waContext="specifying automation on a project"
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">For the trade</p>
+      <h1 class="dsp" style="font-size:clamp(2.1rem,5vw,3.8rem)">
+        Specify it once,<br />at first fix
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          Almost every compromise in a smart home traces back to a back box that
+          was too shallow or a curtain pocket with no power in it. Both are free
+          to get right at first fix and expensive to fix afterwards.
+        </p>
+      </div>
+      <div class="cta">
+        <a class="btn btn--wa" href={whatsappLink('specifying automation on a project')} rel="noopener">
+          Talk to us about a project
+        </a>
+        <a class="btn btn--ghost" href="#spec">See the spec</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="measure">
+        <p
+          class="accent-line"
+          style="font-size:clamp(1.4rem,3vw,2.1rem);border-top:3px solid var(--brass);padding-top:24px"
+        >
+          We work to your drawings and your finishes. The automation should be the part nobody notices.
+        </p>
+      </div>
+      <div class="grid grid--3" style="margin-top:34px">
+        <div class="card">
+          <span class="eyebrow">What you get</span>
+          <h3 class="dsp">Drawings, not a catalogue</h3>
+          <p>
+            Your layouts marked up with back box positions and depths, conduit
+            routes, curtain pocket details and network points — in a form your
+            electrician can build from without ringing us.
+          </p>
+        </div>
+        <div class="card">
+          <span class="eyebrow">What you get</span>
+          <h3 class="dsp">One point of contact</h3>
+          <p>
+            We coordinate with the electrician directly so you are not relaying
+            questions about neutral wires. You hear from us at the four moments
+            that matter and not in between.
+          </p>
+        </div>
+        <div class="card">
+          <span class="eyebrow">What you get</span>
+          <h3 class="dsp">Finishes that match</h3>
+          <p>
+            Plate styles and colours chosen against your scheme, not against our
+            stock. If the switch plate fights the wall, we have made your project
+            worse.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--paper" id="spec">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">The spec, briefly</h2></div>
+      <p class="lede measure" style="margin-top:16px">
+        Enough to get first fix right. Send us the drawings and we will return
+        this marked up against your actual project.
+      </p>
+      <dl class="spec" style="margin-top:26px">
+        {specs.map((s) => <div><dt>{s.label}</dt><dd>{s.value}</dd></div>)}
+      </dl>
+      <p class="small measure" style="margin-top:14px">
+        TODO — replace every TODO above with the client's real installation
+        standards, then offer this page's spec as a downloadable PDF. A document
+        a designer can forward to a contractor is what makes this page earn.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">How we fit into your programme</h2></div>
+      <ol class="stages">
+        {
+          stages.map((s, i) => (
+            <li>
+              <span class="stages__no">{String(i + 1).padStart(2, '0')}</span>
+              <div>
+                <h3 class="dsp">{s.title}</h3>
+                <p><strong>We need:</strong> {s.ask}</p>
+                <p><strong>You get:</strong> {s.give}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section class="band band--paper band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Send us a drawing</h2>
+        <p class="lede">
+          A layout and a sentence about the client is enough to get a written
+          scope back within three days. No fee, and no obligation to use us.
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn--wa" href={whatsappLink('a project drawing')} rel="noopener">
+            Send on WhatsApp
+          </a>
+          <a class="btn btn--ghost" href={`mailto:${site.email}`}>{site.email}</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .stages {
+    list-style: none;
+    margin: 26px 0 0;
+    padding: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .stages li {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 20px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    align-items: start;
+  }
+  .stages__no {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 1.7rem;
+    line-height: 1;
+    color: var(--brass);
+    font-variant-numeric: tabular-nums;
+  }
+  .stages h3 { margin: 0 0 8px; }
+  .stages p {
+    font-size: 0.97rem;
+    line-height: 1.6;
+    color: var(--ink-2);
+    max-width: 62ch;
+  }
+  .stages p + p { margin-top: 4px; }
+</style>

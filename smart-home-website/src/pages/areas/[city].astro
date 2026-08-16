@@ -1,0 +1,111 @@
+---
+import Base from '../../layouts/Base.astro';
+import { site, whatsappLink, packages } from '../../data/site';
+import { services } from '../../data/services';
+
+/**
+ * One page per service area, generated from site.cities.
+ *
+ * These only earn their keep if the city is somewhere you will genuinely send a
+ * van, and if each page eventually carries local proof — real projects in that
+ * city, named localities. A thin page per city with the name swapped is the
+ * classic way to make local SEO worse rather than better, so keep the list
+ * short and make each one specific.
+ */
+export function getStaticPaths() {
+  return site.cities.map((city) => ({
+    params: { city: city.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') },
+    props: { city },
+  }));
+}
+
+const { city } = Astro.props;
+---
+
+<Base
+  title={`Home automation in ${city} — ${site.name}`}
+  description={`Smart switches, curtains, scenes and voice control installed across ${city}. Survey, fixed price, and most homes finished in days.`}
+  waContext={`home automation in ${city}`}
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">Service area</p>
+      <h1 class="dsp" style="font-size:clamp(2.1rem,5vw,3.8rem)">
+        Home automation<br />in {city}
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          We survey, design and install across {city} — switches, curtains,
+          scenes, climate and voice. Most apartments are finished in two days.
+        </p>
+      </div>
+      <div class="cta">
+        <a class="btn btn--wa" href={whatsappLink(`home automation in ${city}`)} rel="noopener">
+          Book a survey in {city}
+        </a>
+        <a class="btn btn--ghost" href="/estimate/">Price it first</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">What we install in {city}</h2></div>
+      <div class="grid grid--3" style="margin-top:26px">
+        {
+          services.map((s) => (
+            <a class="card" href={`/services/${s.slug}/`}>
+              <h3 class="dsp">{s.name}</h3>
+              <p>{s.thesis}</p>
+              <span class="price">Read more →</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--paper">
+    <div class="wrap">
+      <div class="sechead"><h2 class="dsp">What it costs here</h2></div>
+      <div class="grid grid--3" style="margin-top:26px">
+        {
+          packages.map((p) => (
+            <div class="card">
+              <span class="eyebrow">{p.fits}</span>
+              <h3 class="dsp">{p.name}</h3>
+              <p>{p.blurb}</p>
+              <span class="price">{p.price}</span>
+            </div>
+          ))
+        }
+      </div>
+      <p class="small measure" style="margin-top:16px">
+        TODO — this page needs local specifics before it will rank or convert:
+        the localities covered, a real project in {city}, and a note on
+        apartment types common here. A city page that only swaps the name is the
+        fastest way to get all of them ignored.
+      </p>
+    </div>
+  </section>
+
+  <section class="band band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Survey in {city}</h2>
+        <p class="lede">
+          Send a photo of your switchboard on WhatsApp and we will tell you what
+          your home can do before we come out.
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn--wa" href={whatsappLink(`a survey in ${city}`)} rel="noopener">
+            Message us
+          </a>
+          <a class="btn btn--ghost" href={site.phoneHref}>{site.phone}</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

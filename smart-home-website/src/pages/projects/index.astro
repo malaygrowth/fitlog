@@ -1,0 +1,74 @@
+---
+import Base from '../../layouts/Base.astro';
+import Placeholder from '../../components/Placeholder.astro';
+import { projects } from '../../data/projects';
+import { site } from '../../data/site';
+
+const anyPlaceholder = projects.some((p) => p.placeholder);
+---
+
+<Base
+  title={`Projects — ${site.name}`}
+  description="Real homes, what went into them, how long it took and what it cost."
+  waContext="your recent projects"
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">Projects</p>
+      <h1 class="dsp" style="font-size:clamp(2.2rem,5.4vw,4rem)">
+        Homes we have<br />actually finished
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">
+          Every project below lists what was installed, how long it took and what
+          it cost. We would rather show you the numbers than a stock photograph of
+          somebody else's living room.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      {
+        anyPlaceholder && (
+          <div style="margin-bottom:26px">
+            <Placeholder what="These case studies are templates waiting on real installs." />
+          </div>
+        )
+      }
+      <div class="grid grid--3">
+        {
+          projects.map((p) => (
+            <a class="card" href={`/projects/${p.slug}/`}>
+              <span class="eyebrow">{p.homeType}</span>
+              <h3 class="dsp">{p.name}</h3>
+              <p>{p.brief}</p>
+              <span class="price">
+                {p.spend} · {p.duration}
+              </span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="band band--paper band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Want yours to be next?</h2>
+        <p class="lede">
+          Start with a survey. We look at your wiring, tell you what is possible,
+          and give you a number before anybody commits to anything.
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn--primary" href="/estimate/">Estimate it yourself</a>
+          <a class="btn btn--ghost" href="/contact/">Book a survey</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

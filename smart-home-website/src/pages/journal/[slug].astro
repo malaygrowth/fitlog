@@ -1,0 +1,148 @@
+---
+import Base from '../../layouts/Base.astro';
+import { articles } from '../../data/journal';
+import { site, whatsappLink } from '../../data/site';
+
+export function getStaticPaths() {
+  return articles.map((article) => ({
+    params: { slug: article.slug },
+    props: { article },
+  }));
+}
+
+const { article } = Astro.props;
+const others = articles.filter((a) => a.slug !== article.slug);
+const fmt = (d: string) =>
+  new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+---
+
+<Base
+  title={`${article.title} — ${site.name}`}
+  description={article.summary}
+  waContext={article.question.toLowerCase().replace(/\?$/, '')}
+>
+  <section class="hero">
+    <div class="wrap">
+      <div class="brass-rule"></div>
+      <p class="eyebrow" style="margin-top:16px">
+        Journal · {fmt(article.updated)} · {article.readTime}
+      </p>
+      <h1 class="dsp" style="font-size:clamp(2rem,4.8vw,3.5rem);max-width:18ch">
+        {article.title}
+      </h1>
+      <div class="measure" style="margin-top:22px">
+        <p class="lede">{article.summary}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <article class="article">
+        {
+          article.body.map((b) =>
+            b.t === 'h2' ? (
+              <h2 class="dsp">{b.text}</h2>
+            ) : b.t === 'p' ? (
+              <p>{b.text}</p>
+            ) : b.t === 'ul' ? (
+              <ul>{b.items.map((i) => <li>{i}</li>)}</ul>
+            ) : (
+              <aside class="article__note">{b.text}</aside>
+            ),
+          )
+        }
+      </article>
+    </div>
+  </section>
+
+  <section class="band band--paper band--tight">
+    <div class="wrap">
+      <div class="stack g16 measure">
+        <div class="brass-rule"></div>
+        <h2 class="dsp">Price your own home</h2>
+        <p class="lede">
+          The estimator takes about a minute and gives you a range for your
+          actual rooms — no phone call, and nothing sent anywhere until you
+          choose to send it.
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn--primary" href="/estimate/">Open the estimator</a>
+          <a class="btn btn--ghost" href={whatsappLink('a question from your journal')} rel="noopener">
+            Ask us instead
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {
+    others.length > 0 && (
+      <section class="band">
+        <div class="wrap">
+          <div class="sechead"><h2 class="dsp">Also worth reading</h2></div>
+          <div class="grid grid--2" style="margin-top:26px">
+            {others.map((a) => (
+              <a class="card" href={`/journal/${a.slug}/`}>
+                <span class="eyebrow">{a.readTime}</span>
+                <h3 class="dsp">{a.title}</h3>
+                <p>{a.summary}</p>
+                <span class="price">Read →</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+</Base>
+
+<style>
+  .article {
+    max-width: 66ch;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .article h2 {
+    font-size: clamp(1.3rem, 2.6vw, 1.8rem);
+    margin: 22px 0 0;
+  }
+  .article p {
+    font-size: 1.06rem;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+  .article ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+  .article li {
+    position: relative;
+    padding-left: 20px;
+    font-size: 1.02rem;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+  .article li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.62em;
+    width: 7px;
+    height: 7px;
+    background: var(--brass);
+  }
+  .article__note {
+    border-left: 3px solid var(--brass);
+    background: var(--brass-wash);
+    padding: 16px 18px;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+</style>
