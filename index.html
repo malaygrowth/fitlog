@@ -477,7 +477,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='2.0.0';
+const APP_VER='2.1.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -543,7 +543,7 @@ function defaults(){
       sleepRemind:'22:30', sleepGoal:8, breathGoal:15, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], caff:{}, light:{}, sauna:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], caff:{}, light:{}, sauna:{}, skipped:[], measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
   };
 }
 let S;
@@ -1897,6 +1897,61 @@ function todaysPlanRoutine(){
   const id=(S.plan||{})[new Date().getDay()];
   return id ? S.routines.find(function(r){return r.id===id;})||null : null;
 }
+/* ---------- missed sessions ----------
+   The plan is fixed to days of the week, so a missed Monday used to vanish
+   without comment. This does not move the plan: it surfaces what was skipped in
+   the last few days and which muscle group that left short. */
+function missedSessions(days){
+  const out=[];
+  for(let i=1;i<=(days||3);i++){
+    const d=dShift(today(),-i);
+    if(activeBreak(d)) continue;
+    if((S.skipped||[]).indexOf(d)>-1) continue;
+    const id=(S.plan||{})[new Date(d+'T12:00:00').getDay()];
+    if(!id) continue;
+    if(S.sessions.some(function(s){ return s.date===d; })) continue;
+    const rt=S.routines.find(function(r){ return r.id===id; });
+    if(rt) out.push({date:d, routine:rt, ago:i});
+  }
+  return out;
+}
+/* Which groups the missed routine covers, and whether the week is short there.
+   Same 10-20 set range the volume screen uses. */
+function shortGroups(rt){
+  const have={};
+  weeklyVolume(7).forEach(function(v){ have[v.group]=v.sets; });
+  const groups=[];
+  (rt.exIds||[]).forEach(function(id){
+    const g=exGroupOf(id);
+    if(!g||g==='Cardio'||g==='Mobility') return;
+    if(groups.indexOf(g)<0) groups.push(g);
+  });
+  return groups.filter(function(g){ return (have[g]||0) < 10; })
+    .map(function(g){ return {group:g, sets:have[g]||0}; });
+}
+function catchUpCard(){
+  const missed=missedSessions(3);
+  if(!missed.length) return '';
+  const m=missed[0], short=shortGroups(m.routine);
+  return '<div class="card" style="border-left:3px solid var(--wk)">'+
+    '<div class="tiny muted" style="font-weight:700; letter-spacing:.08em; text-transform:uppercase">Missed · '+
+      (m.ago===1?'yesterday':m.ago+' days ago')+'</div>'+
+    '<b style="font-size:16px">'+esc(m.routine.name)+'</b>'+
+    (short.length
+      ? '<div class="tiny muted" style="margin-top:4px; line-height:1.5">'+
+        short.map(function(x){ return esc(x.group)+' is at '+x.sets+' set'+(x.sets===1?'':'s'); }).join(', ')+
+        ' this week, under the 10-20 range that drives growth.</div>'
+      : '<div class="tiny muted" style="margin-top:4px">Weekly volume is still in range, so this one is optional.</div>')+
+    '<div class="row" style="gap:8px; margin-top:11px">'+
+      '<button class="btn primary grow" onclick="startSession(\''+m.routine.id+'\')">Do it today</button>'+
+      '<button class="btn ghost grow" onclick="skipMissed(\''+m.date+'\')">Skip it</button>'+
+    '</div></div>';
+}
+function skipMissed(d){
+  S.skipped=(S.skipped||[]).concat([d]); save();
+  renderToday(); renderWorkout();
+  toast('Noted. The plan is unchanged.');
+}
 function planEditor(){
   const days=[['1','Monday'],['2','Tuesday'],['3','Wednesday'],['4','Thursday'],['5','Friday'],['6','Saturday'],['0','Sunday']];
   openSheet('<h3>Weekly plan</h3>'+
@@ -2793,6 +2848,8 @@ function renderToday(){
     '<div class="row wrap" style="gap:6px; margin-top:14px">'+
     pillars.map(function(p){ return '<span class="pp'+(p.on?' on':'')+'">'+(p.on?'✓ ':'')+p.l+'</span>'; }).join('')+
     '</div>'+weekRow()+'</div>';
+  /* a missed session belongs at the top, not under the tracker tiles */
+  h+=catchUpCard();
   /* ===== quote + coach fact ===== */
   const qi=dayIdx();
   h+='<div class="card qcard" style="padding:16px 18px">“'+QUOTES[qi%QUOTES.length]+'”'+
@@ -2935,7 +2992,22 @@ function achievements(){
     {i:'🌙', t:'Sleep logged ×7', ok:Object.keys(S.sleep).length>=7},
     {i:'🌬️', t:'7-day breathwork streak', ok:breathDays>=7},
     {i:'📸', t:'First progress photo', ok:S.photos.length>=1},
-    {i:'📏', t:'First measurements', ok:S.measures.length>=1}
+    {i:'📏', t:'First measurements', ok:S.measures.length>=1},
+    /* the things the app started measuring later, which had no milestones */
+    {i:'🥬', t:'Fiber goal ×7 days', ok:Object.keys(S.food||{}).filter(function(d){
+      return foodTotals(d).fb >= (+S.settings.fiberGoal||30); }).length>=7},
+    {i:'🫀', t:'First VO2max test', ok:(S.vo2||[]).length>=1},
+    {i:'📈', t:'VO2max improved', ok:(function(){
+      const v=S.vo2||[]; if(v.length<2) return false;
+      return v[v.length-1].val > v[0].val; })()},
+    {i:'🚴', t:'150 zone-2 min in a week', ok:zone2Mins(7)>=150},
+    {i:'⏱️', t:'Sleep regularity above 80', ok:(function(){
+      const r=sleepRegularity(14); return !!r && r.score>=80; })()},
+    {i:'♨️', t:'Steam ×2 in a week', ok:saunaWeek().n>=2},
+    {i:'☀️', t:'7-day morning daylight streak', ok:lightStreak()>=7},
+    {i:'💊', t:'Full checklist ×7 days', ok:Object.keys(S.suppLog||{}).filter(function(d){
+      const done=Object.keys(S.suppLog[d]||{}).length;
+      return S.supps.length && done>=S.supps.length; }).length>=7}
   ];
 }
 function achievementsSheet(){
@@ -3138,6 +3210,7 @@ function renderWorkout(){
   const ach=achievements(), achGot=ach.filter(function(a){return a.ok;});
   let h=nav;
   if(!trainedToday) h+=readinessBanner();
+  if(!trainedToday) h+=catchUpCard();
   /* hero */
   h+='<div class="card">';
   if(trainedToday){
@@ -3885,7 +3958,17 @@ function libraryHTML(){
   return h;
 }
 function delExercise(id){ if(!confirm('Delete exercise? Past logs keep their data.')) return;
-  S.exercises=S.exercises.filter(function(e){return e.id!==id;}); save(); renderWorkout(); }
+  S.exercises=S.exercises.filter(function(e){return e.id!==id;});
+  /* routines kept the id and rendered it forever as a row called "(deleted)" */
+  let touched=0;
+  (S.routines||[]).forEach(function(r){
+    const n=r.exIds.length;
+    r.exIds=r.exIds.filter(function(x){ return x!==id; });
+    if(r.exIds.length!==n) touched++;
+  });
+  save(); renderWorkout();
+  if(touched) toast('Removed from '+touched+' routine'+(touched>1?'s':'')+' too');
+}
 function openExInfo(exId){
   const name=exName(exId), g=exGroupOf(exId);
   let h='<h3>'+esc(name)+'</h3><div class="tiny muted" style="margin:-8px 0 12px">'+esc(g)+'</div>';
@@ -4019,7 +4102,13 @@ function saveRoutine(id){
   save(); WV='home'; renderWorkout(); toast('Routine saved');
 }
 function delRoutine(id){ if(!confirm('Delete routine?')) return;
-  S.routines=S.routines.filter(function(r){return r.id!==id;}); save(); WV='home'; renderWorkout(); }
+  S.routines=S.routines.filter(function(r){return r.id!==id;});
+  /* the weekly plan kept pointing at it, so that day silently became a rest day */
+  const days=[];
+  Object.keys(S.plan||{}).forEach(function(k){ if(S.plan[k]===id){ S.plan[k]=''; days.push(k); } });
+  save(); WV='home'; renderWorkout();
+  if(days.length) toast(days.length+' plan day'+(days.length>1?'s':'')+' now open, set them in Plan');
+}
 
 /* session clock */
 setInterval(function(){
