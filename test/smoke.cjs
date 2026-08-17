@@ -335,6 +335,83 @@ function check(name, cond, detail) {
   check('onboarding stores age, sex and a fiber goal', audit.onboarding.length === 0, audit.onboarding);
   check('the exercise card leads with what to lift today', audit.cardLeads);
 
+  console.log('barcode scanning');
+  const bc = await page.evaluate(() => {
+    const g = {};
+    const savedFood = JSON.stringify(S.food);
+    S.barcodes = {};
+    go('food'); addFoodForm('s');
+    g.entryPoint = /scanSheet\(/.test(document.querySelector('#sheetIn').innerHTML);
+    // this browser has no reader: the sheet must say so rather than hang
+    g.supported = barcodeSupported();
+    scanSheet('s');
+    const noSupport = document.querySelector('#sheetIn').textContent;
+    g.degrades = g.supported || (/no barcode reader/i.test(noSupport) && /type the number/i.test(noSupport));
+    // an unknown code asks once
+    onCode('8901058000108');
+    const t1 = document.querySelector('#sheetIn').textContent;
+    g.asks = /New barcode/.test(t1) && /8901058000108/.test(t1);
+    // link it by searching the database
+    bcSearch('monaco');
+    g.searchHits = BCRES.length;
+    bcAttach(0);
+    g.learned = !!S.barcodes['8901058000108'];
+    g.snapshot = ['name', 'kcal', 'p', 'c', 'f', 'fb'].every((k) => k in S.barcodes['8901058000108']);
+    // the snapshot must survive the source food being deleted
+    const src = S.barcodes['8901058000108'].name;
+    g.independent = S.barcodes['8901058000108'].kcal > 0 && typeof src === 'string';
+    // a second scan goes straight to a quantity, and scales correctly
+    onCode('8901058000108');
+    g.straightToQty = /Quantity/.test(document.querySelector('#sheetIn').textContent);
+    const before = ((S.food[foodDate] || {}).s || []).length;
+    document.querySelector('#bcQty').value = '2';
+    barcodeLog('8901058000108');
+    const list = (S.food[foodDate] || {}).s || [];
+    const e = list[list.length - 1];
+    const unit = S.barcodes['8901058000108'];
+    g.logged = list.length === before + 1;
+    g.scaled = e.kcal === Math.round(unit.kcal * 2) && e.fb === Math.round(unit.fb * 2 * 10) / 10;
+    g.quantityInName = /^2× /.test(e.name);
+    // typing off the label also works
+    scanSheet('s'); onCode('9999999999999');
+    document.querySelector('#bcName').value = 'Test packet';
+    document.querySelector('#bcK').value = '200';
+    document.querySelector('#bcFb').value = '3';
+    bcSaveTyped();
+    g.typed = S.barcodes['9999999999999'] && S.barcodes['9999999999999'].fb === 3;
+    // an unnamed product is refused rather than saved blank
+    onCode('7777777777777');
+    document.querySelector('#bcName').value = '';
+    bcSaveTyped();
+    g.refusesBlank = S.barcodes['7777777777777'] === undefined;
+    // a wrong link is fixable, and the list shows what was learned
+    barcodeList();
+    g.listShows = /9999999999999/.test(document.querySelector('#sheetIn').textContent);
+    barcodeForget('9999999999999');
+    g.forgets = S.barcodes['9999999999999'] === undefined;
+    // closing the sheet must always release the camera
+    BC.stream = { getTracks: () => [{ stop: () => { window.__bcStopped = true; } }] };
+    BC.timer = setInterval(() => {}, 1000);
+    closeSheet();
+    g.releasesCamera = window.__bcStopped === true && BC.stream === null && BC.timer === null;
+    // nothing here touches the network
+    g.offline = !/openfoodfacts|api\./i.test(scanSheet.toString() + onCode.toString() + bcAttach.toString());
+    S.barcodes = {}; S.food = JSON.parse(savedFood); save();
+    return g;
+  });
+  check('the food sheet offers a scan button', bc.entryPoint);
+  check('a browser without a reader says so instead of hanging', bc.degrades);
+  check('an unknown barcode asks what it is, showing the code', bc.asks);
+  check('it can be linked to a food from the database', bc.searchHits >= 1 && bc.learned, bc);
+  check('what is stored is a self-contained snapshot', bc.snapshot && bc.independent, bc);
+  check('a known barcode goes straight to a quantity', bc.straightToQty);
+  check('logging scales calories and fiber by quantity', bc.logged && bc.scaled && bc.quantityInName, bc);
+  check('a product can be typed off the label instead', bc.typed);
+  check('a blank product name is refused, not saved empty', bc.refusesBlank);
+  check('learned products are listed and can be forgotten', bc.listShows && bc.forgets, bc);
+  check('closing the sheet always releases the camera', bc.releasesCamera);
+  check('no network call anywhere in the scan path', bc.offline);
+
   console.log('missed days, dangling references, milestones');
   const gaps = await page.evaluate(() => {
     const g = {};

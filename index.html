@@ -477,7 +477,7 @@
 <script>
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
-const APP_VER='2.1.0';
+const APP_VER='2.2.0';
 const K='fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
@@ -543,7 +543,7 @@ function defaults(){
       sleepRemind:'22:30', sleepGoal:8, breathGoal:15, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], caff:{}, light:{}, sauna:{}, skipped:[], measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], caff:{}, light:{}, sauna:{}, skipped:[], barcodes:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
   };
 }
 let S;
@@ -1213,7 +1213,10 @@ function render(){
 
 /* ============ sheet ============ */
 function openSheet(html){ $('#sheetIn').innerHTML=html; $('#sheet').classList.add('on'); $('#shade').classList.add('on'); }
-function closeSheet(){ $('#sheet').classList.remove('on'); $('#shade').classList.remove('on'); }
+function closeSheet(){
+  if(typeof stopScan==='function') stopScan();   /* never leave the camera running */
+  $('#sheet').classList.remove('on'); $('#shade').classList.remove('on');
+}
 
 /* ============ daily quote + coach fact ============ */
 const QUOTES=[
@@ -4644,6 +4647,161 @@ function renderFood(){
   $('#tab-food').innerHTML=h;
 }
 function foodNav(d){ const nx=dShift(foodDate,d); if(nx>today()) return; foodDate=nx; renderFood(); }
+/* ---------- barcode scanning ----------
+   There is no product database to call: the app makes no network requests and
+   the artifact's CSP blocks external hosts outright. So it learns instead. The
+   first scan of a packet asks what it is, once, and remembers the code for good.
+   The stored value is a snapshot, not a reference, so it survives the source
+   food being edited or deleted later. */
+let BC={stream:null, timer:null, meal:'s', det:null};
+function barcodeSupported(){ return typeof window.BarcodeDetector!=='undefined'; }
+function scanSheet(meal){
+  BC.meal=meal||'s';
+  const known=Object.keys(S.barcodes||{}).length;
+  if(!barcodeSupported()){
+    openSheet('<h3>Scan a barcode</h3>'+
+      '<p class="small" style="color:var(--ink2); line-height:1.6">This browser has no barcode reader built in. '+
+      'Chrome on Android does; Safari and every browser on iPhone do not, and Apple has not shipped it.</p>'+
+      '<p class="tiny muted" style="line-height:1.6">You can still type the number off the packet, and it will be remembered the same way.</p>'+
+      barcodeManualField()+
+      (known? '<button class="btn ghost wide" style="margin-top:10px" onclick="barcodeList()">'+known+' saved product'+(known>1?'s':'')+'</button>':''));
+    return;
+  }
+  openSheet('<h3>Scan a barcode</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 10px">Hold the packet steady, barcode filling the frame.</p>'+
+    '<div style="position:relative; background:#000; border-radius:14px; overflow:hidden; aspect-ratio:4/3">'+
+      '<video id="bcVid" playsinline muted style="width:100%; height:100%; object-fit:cover"></video>'+
+      '<div style="position:absolute; left:8%; right:8%; top:38%; height:24%; border:2px solid var(--wk); border-radius:8px"></div>'+
+    '</div>'+
+    '<div id="bcMsg" class="tiny muted" style="margin-top:10px; text-align:center">Starting the camera…</div>'+
+    barcodeManualField()+
+    (known? '<button class="btn ghost wide" style="margin-top:10px" onclick="barcodeList()">'+known+' saved product'+(known>1?'s':'')+'</button>':''));
+  startScan();
+}
+function barcodeManualField(){
+  return '<div class="field" style="margin-top:12px"><label for="bcNum">Or type the number</label>'+
+    '<input id="bcNum" type="number" inputmode="numeric" placeholder="8901058…"></div>'+
+    '<button class="btn wide" onclick="onCode((document.querySelector(\'#bcNum\')||{}).value)">Look it up</button>';
+}
+function startScan(){
+  const v=$('#bcVid'); if(!v) return;
+  try{ BC.det=new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']}); }
+  catch(e){ BC.det=new window.BarcodeDetector(); }
+  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}}).then(function(st){
+    BC.stream=st; v.srcObject=st; v.play();
+    const msg=$('#bcMsg'); if(msg) msg.textContent='Looking for a barcode…';
+    BC.timer=setInterval(function(){
+      if(!BC.det||!v.videoWidth) return;
+      BC.det.detect(v).then(function(codes){
+        if(codes&&codes.length) onCode(codes[0].rawValue);
+      }).catch(function(){});
+    }, 350);
+  }).catch(function(err){
+    const msg=$('#bcMsg');
+    if(msg) msg.innerHTML='<span style="color:var(--wk)">Camera unavailable: '+esc(err.name||'blocked')+
+      '.</span> Type the number below instead.';
+  });
+}
+function stopScan(){
+  clearInterval(BC.timer); BC.timer=null;
+  if(BC.stream){ BC.stream.getTracks().forEach(function(t){ t.stop(); }); BC.stream=null; }
+  BC.det=null;
+}
+function onCode(code){
+  code=String(code||'').trim();
+  if(!code){ toast('Enter a number first'); return; }
+  stopScan(); vib(18);
+  const hit=(S.barcodes||{})[code];
+  if(hit) barcodePick(code, hit);
+  else barcodeLink(code);
+}
+/* known code: straight to a quantity, one tap from logged */
+function barcodePick(code, f){
+  openSheet('<h3>'+esc(f.name)+'</h3>'+
+    '<div class="tiny muted num" style="margin:-6px 0 12px">'+f.kcal+' kcal · P '+f.p+' · C '+f.c+' · F '+f.f+
+      ((+f.fb)?' · Fib '+f.fb:'')+' · code '+esc(code)+'</div>'+
+    '<div class="row"><span class="small">Quantity</span>'+
+      '<input id="bcQty" type="number" inputmode="decimal" value="1" min="0.5" step="0.5" style="max-width:90px; text-align:center">'+
+      '<button class="btn food grow" onclick="barcodeLog(\''+esc(code)+'\')">Add</button></div>'+
+    '<button class="btn ghost wide danger" style="margin-top:14px" onclick="barcodeForget(\''+esc(code)+'\')">Wrong product, forget this code</button>');
+}
+function barcodeLog(code){
+  const f=(S.barcodes||{})[code]; if(!f) return;
+  const n=Math.max(0.5, +($('#bcQty')||{}).value||1);
+  const day=S.food[foodDate]=S.food[foodDate]||{};
+  (day[BC.meal]=day[BC.meal]||[]).push({id:uid(), name:(n!==1? n+'× ':'')+f.name,
+    kcal:Math.round(f.kcal*n), p:Math.round(f.p*n*10)/10, c:Math.round(f.c*n*10)/10,
+    f:Math.round(f.f*n*10)/10, fb:Math.round((f.fb||0)*n*10)/10});
+  save(); closeSheet(); renderFood();
+  toast(f.name+' logged from the packet');
+}
+/* unknown code: link it once, either to a food already in the database or to
+   the numbers off the label */
+function barcodeLink(code){
+  BC.pending=code;
+  openSheet('<h3>New barcode</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">'+esc(code)+' is not saved yet. Tell it what this is once and it will know next time.</p>'+
+    '<div class="field"><label for="bcSearch">Find it in the '+FOODDB.length+' foods</label>'+
+    '<input id="bcSearch" placeholder="monaco, lays, krackjack…" oninput="bcSearch(this.value)"></div>'+
+    '<div id="bcRes"></div>'+
+    '<hr style="border:0; border-top:1px solid var(--line); margin:14px 0">'+
+    '<p class="tiny muted" style="margin-bottom:8px">Or copy the label, per serving</p>'+
+    '<div class="field"><label for="bcName">Product name</label><input id="bcName" placeholder="e.g. Monaco (small packet)"></div>'+
+    '<div class="fields2">'+
+      '<div class="field"><label for="bcK">Calories</label><input id="bcK" type="number" inputmode="numeric" placeholder="0"></div>'+
+      '<div class="field"><label for="bcP">Protein g</label><input id="bcP" type="number" inputmode="decimal" placeholder="0"></div></div>'+
+    '<div class="fields3">'+
+      '<div class="field"><label for="bcC">Carbs g</label><input id="bcC" type="number" inputmode="decimal" placeholder="0"></div>'+
+      '<div class="field"><label for="bcF">Fat g</label><input id="bcF" type="number" inputmode="decimal" placeholder="0"></div>'+
+      '<div class="field"><label for="bcFb">Fiber g</label><input id="bcFb" type="number" inputmode="decimal" placeholder="0"></div></div>'+
+    '<button class="btn food wide" onclick="bcSaveTyped()">Save and log it</button>');
+}
+let BCRES=[];
+function bcSearch(q){
+  const box=$('#bcRes'); if(!box) return;
+  const toks=String(q||'').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if(!toks.length){ box.innerHTML=''; BCRES=[]; return; }
+  BCRES=fdbAllFoods().filter(function(f){
+    const n=f.name.toLowerCase();
+    return toks.every(function(t){ return n.indexOf(t)>-1; });
+  }).slice(0,6);
+  box.innerHTML=BCRES.map(function(f,i){
+    return '<div class="listrow" style="cursor:pointer" onclick="bcAttach('+i+')"><span class="small">'+esc(f.name)+'</span>'+
+      '<span class="tiny muted num">'+f.kcal+' kcal</span></div>';
+  }).join('')||'<div class="tiny muted" style="padding:6px 2px">Nothing matched. Use the label fields below.</div>';
+}
+function bcAttach(i){
+  const f=BCRES[i], code=BC.pending; if(!f||!code) return;
+  S.barcodes[code]={name:f.name, kcal:+f.kcal||0, p:+f.p||0, c:+f.c||0, f:+f.f||0, fb:+f.fb||0};
+  save(); vib(14);
+  toast(f.name+' saved to that barcode');
+  barcodePick(code, S.barcodes[code]);
+}
+function bcSaveTyped(){
+  const code=BC.pending; if(!code) return;
+  const name=($('#bcName')||{}).value||'';
+  if(!name.trim()){ toast('Name it first'); return; }
+  S.barcodes[code]={name:name.trim(), kcal:+($('#bcK')||{}).value||0, p:+($('#bcP')||{}).value||0,
+    c:+($('#bcC')||{}).value||0, f:+($('#bcF')||{}).value||0, fb:+($('#bcFb')||{}).value||0};
+  save(); vib(14);
+  barcodePick(code, S.barcodes[code]);
+}
+function barcodeForget(code){
+  delete S.barcodes[code]; save(); closeSheet();
+  toast('Forgotten. The next scan will ask again.');
+}
+/* every learned code, so a wrong link is fixable */
+function barcodeList(){
+  const codes=Object.keys(S.barcodes||{});
+  openSheet('<h3>Saved products</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">Barcodes this phone has learned. Nothing was looked up online.</p>'+
+    (codes.length? codes.map(function(c){
+      const f=S.barcodes[c];
+      return '<div class="listrow"><div style="min-width:0"><span class="small">'+esc(f.name)+'</span>'+
+        '<div class="tiny muted num">'+esc(c)+' · '+f.kcal+' kcal</div></div>'+
+        '<button class="btn ghost sm danger" onclick="barcodeForget(\''+esc(c)+'\')">✕</button></div>';
+    }).join('') : '<div class="empty">Nothing scanned yet.</div>'));
+}
 function againRow(meal){
   AGAIN=recentFoods(8);
   if(!AGAIN.length) return '';
@@ -4659,6 +4817,7 @@ function addFoodForm(meal){
   let h='<h3>Add food</h3>'+
     '<div class="field"><label for="fdbQ">Search '+FOODDB.length+' Indian foods (per piece, per packet, or just the parts)</label>'+
     '<input id="fdbQ" placeholder="monaco, paneer, dal, almond, chai…" oninput="fdbSearch(this.value)"></div>'+
+    '<button class="btn wide" style="margin:-4px 0 2px" onclick="scanSheet(\''+meal+'\')">📷 Scan a packet</button>'+
     '<p class="tiny muted" style="margin:-6px 0 4px">Add sends one item straight in. + Plate collects several, then logs them as one meal.</p>'+
     againRow(meal)+
     '<div id="fdbRes"></div><div id="fdbSel"></div><div id="fdbPlate"></div>'+
