@@ -36,11 +36,11 @@ function check(name, cond, detail) {
     shake: S.myFoods.some((m) => /post-workout shake/i.test(m.name)),
   }));
   check('38 imported sessions + the re-entered 10 August push', boot.sessions === 39, boot.sessions);
-  check('10 supplements seeded', boot.supps === 10, boot.supps);
+  check('11 supplements seeded, including the shake', boot.supps === 11, boot.supps);
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 22, boot.schema);
+  check('schemaVersion stamped', boot.schema === 23, boot.schema);
   check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
@@ -70,7 +70,7 @@ function check(name, cond, detail) {
       allOk: s && s.ex.every((e) => e.sets.every((t) => t.e === 'ok')),
       anyEasy: s && s.ex.some((e) => e.sets.some((t) => t.e === 'easy')),
       sorted: S.sessions.every((x, i, a) => !i || a[i - 1].date <= x.date),
-      inWeek: wk, total: S.sessions.length, rx, held: readiness().hold,
+      inWeek: wk, ownWeek: weekStats(wkMonday('2026-08-10')).ses, total: S.sessions.length, rx, held: readiness().hold,
     };
   });
   check('exactly one session on 10 August', aug10.count === 1, aug10.count);
@@ -79,7 +79,7 @@ function check(name, cond, detail) {
   check('volume 1575, plank contributes nothing', aug10.vol === 1575, aug10.vol);
   check('comeback loads set no records', aug10.prs === 0, aug10.prs);
   check('every set marked moderate, not easy', aug10.allOk && !aug10.anyEasy, aug10);
-  check('history stays sorted and it counts in the week', aug10.sorted && aug10.inWeek >= 1, aug10);
+  check('history stays sorted and it counts in its own week', aug10.sorted && aug10.ownWeek >= 1, aug10);
   check('the payoff: every push lift now progresses', Object.values(aug10.rx).every((r) => r.tag === 'up' || r.tag === 'progress'), aug10.rx);
   check('moderate sets earn a single increment, not a doubled one',
     aug10.rx['Incline dumbbell press'].w === 12.5 && aug10.rx['Chest fly (dumbbell)'].w === 7.5
@@ -124,7 +124,7 @@ function check(name, cond, detail) {
       backfilled: bf[0].fb, unmatched: bf[1].fb, custom, goal: S.settings.fiberGoal,
     };
   });
-  check('all 261 foods carry a sane fiber value', fib.rows === 261 && fib.bad.length === 0, fib.bad);
+  check('every food carries a sane fiber value', fib.rows >= 315 && fib.bad.length === 0, fib.bad);
   check('legumes high, fats and dairy zero', fib.dal === 8 && fib.ghee === 0 && fib.milk === 0, fib);
   check('plate sums fiber from its parts (8 + 2×3)', fib.plateFb === 14, fib.plateFb);
   check('the logged entry carries it, and the day total moves', fib.entryFb === 14 && fib.dayDelta === 14, fib);
@@ -334,6 +334,91 @@ function check(name, cond, detail) {
   check('zone 2 shows on a cardio set, and only when flagged', audit.z2Shown && audit.z2Absent, audit);
   check('onboarding stores age, sex and a fiber goal', audit.onboarding.length === 0, audit.onboarding);
   check('the exercise card leads with what to lift today', audit.cardLeads);
+
+  console.log('Jaipur food coverage and the supplement schedule');
+  const jai = await page.evaluate(() => {
+    const g = {};
+    const has = (q) => FOODDB.some((r) => r[0].toLowerCase().includes(q.toLowerCase()));
+    g.missing = ['waffle', 'tres leches', 'cajun potatoes', 'ravioli', 'rabri ghewar', 'puri aloo',
+      'samosa chaat', 'tandoori momos', 'afghani momos', 'kurkure momos', 'paneer momos',
+      'cheesecake', 'croissant', 'pancakes', 'falafel', 'hummus', 'quesadilla', 'burrito',
+      'latte', 'frappe', 'boba', 'smoothie', 'cold coffee'].filter((q) => !has(q));
+    g.rows = FOODDB.length;
+    g.allSix = FOODDB.every((r) => r.length === 6 && typeof r[5] === 'number');
+    const names = FOODDB.map((r) => r[0]);
+    g.dupes = names.filter((n, i) => names.indexOf(n) !== i);
+    // muesli swap
+    g.shakeName = (S.myFoods.find((m) => /post-workout shake/i.test(m.name)) || {}).name;
+    g.massName = (S.quick.find((q) => /Mass shake/i.test(q.name)) || {}).name;
+    // the double-count
+    const shake = S.supps.find((x) => /post-workout shake/i.test(x.name));
+    const whey = S.supps.find((x) => /^whey/i.test(x.name));
+    const cre = S.supps.find((x) => /creatine/i.test(x.name));
+    g.wheyNoLogFood = whey.logFood === false;
+    const base = foodTotals(today());
+    toggleSupp(shake.id);
+    const after = foodTotals(today());
+    g.shakeKcal = after.kcal - base.kcal;
+    g.covered = String(S.suppLog[today()][whey.id]).indexOf('via:') === 0
+      && String(S.suppLog[today()][cre.id]).indexOf('via:') === 0;
+    const k = foodTotals(today()).kcal;
+    toggleSupp(whey.id);
+    g.noDouble = foodTotals(today()).kcal === k;
+    toggleSupp(shake.id);
+    g.released = S.suppLog[today()][whey.id] === undefined && S.suppLog[today()][cre.id] === undefined;
+    g.baseline = foodTotals(today()).kcal === base.kcal;
+    // doses and slots
+    g.doses = S.supps.every((sp) => !!suppDose(sp));
+    g.slots = ['morning', 'post', 'lunch', 'bed'].every((sl) => S.supps.some((sp) => suppPlan(sp.name).slot === sl));
+    g.calciumLunch = suppPlan('Calcium: with lunch').slot === 'lunch';
+    g.magBed = suppPlan('Magnesium: before bed').slot === 'bed';
+    // an editable dose survives
+    setSuppDose(cre.id, '3 g');
+    g.doseEdit = suppDose(S.supps.find((x) => x.id === cre.id)) === '3 g';
+    delete S.supps.find((x) => x.id === cre.id).dose;
+    // the conflict check: quiet on this stack, loud when forced
+    g.noConflictNow = suppConflicts().length === 0;
+    // move calcium onto the evening slot and the check should object
+    const cal = S.supps.find((x) => /calcium/i.test(x.name));
+    g.calDefault = suppSlot(cal) === 'lunch';
+    setSuppSlot(cal.id, 'bed');
+    g.conflictFound = suppConflicts().some((c) => /two hours/.test(c));
+    g.slotEdit = suppSlot(cal) === 'bed';
+    delete cal.slot;
+    g.conflictClears = suppConflicts().length === 0;
+    // the grouped checklist and the 30-day grid render
+    checklistSheet();
+    const cl = document.querySelector('#sheetIn');
+    g.grouped = /MORNING|Morning/.test(cl.textContent) && /Before bed/i.test(cl.textContent);
+    g.showsDose = /2000 IU/.test(cl.textContent) && /500 mcg/.test(cl.textContent);
+    g.showsWhy = /absorption rises about 32%/.test(cl.textContent);
+    closeSheet();
+    S.suppLog[today()] = S.suppLog[today()] || {};
+    S.suppLog[today()][shake.id] = 1;
+    suppGrid();
+    const grid = document.querySelector('#sheetIn');
+    g.gridCells = grid.querySelectorAll('.sgrid')[0].children.length;
+    g.gridRows = grid.querySelectorAll('.sgrid').length;
+    g.suppCount = S.supps.length;
+    closeSheet();
+    delete S.suppLog[today()][shake.id];
+    save();
+    return g;
+  });
+  check('every food the user listed is in the database', jai.missing.length === 0, jai.missing);
+  check('315+ foods, all six fields, no duplicates', jai.rows >= 315 && jai.allSix && jai.dupes.length === 0, jai);
+  check('the shake is muesli now, not oats', /muesli/i.test(jai.shakeName) && /muesli/i.test(jai.massName), jai);
+  check('ticking the shake logs its calories once', jai.shakeKcal === 700, jai.shakeKcal);
+  check('whey and creatine are marked as covered by it', jai.covered);
+  check('whey no longer writes its own food entry', jai.wheyNoLogFood && jai.noDouble, jai);
+  check('unticking the shake releases both, and food returns to baseline', jai.released && jai.baseline, jai);
+  check('every supplement shows a dose', jai.doses);
+  check('slots group morning, post-workout, lunch and bed', jai.slots && jai.calciumLunch && jai.magBed, jai);
+  check('a dose you type is kept', jai.doseEdit);
+  check('no conflict on this stack as scheduled', jai.noConflictNow && jai.calDefault, jai);
+  check('moving calcium next to zinc is caught, and clears when moved back', jai.conflictFound && jai.slotEdit && jai.conflictClears, jai);
+  check('the checklist groups by time and explains the gaps', jai.grouped && jai.showsDose && jai.showsWhy, jai);
+  check('the 30-day grid renders a row per supplement', jai.gridCells === 30 && jai.gridRows === jai.suppCount, jai);
 
   console.log('VO2max interval training');
   const ivt = await page.evaluate(() => {
@@ -734,8 +819,8 @@ function check(name, cond, detail) {
     stampedNow: S.schemaVersion,
     persisted: (JSON.parse(localStorage.getItem('fitlog.v1') || '{}')).schemaVersion,
   }));
-  check('an upgrade writes the pre-update snapshot', snap.hasSnapshot && snap.meta && snap.meta.to === 22 && snap.meta.from === 12, snap.meta);
-  check('the schema stamp is actually persisted, not left to chance', snap.persisted === 22 && snap.stampedNow === 22, snap);
+  check('an upgrade writes the pre-update snapshot', snap.hasSnapshot && snap.meta && snap.meta.to === 23 && snap.meta.from === 12, snap.meta);
+  check('the schema stamp is actually persisted, not left to chance', snap.persisted === 23 && snap.stampedNow === 23, snap);
 
   const past = await page.evaluate(() => {
     const d = dShift(today(), -3);
@@ -904,7 +989,7 @@ function check(name, cond, detail) {
   check('steps state deleted by migration', migAfter.steps, migAfter);
   check('past ticks converted to logged minutes', migAfter.ticksConverted, migAfter.ticksConverted);
   check('breathwork supp retired from list + checklist', migAfter.suppGone && migAfter.checklistClean && migAfter.supps === mig.supps - 1, migAfter);
-  check('migration stamps schema 22', migAfter.schema === 22, migAfter.schema);
+  check('migration stamps schema 23', migAfter.schema === 23, migAfter.schema);
 
   console.log('em-dash removal: parsers + v17 migration');
   const dash = await page.evaluate(() => ({
@@ -959,7 +1044,7 @@ function check(name, cond, detail) {
   check('user-authored routine renamed, wording kept', v17After.rt === 'Push: my own routine', v17After.rt);
   check('stored session + PR text renamed', v17After.ses === 'Return: full body (light)' && v17After.pr === '70×5: heaviest ever', v17After);
   check('S.lastPhase migrated (no false phase celebration)', v17After.lastPhase === 'Phase 0: Rebuild' && !v17After.celebrated, v17After);
-  check('migration stamps schema 22', v17After.schema === 22, v17After.schema);
+  check('migration stamps schema 23', v17After.schema === 23, v17After.schema);
 
   console.log('workout cards: preview before starting');
   const cards = await page.evaluate(() => {
