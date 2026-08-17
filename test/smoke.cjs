@@ -335,6 +335,72 @@ function check(name, cond, detail) {
   check('onboarding stores age, sex and a fiber goal', audit.onboarding.length === 0, audit.onboarding);
   check('the exercise card leads with what to lift today', audit.cardLeads);
 
+  console.log('missed days, dangling references, milestones');
+  const gaps = await page.evaluate(() => {
+    const g = {};
+    const savedSessions = JSON.stringify(S.sessions), savedPlan = JSON.stringify(S.plan),
+          savedEx = JSON.stringify(S.exercises), savedRt = JSON.stringify(S.routines);
+    // a planned day with nothing logged is a missed session
+    S.sessions = S.sessions.filter((x) => x.date < dShift(today(), -8));
+    S.skipped = [];
+    save();
+    const m = missedSessions(3);
+    g.found = m.length >= 1;
+    g.hasRoutine = !!(m[0] && m[0].routine && m[0].routine.name);
+    g.agoSane = !!(m[0] && m[0].ago >= 1 && m[0].ago <= 3);
+    g.card = /Missed/.test(catchUpCard());
+    // a rest day is not a missed session
+    const restDow = Object.keys(S.plan).find((k) => !S.plan[k]);
+    g.restNotMissed = restDow === undefined || !m.some((x) => String(new Date(x.date + 'T12:00:00').getDay()) === restDow);
+    // skipping removes it and does not touch the plan
+    const planBefore = JSON.stringify(S.plan);
+    skipMissed(m[0].date);
+    g.skipWorks = !missedSessions(3).some((x) => x.date === m[0].date);
+    g.planUntouched = JSON.stringify(S.plan) === planBefore;
+    // a break is never a missed session
+    S.skipped = [];
+    const d2 = dShift(today(), -2);
+    S.breaks = (S.breaks || []).concat([{ id: 'bk-t', from: d2, to: d2, label: 'Test break' }]);
+    g.breakExcluded = !missedSessions(3).some((x) => x.date === d2);
+    S.breaks = S.breaks.filter((x) => x.id !== 'bk-t');
+    // short-group reporting uses the same 10-20 range as the volume screen
+    const push = S.routines.find((r) => /Push: wrist/.test(r.name));
+    const sg = shortGroups(push);
+    g.shortShape = Array.isArray(sg) && sg.every((x) => 'group' in x && 'sets' in x);
+    // deleting a routine clears the plan days pointing at it
+    S.plan[1] = push.id;
+    delRoutine(push.id);
+    g.planCleared = !S.plan[1];
+    g.planSurvives = (() => { try { todaysPlanRoutine(); return true; } catch (e) { return false; } })();
+    // deleting an exercise removes it from every routine
+    const r2 = S.routines.find((r) => r.exIds.length > 2);
+    const exId = r2.exIds[0];
+    delExercise(exId);
+    g.routineCleaned = r2.exIds.indexOf(exId) === -1;
+    g.noDeletedRows = !S.routines.some((r) => r.exIds.some((id) => exName(id) === '(deleted)'));
+    S.sessions = JSON.parse(savedSessions); S.plan = JSON.parse(savedPlan);
+    S.exercises = JSON.parse(savedEx); S.routines = JSON.parse(savedRt);
+    S.skipped = []; save();
+    // milestones now cover what the app measures
+    const ach = achievements();
+    g.achCount = ach.length;
+    const txt = ach.map((a) => a.t.toLowerCase()).join(' ');
+    g.achMissing = ['fiber', 'vo2max', 'zone-2', 'regularity', 'steam', 'daylight', 'checklist']
+      .filter((k) => txt.indexOf(k) < 0);
+    g.achShape = ach.every((a) => a.i && a.t && typeof a.ok === 'boolean');
+    return g;
+  });
+  check('a planned day with nothing logged reads as missed', gaps.found && gaps.hasRoutine && gaps.agoSane, gaps);
+  check('the catch-up card offers it', gaps.card);
+  check('a rest day is never a missed session', gaps.restNotMissed);
+  check('skipping dismisses it without touching the plan', gaps.skipWorks && gaps.planUntouched, gaps);
+  check('a planned break is never a missed session', gaps.breakExcluded);
+  check('short groups report against the same volume range', gaps.shortShape);
+  check('deleting a routine clears the plan days pointing at it', gaps.planCleared && gaps.planSurvives, gaps);
+  check('deleting an exercise removes it from every routine', gaps.routineCleaned && gaps.noDeletedRows, gaps);
+  check('milestones cover the newer metrics too', gaps.achMissing.length === 0 && gaps.achCount >= 23, gaps);
+  check('every milestone has an icon, a name and a state', gaps.achShape);
+
   console.log('Jaipur food coverage and the supplement schedule');
   const jai = await page.evaluate(() => {
     const g = {};
