@@ -7,6 +7,13 @@ const path = require('path');
 
 const APP = 'file://' + path.resolve(__dirname, '..', 'index.html');
 const EXE = process.env.CHROME_PATH || '/opt/pw-browsers/chromium';
+/* Read the schema out of the source rather than hard-coding it. What these
+   checks are really for is that the stamp gets written and persisted, and that
+   the pre-upgrade snapshot records the right jump — not that the number is 23.
+   Hard-coding it made every migration break five unrelated assertions. */
+const SCHEMA = +require('fs')
+  .readFileSync(path.resolve(__dirname, '..', 'core.html'), 'utf8')
+  .match(/const SCHEMA=(\d+)/)[1];
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -40,7 +47,7 @@ function check(name, cond, detail) {
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 23, boot.schema);
+  check('schemaVersion stamped', boot.schema === SCHEMA, boot.schema);
   check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
@@ -962,8 +969,8 @@ function check(name, cond, detail) {
     stampedNow: S.schemaVersion,
     persisted: (JSON.parse(localStorage.getItem('fitlog.v1') || '{}')).schemaVersion,
   }));
-  check('an upgrade writes the pre-update snapshot', snap.hasSnapshot && snap.meta && snap.meta.to === 23 && snap.meta.from === 12, snap.meta);
-  check('the schema stamp is actually persisted, not left to chance', snap.persisted === 23 && snap.stampedNow === 23, snap);
+  check('an upgrade writes the pre-update snapshot', snap.hasSnapshot && snap.meta && snap.meta.to === SCHEMA && snap.meta.from === 12, snap.meta);
+  check('the schema stamp is actually persisted, not left to chance', snap.persisted === SCHEMA && snap.stampedNow === SCHEMA, snap);
 
   const past = await page.evaluate(() => {
     const d = dShift(today(), -3);
@@ -1132,7 +1139,7 @@ function check(name, cond, detail) {
   check('steps state deleted by migration', migAfter.steps, migAfter);
   check('past ticks converted to logged minutes', migAfter.ticksConverted, migAfter.ticksConverted);
   check('breathwork supp retired from list + checklist', migAfter.suppGone && migAfter.checklistClean && migAfter.supps === mig.supps - 1, migAfter);
-  check('migration stamps schema 23', migAfter.schema === 23, migAfter.schema);
+  check('migration stamps the current schema', migAfter.schema === SCHEMA, migAfter.schema);
 
   console.log('em-dash removal: parsers + v17 migration');
   const dash = await page.evaluate(() => ({
@@ -1187,7 +1194,7 @@ function check(name, cond, detail) {
   check('user-authored routine renamed, wording kept', v17After.rt === 'Push: my own routine', v17After.rt);
   check('stored session + PR text renamed', v17After.ses === 'Return: full body (light)' && v17After.pr === '70×5: heaviest ever', v17After);
   check('S.lastPhase migrated (no false phase celebration)', v17After.lastPhase === 'Phase 0: Rebuild' && !v17After.celebrated, v17After);
-  check('migration stamps schema 23', v17After.schema === 23, v17After.schema);
+  check('migration stamps the current schema', v17After.schema === SCHEMA, v17After.schema);
 
   console.log('workout cards: preview before starting');
   const cards = await page.evaluate(() => {

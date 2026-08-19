@@ -525,6 +525,18 @@ const SEED_RT=[
   {name:'Agility & conditioning', ex:['Jumping jacks','High knees','Mountain climbers','Cossack squat','Bear crawl','Burpees','Kettlebell swing']},
   {name:'VO2max intervals (4×4)', ex:['VO2max 4×4 (bike)']}
 ];
+/* The four injury-specific names describe one person's wrist and knee, and the
+   Hyrox branding is a niche race. Renaming them at onboarding was too late: a
+   public user browsing Exercises before finishing setup still saw them. Applied
+   to the seed instead, so those names never exist in a public store. */
+const RT_PUB_NAME={
+  'Push: wrist-safe return':   'Push: joint-friendly',
+  'Pull: wrist-safe return':   'Pull: joint-friendly',
+  'Legs: knee-safe return':    'Legs: joint-friendly (legs)',
+  'Rehab: knee & wrist (~15 min)': 'Joint prep (~15 min)',
+  'Hyrox stations':            'Station circuit'
+};
+if(PUB) SEED_RT.forEach(function(r){ if(RT_PUB_NAME[r.name]) r.name=RT_PUB_NAME[r.name]; });
 const SEED_QK=[
   {name:'Whey (1 scoop)',kcal:130,p:24,c:4,f:2,fb:0},{name:'Casein (1 scoop)',kcal:120,p:24,c:4,f:1,fb:0},
   {name:'Milk 250ml',kcal:150,p:8,c:12,f:8,fb:0},{name:'Curd (bowl, 200g)',kcal:120,p:7,c:9,f:6,fb:0},
@@ -538,7 +550,7 @@ const SEED_QK=[
 function defaults(){
   return {
     settings:{name:'', unit:'kg', waterGoal:3000, calGoal:2600, proteinGoal:120, carbGoal:340, fatGoal:75,
-      rest:90, fiberGoal:30, height:(PUB?'':'176'), goalWeight:(PUB?'':'68'), waterRemind:true, waterEvery:75, workoutRemind:'',
+      rest:90, fiberGoal:30, diet:'veg', height:(PUB?'':'176'), goalWeight:(PUB?'':'68'), waterRemind:true, waterEvery:75, workoutRemind:'',
       sleepRemind:'22:30', sleepGoal:8, breathGoal:15, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
@@ -786,9 +798,19 @@ function seedV5(){
 /* v7: the user's actual supplement stack */
 function seedV7(){
   if(S.seedV7) return; S.seedV7=true;
+  /* A suggestion, not a prescription: the five with the strongest evidence, each
+     with a dose and a slot so the schedule, the conflict check and the 30-day
+     grid have something real to render on day one. Every one is deletable, and
+     suppInfo() shows the evidence tier next to it. */
   (PUB ? [
-    {name:'Creatine 5g: daily', kcal:0, p:0, c:0, f:0, logFood:false},
-    {name:'Whey protein (1 scoop)', kcal:130, p:24, c:4, f:2, logFood:true}
+    {name:'Creatine monohydrate', kcal:0, p:0, c:0, f:0, logFood:false, dose:'5 g', slot:'anytime'},
+    /* "protein powder", not "whey": the stack is seeded at boot, before
+       onboarding has asked how you eat, and a vegan should not open the app to
+       a dairy product already on their list. Plant blends hit the same macros. */
+    {name:'Protein powder (1 scoop)', kcal:130, p:24, c:4, f:2, logFood:true, dose:'1 scoop', slot:'post'},
+    {name:'Vitamin D3', kcal:0, p:0, c:0, f:0, logFood:false, dose:'2000 IU', slot:'morning'},
+    {name:'Vitamin B12', kcal:0, p:0, c:0, f:0, logFood:false, dose:'500 mcg', slot:'morning'},
+    {name:'Omega-3 (EPA+DHA)', kcal:0, p:0, c:0, f:0, logFood:false, dose:'2 g EPA+DHA', slot:'lunch'}
   ] : [
     {name:'Creatine 5g: GNC monohydrate', kcal:0, p:0, c:0, f:0, logFood:false},
     {name:'Whey: Avatar Malay Kulfi (1 scoop)', kcal:150, p:27.5, c:4, f:2, logFood:true},
@@ -1097,12 +1119,39 @@ function seedV23(){
   save();
 }
 
+/* v24: catches up public stores installed before the launch work. Two things:
+   the routine names, which used to be rewritten at onboarding rather than in
+   the seed, so an early install still holds "wrist-safe return" and "Hyrox
+   stations"; and the starter supplement stack, which grew from two items to
+   five. Renames keep the routine ids, so the weekly plan and every logged
+   session still point at them. Personal builds skip all of it: those names
+   describe a real wrist and a real knee. */
+function seedV24(){
+  if(!PUB){ S.seedV24=true; return; }
+  if(S.seedV24) return; S.seedV24=true;
+  (S.routines||[]).forEach(function(r){
+    if(RT_PUB_NAME[r.name]) r.name=RT_PUB_NAME[r.name];
+  });
+  /* Only the three that are new. Anything the user deleted stays deleted is not
+     achievable without a tombstone, but adding by name means a rename or a
+     re-add by hand is never duplicated. */
+  [{name:'Vitamin D3', dose:'2000 IU', slot:'morning', re:/\bd3\b|vitamin d/i},
+   {name:'Vitamin B12', dose:'500 mcg', slot:'morning', re:/b12|cobalamin/i},
+   {name:'Omega-3 (EPA+DHA)', dose:'2 g EPA+DHA', slot:'lunch', re:/omega|epa|dha/i}
+  ].forEach(function(sp){
+    if((S.supps||[]).some(function(x){ return sp.re.test(x.name); })) return;
+    S.supps.push({id:uid(), name:sp.name, kcal:0, p:0, c:0, f:0, logFood:false,
+      dose:sp.dose, slot:sp.slot});
+  });
+  save();
+}
+
 /* ============ migration runner ============
    Ordered and append-only — this list IS the execution order (it preserves
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
-const SCHEMA=23;
+const SCHEMA=24;
 /* Snapshot the store as it was BEFORE this build's migrations touch it, so a bad
    upgrade is recoverable instead of permanent. Written once per schema bump. */
 (function(){
@@ -1114,7 +1163,8 @@ const SCHEMA=23;
   }catch(e){}
 })();
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
- seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20, seedV21, seedV22, seedV23].forEach(function(step){ step(); });
+ seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20, seedV21, seedV22, seedV23,
+ seedV24].forEach(function(step){ step(); });
 /* Persist the stamp explicitly. It used to ride along on whatever happened to
    call save() next, which made both the migration guards and the pre-upgrade
    snapshot depend on timing rather than intent. */
@@ -1239,14 +1289,14 @@ const QUOTES=[
 'Your body hears everything your mind says.',
 'Strength is built in the reps you didn’t feel like doing.',
 'Energy creates energy. Start moving.',
-'The wedding photos are being taken now, in the gym.',
+'The photos you’ll be glad about next year are being taken now, in the gym.',
 'Trust the boring weeks. They’re the ones that work.',
 'Your future self is watching through your memories.',
 'Champions train. Everyone else waits for motivation.'];
 const TIPS=[
 'Creatine works by saturation, not timing. The daily tick matters more than the clock.',
 'Protein within ~2 hours after training gives a small but real edge.',
-'In Jaipur’s dry heat you dehydrate without visible sweat. Sip before you feel thirsty.',
+'In dry heat you dehydrate without ever looking sweaty. Sip before you feel thirsty.',
 'Muscle is built during sleep. The gym only sends the signal.',
 'A 10-minute walk after meals blunts the blood-sugar spike from rice and rotis.',
 'Chai without sugar saves ~45 kcal a cup, so three cups a day is a laddu a week.',
@@ -1256,16 +1306,16 @@ const TIPS=[
 'Paneer or curd at dinner drip-feeds protein all night, like natural casein.',
 'Nasal breathing on easy runs builds your engine faster than harder mouth-breathing.',
 'Even 2% dehydration measurably costs you reps.',
-'The knee heals with pain-free motion, not rest alone.',
+'Joints heal with pain-free motion, not with rest alone.',
 'Three average workouts beat one heroic one, every single week.',
 'Caffeine within 8 hours of bed steals deep sleep even if you fall asleep fine.',
 'Photos every 2 weeks catch what the daily mirror hides.',
 'Goblet squats build the same legs as front squats without loading the wrists.',
 'Fibre from dal and sabzi keeps protein absorption steady. Thali wisdom is real.',
-'Late screens delay melatonin ~30 minutes. The 22:30 wind-down is physiology.',
+'Late screens delay melatonin ~30 minutes. A wind-down time is physiology, not discipline.',
 'A planned deload every 6–8 weeks makes you stronger, not weaker.',
 'Make the exhale longer than the inhale. That ratio, not the length, is what flips you into recovery.',
-'Wall balls test breathing more than muscles. That’s why Hyrox loves them.',
+'Wall balls test breathing more than muscles. Pace the breath, not the arms.',
 'Magnesium at night improves sleep quality. Watch your “woke rested” count.',
 'Volume drives muscle; intensity drives strength; consistency drives both.'];
 function dayIdx(){ return Math.floor(new Date(today()+'T12:00:00').getTime()/86400000); }
@@ -1324,7 +1374,7 @@ const CD_BY_GROUP={
   Back:'Lat stretch on the rack 40s/side · child’s pose 45s',
   Legs:'Quad, hamstring and couch stretch 45s each',
   Shoulders:'Cross-body stretch 30s/side',
-  Arms:'Wrist flexor stretch 30s/side, protect that wrist',
+  Arms:'Wrist flexor stretch 30s/side: the wrists take the load in every press',
   Core:'Cobra hold 30s',
   Conditioning:'3 min walk, breathing slowing down',
   Cardio:'3–5 min walk with nasal breathing'
@@ -1642,13 +1692,13 @@ const CUES={
   'Romanian deadlift':'Soft knees, hips back until the hamstrings load; bar slides along the thighs.',
   'Overhead press':'Glutes squeezed, ribs down; finish with the bar over mid-foot, wrists neutral.',
   'Barbell row':'Hinge ~45°, pull to the lower ribs; no jerking from the lower back.',
-  'Pull-ups':'Active shoulders, controlled negative; skip these until the wrist has a pain-free week.',
+  'Pull-ups':'Active shoulders, controlled negative; skip these while a wrist or elbow still hurts.',
   'Hip thrust':'Chin tucked, ribs down; squeeze the glutes at the top instead of arching the back.',
   'Lunges':'Long step, tall torso; back knee kisses the floor; drive through the front heel.',
   'Leg press':'Feet mid-platform; stay in the pain-free knee range; never slam into lockout.',
   'Wall balls':'It is a squat plus a push, not an arm throw; hit the same spot every rep.',
   'Kettlebell swing':'A hip hinge, not a squat; arms are ropes; the hips snap, the glutes finish.',
-  'Burpee broad jump':'Land soft with bent knees; step back instead of jumping back while the wrists heal.',
+  'Burpee broad jump':'Land soft with bent knees; step back instead of jumping back if the wrists complain.',
   'Farmer’s carry':'Tall posture, packed shoulders, quick small steps; tight grip, neutral wrists.',
   'Walking':'Nasal breathing only: recovery and aerobic engine in one.',
   'Treadmill run':'Easy pace, nasal breathing where possible; land soft, feet under the hips.',
@@ -1957,7 +2007,7 @@ function skipMissed(d){
 function planEditor(){
   const days=[['1','Monday'],['2','Tuesday'],['3','Wednesday'],['4','Thursday'],['5','Friday'],['6','Saturday'],['0','Sunday']];
   openSheet('<h3>Weekly plan</h3>'+
-    '<p class="tiny muted" style="margin:-6px 0 12px">The Today screen suggests each day’s workout from this plan. When the knee and wrist have a fully pain-free week, swap the return routines for the full Push / Pull / Legs days.</p>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">The Today screen suggests each day’s workout from this plan. Once you have a fully pain-free week, swap the joint-friendly routines for the full Push / Pull / Legs days.</p>'+
     days.map(function(d){
       const cur=(S.plan||{})[d[0]]||'';
       return '<div class="field"><label>'+d[1]+'</label><select data-plan="'+d[0]+'">'+
@@ -2202,14 +2252,19 @@ const SUPP_PLAN=[
   [/calcium/i,         {dose:'500 mg',       slot:'lunch',   note:'Deliberately hours from magnesium and zinc: calcium blocks both when taken together. Skip it on a dairy-heavy day.'}],
   [/magnesium/i,       {dose:'200-400 mg',   slot:'bed',     note:'Glycinate or citrate for sleep. Kept away from the calcium.'}],
   [/zinc/i,            {dose:'15-25 mg',     slot:'bed',     note:'Away from calcium. Fine alongside magnesium at these doses.'}],
-  [/omega|epa|dha/i,   {dose:'2 g EPA+DHA',  slot:'lunch',   note:'With food. Must be algal to be vegetarian.'}],
+  [/omega|epa|dha/i,   {dose:'2 g EPA+DHA',  slot:'lunch',   note:function(d){ return d==='nonveg' ? 'With food. Fish oil is fine, or skip it on the days you eat oily fish.' : 'With food. Check the bottle says algal: most omega-3 on the shelf is fish oil.'; }}],
   [/theanine/i,        {dose:'100-200 mg',   slot:'evening', note:'Only if it helps you settle. Weak evidence either way.'}],
   [/iodine/i,          {dose:'150 mcg',      slot:'morning', note:'Only if your salt is not iodised.'}],
   [/beta-?alanine/i,   {dose:'3-5 g',        slot:'anytime', note:'Daily, and it takes weeks to load. Tingling is harmless.'}],
   [/shake/i,           {dose:'1 serving',    slot:'post',    note:'Carries the whey and creatine, so those are covered when this is ticked.'}]
 ];
 function suppPlan(name){
-  for(let i=0;i<SUPP_PLAN.length;i++) if(SUPP_PLAN[i][0].test(name||'')) return SUPP_PLAN[i][1];
+  const d=(S.settings&&S.settings.diet)||'veg';
+  for(let i=0;i<SUPP_PLAN.length;i++) if(SUPP_PLAN[i][0].test(name||'')){
+    const p=SUPP_PLAN[i][1];
+    /* a note may be a function of the diet; callers only ever want the string */
+    return typeof p.note==='function' ? Object.assign({}, p, {note:p.note(d)}) : p;
+  }
   return {dose:'', slot:'anytime', note:''};
 }
 function suppDose(sp){ return sp.dose || suppPlan(sp.name).dose; }
@@ -2234,20 +2289,34 @@ const SUPP_INFO=[
   [/creatine/i,'strong','Strength, lean mass and cognition. The best-evidenced supplement there is, and vegetarians respond more strongly because baseline muscle creatine sits lower.'],
   [/whey|casein|protein/i,'strong','Hitting a daily protein target. Nothing magic beyond the protein itself, which is rather the point.'],
   [/\bd3\b|vitamin d/i,'strong','Bone, immune and muscle function. Roughly 70-90% of Indians run low, so this is a real gap rather than insurance.'],
-  [/b12|cobalamin/i,'strong','Nerve function and red blood cells. Around 70% of Indian vegetarians are deficient and there is no reliable plant source, so this one is non-negotiable.'],
-  [/omega|epa|dha|fish oil|algal/i,'strong','Triglycerides and inflammation. Must be algal to be vegetarian: worth checking the bottle, since most omega-3 on the shelf is fish oil.'],
+  /* These two are the only entries whose advice genuinely changes with how you
+     eat, so their `why` is a function of the diet rather than a fixed string. */
+  [/b12|cobalamin/i,'strong',function(d){
+    if(d==='vegan') return 'Nerve function and red blood cells. Plants carry none of it at all, and the damage from a long deficiency is not fully reversible. On a vegan diet this is not optional.';
+    if(d==='nonveg'||d==='egg') return 'Nerve function and red blood cells. Meat, fish, eggs and dairy cover it, so supplement only if a test comes back low or you eat animal food rarely.';
+    return 'Nerve function and red blood cells. Around 70% of Indian vegetarians are deficient and there is no reliable plant source, so this one is non-negotiable.';
+  }],
+  [/omega|epa|dha|fish oil|algal/i,'strong',function(d){
+    if(d==='nonveg') return 'Triglycerides and inflammation. Two portions of oily fish a week does the same job; fish oil is the shortcut if you do not eat it.';
+    if(d==='vegan') return 'Triglycerides and inflammation. It must be algal oil: flax and chia give ALA, and the body converts only a few percent of it to EPA and almost no DHA.';
+    return 'Triglycerides and inflammation. Must be algal to be vegetarian: worth checking the bottle, since most omega-3 on the shelf is fish oil.';
+  }],
   [/magnesium/i,'moderate','Sleep quality and cramps. Decent evidence when intake is low, thinner when it is not.'],
   [/zinc/i,'moderate','Immune function and hormones when deficient. Vegetarian diets absorb less of it because of phytates.'],
   [/calcium/i,'moderate','Bone density alongside D3 and K2. Worth it when dairy is low, less so on a dairy-heavy day.'],
   [/\bk2\b|menaquinone/i,'moderate','Directs calcium to bone rather than arteries. Sensible paired with D3; standalone evidence is still developing.'],
   [/theanine/i,'limited','Calm without sedation, usually paired with caffeine. Small short trials: harmless, but do not expect much.'],
   [/iodine/i,'strong','Thyroid function, and a genuine vegetarian gap where iodised salt and dairy are low.'],
-  [/beta-?alanine/i,'strong','Buffers fatigue in efforts of one to four minutes, which is most of Hyrox. Vegetarians start lower on carnosine.'],
+  [/beta-?alanine/i,'strong','Buffers fatigue in efforts of one to four minutes: intervals, circuits and the last set of a hard rep range. Vegetarians start lower on carnosine.'],
   [/\biron\b|ferrous|ferritin/i,'test-first','Only after a ferritin test. Iron overload does real damage and is not something you feel early, so this is the one never to take blind.'],
   [/nmn|nad|resveratrol|testosterone booster|longevity blend/i,'skip','Marketed hard, evidenced thinly: short trials on surrogate markers, nothing on the outcome you actually want.']
 ];
 function suppInfo(name){
-  for(let i=0;i<SUPP_INFO.length;i++) if(SUPP_INFO[i][0].test(name||'')) return {tier:SUPP_INFO[i][1], why:SUPP_INFO[i][2]};
+  const d=(S.settings&&S.settings.diet)||'veg';
+  for(let i=0;i<SUPP_INFO.length;i++) if(SUPP_INFO[i][0].test(name||'')){
+    const w=SUPP_INFO[i][2];
+    return {tier:SUPP_INFO[i][1], why:(typeof w==='function'? w(d) : w)};
+  }
   return null;
 }
 const TIER_LABEL={strong:'Strong evidence', moderate:'Moderate evidence', limited:'Limited evidence',
@@ -2258,7 +2327,7 @@ function tierChip(t){
 }
 const SUPP_GAPS=[
   ['Iodine','strong','Thyroid function, and a genuine vegetarian gap if you are not on iodised salt.'],
-  ['Beta-alanine','strong','Buffers the one-to-four-minute efforts Hyrox is built from. Vegetarians start lower on carnosine.'],
+  ['Beta-alanine','strong','Buffers the one-to-four-minute efforts intervals and circuits are built from. Vegetarians start lower on carnosine.'],
   ['Iron','test-first','Get ferritin tested before touching it. Never supplement iron blind.']
 ];
 function suppEditor(){
@@ -2606,7 +2675,7 @@ function coachNotes(cur,prv,adh){
   else if(adh.planned>0 && adh.done>=adh.planned) n.push('You followed the plan '+adh.done+'/'+adh.planned+' days. This is the consistency that changes bodies.');
   else if(adh.planned>0) n.push('Plan adherence '+adh.done+'/'+adh.planned+'. Missed days happen. The rule is: never miss twice in a row.');
   if(cur.slN>=3 && cur.sleep<7) n.push('Sleep averaged '+cur.sleep+'h. Under 7 hours, strength and recovery stall. Protect the 22:30 wind-down.');
-  if(prv.vol>0 && cur.vol>prv.vol*1.25) n.push('Training volume jumped '+Math.round((cur.vol/prv.vol-1)*100)+'% vs last week. Keep increases near 10%. Your knee and wrist are watching.');
+  if(prv.vol>0 && cur.vol>prv.vol*1.25) n.push('Training volume jumped '+Math.round((cur.vol/prv.vol-1)*100)+'% vs last week. Keep increases near 10%. Your joints are keeping score.');
   if(cur.fdN>=3 && cur.prot<(+S.settings.proteinGoal||120)*0.8) n.push('Protein averaged '+cur.prot+'g against your '+S.settings.proteinGoal+'g goal. One more whey scoop or 100g paneer daily closes it.');
   if(cur.wLast && prv.wLast && cur.wLast<prv.wLast-0.3 && cur.vol>=prv.vol) n.push('Body weight fell while training rose. You are under-eating for a muscle-building goal. Add ~200 kcal/day.');
   return n.slice(0,3);
@@ -3397,7 +3466,7 @@ function vo2Form(kind){
   const st=S.settings, cooper=(kind==='cooper');
   openSheet('<h3>'+(cooper?'Cooper 12-minute run':'Rockport 1-mile walk')+'</h3>'+
     '<p class="tiny muted" style="margin:-6px 0 12px">'+(cooper
-      ? 'Run as far as you can in exactly 12 minutes on a flat course, then enter the distance. Hard effort, so only when the knee is happy.'
+      ? 'Run as far as you can in exactly 12 minutes on a flat course, then enter the distance. Hard effort, so only when everything is pain-free.'
       : 'Walk one mile (1.61 km) as fast as you comfortably can, then enter your time and the heart rate you finish on.')+'</p>'+
     (cooper
       ? '<div class="field"><label for="v2d">Distance covered (metres)</label><input id="v2d" type="number" inputmode="numeric" placeholder="2400"></div>'
@@ -4422,6 +4491,24 @@ const FOODDB=[
 ['Tandoori momos (6)',340,12,34,16,3],['Afghani momos (6)',400,13,32,24,3],
 ['Chilli momos (6)',380,11,40,18,3],['Kurkure momos (6)',420,11,42,22,3],
 ['Cheese corn momos (6)',340,12,36,15,3],['Momo soup (bowl)',180,8,24,5,3],
+/* non-vegetarian, in the preparations they are actually eaten in here.
+   Fiber is 0 for plain meat and non-zero only where the dish carries
+   vegetables, pulses or grain. */
+['Egg boiled (1)',78,6.3,0.6,5.3,0],['Egg white boiled (1)',17,3.6,0.2,0.1,0],
+['Egg omelette (2 eggs)',220,13,2,17,0.4],['Egg bhurji (bowl)',260,14,4,20,1],
+['Egg curry (2 eggs)',330,14,10,26,2],['Half fry / sunny side up (1)',110,6.5,0.6,9,0],
+['Egg paratha (1)',330,12,38,14,3],['Anda bhurji pav (plate)',420,17,42,21,3],
+['Chicken breast grilled (100g)',165,31,0,3.6,0],['Chicken tikka (6 pieces)',290,36,6,13,0.5],
+['Butter chicken (bowl)',430,28,12,30,1.5],['Chicken curry (bowl)',320,26,8,20,2],
+['Chicken biryani (plate)',600,30,70,22,3],['Tandoori chicken (2 pieces)',300,34,4,16,0.5],
+['Chicken 65 (plate)',380,28,18,22,1],['Chicken momos steamed (6)',280,16,32,9,2],
+['Chicken shawarma roll (1)',480,26,48,20,4],['Grilled chicken salad (plate)',330,32,12,17,4],
+['Chicken soup (bowl)',150,12,10,6,1],['Chicken keema (bowl)',350,26,8,24,2],
+['Mutton curry / rogan josh (bowl)',450,26,8,34,1.5],['Mutton keema (bowl)',400,24,6,31,1.5],
+['Mutton biryani (plate)',700,32,70,32,3],
+['Fish curry (bowl)',280,26,7,16,1.5],['Fish fry (2 pieces)',300,28,8,18,0.5],
+['Tandoori fish (2 pieces)',240,30,3,12,0.5],['Prawn curry (bowl)',260,24,8,14,1.5],
+['Prawn fry (100g)',220,22,5,12,0.5],
 /* drinks */
 ['Chai with milk + sugar (1 cup)',90,2,12,3.5,1],['Chai no sugar (1 cup)',45,2,4,2.5,0],['Black coffee (1 cup)',5,0,0,0,0],
 ['Nimbu pani with sugar (glass)',60,0,15,0,0.3],['Chaas / buttermilk (glass)',40,2,3,1.5,1],['Sweet lassi (glass)',220,6,30,8,1],
@@ -4464,8 +4551,47 @@ function logAgain(meal,i){
   save(); vib(12); closeSheet(); renderFood();
   toast(f.name+': '+Math.round(f.kcal)+' kcal logged');
 }
+/* ---------- diet ----------
+   Classified by name rather than a seventh column, so the 343 rows keep the
+   six-field shape everything else relies on. This filters what is OFFERED only:
+   entries you already logged and barcodes you already taught are snapshots, and
+   must never be filtered out from under you. */
+/* Substring matching has predictable false positives: "no ghee" contains ghee,
+   "peanut butter" contains butter, "kheera" contains kheer. Tested BEFORE
+   DIET_TAGS so the tag wins outright, rather than patching three names and
+   waiting for the next food that says butter. */
+const DIET_EXCEPT=[
+  [/no ghee|without ghee|peanut butter|almond butter|kheera/i, 'veg']
+];
+const DIET_TAGS=[
+  [/chicken|mutton|lamb|keema|fish|prawn|shrimp|shawarma/i, 'nonveg'],
+  /* no loose "bhurji": egg bhurji is caught by \begg\b and anda, whereas a
+     bare bhurji match hid paneer bhurji from vegetarians */
+  [/\begg\b|eggs|omelette|anda|half fry|sunny side/i, 'egg'],
+  [/paneer|milk|curd|dahi|lassi|ghee|butter|cheese|cream|malai|khoya|mawa|rabri|kheer|shrikhand|kulfi|ice cream|softy|choco bar|cassata|whey|casein|chaas|buttermilk|hung curd|latte|cappuccino|frappe|cold coffee|hot chocolate|milkshake|shake|cold cocoa/i, 'dairy']
+];
+function foodDiet(name){
+  const n=name||'';
+  for(let i=0;i<DIET_EXCEPT.length;i++) if(DIET_EXCEPT[i][0].test(n)) return DIET_EXCEPT[i][1];
+  /* egg bhurji is egg; paneer bhurji is dairy, so nonveg and egg are tested first */
+  for(let i=0;i<DIET_TAGS.length;i++) if(DIET_TAGS[i][0].test(n)) return DIET_TAGS[i][1];
+  return 'veg';
+}
+const DIET_ALLOWS={
+  nonveg:['nonveg','egg','dairy','veg'],
+  egg:['egg','dairy','veg'],
+  veg:['dairy','veg'],
+  vegan:['veg']
+};
+function dietAllows(name, diet){
+  const allow=DIET_ALLOWS[diet||'veg']||DIET_ALLOWS.veg;
+  return allow.indexOf(foodDiet(name))>-1;
+}
 function fdbAllFoods(){
-  return FOODDB.map(function(f){ return {name:f[0], kcal:f[1], p:f[2], c:f[3], f:f[4], fb:f[5]||0}; })
+  const diet=S.settings.diet||'veg';
+  return FOODDB.filter(function(f){ return dietAllows(f[0], diet); })
+    .map(function(f){ return {name:f[0], kcal:f[1], p:f[2], c:f[3], f:f[4], fb:f[5]||0}; })
+    /* your own saved foods are never filtered: you made them on purpose */
     .concat((S.myFoods||[]).map(function(m){ return {name:m.name, kcal:m.kcal, p:m.p, c:m.c, f:m.f, fb:m.fb||0, mine:true, id:m.id}; }));
 }
 function fdbSearch(q){
@@ -5136,6 +5262,10 @@ function openSettings(){
     '<div class="field"><label for="sCarb">Carb goal (g)</label><input id="sCarb" type="number" inputmode="numeric" value="'+st.carbGoal+'"></div>'+
     '<div class="field"><label for="sFat">Fat goal (g)</label><input id="sFat" type="number" inputmode="numeric" value="'+st.fatGoal+'"></div></div>'+
     '<div class="field"><label for="sGoalW">Goal weight ('+st.unit+', shows on chart)</label><input id="sGoalW" type="number" inputmode="decimal" value="'+esc(st.goalWeight)+'" placeholder="optional"></div>'+
+    '<div class="field"><label for="sDiet">How you eat (filters food search)</label><select id="sDiet">'+
+      [['nonveg','Non-vegetarian'],['egg','Eggetarian'],['veg','Vegetarian'],['vegan','Vegan']].map(function(d){
+        return '<option value="'+d[0]+'"'+((st.diet||'veg')===d[0]?' selected':'')+'>'+d[1]+'</option>'; }).join('')+
+    '</select></div>'+
     '<hr style="border:0;border-top:1px solid var(--line); margin:14px 0">'+
     '<label class="row small" style="gap:8px; cursor:pointer; margin-bottom:10px"><input type="checkbox" id="sWaterRemind" '+(st.waterRemind?'checked':'')+' style="width:20px;height:20px;accent-color:var(--wa)">Water reminders (while app is open)</label>'+
     '<div class="fields2">'+
@@ -5205,6 +5335,7 @@ function collectSettings(){
   st.rest=+$('#sRest').value||90; st.calGoal=+$('#sCal').value||2200;
   st.proteinGoal=+$('#sProt').value||130; st.carbGoal=+$('#sCarb').value||250; st.fatGoal=+$('#sFat').value||70;
   st.goalWeight=$('#sGoalW').value;
+  if($('#sDiet')) st.diet=$('#sDiet').value;
   st.waterRemind=$('#sWaterRemind').checked; st.waterEvery=Math.max(10,+$('#sWaterEvery').value||60);
   st.workoutRemind=$('#sWkRemind').value;
   st.sleepRemind=$('#sSlRemind').value; st.sleepGoal=+$('#sSlGoal').value||8;
@@ -5332,15 +5463,31 @@ function obGoal(){
     [['gain','Build muscle','Small calorie surplus, high protein'],
      ['lose','Lose fat','Moderate deficit, protein protected'],
      ['fit','Stay fit','Maintenance calories, balanced']].map(function(g){
-      return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obPlan(\''+g[0]+'\')"><span><b>'+g[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+g[2]+'</span></span></button>';
+      return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obDiet(\''+g[0]+'\')"><span><b>'+g[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+g[2]+'</span></span></button>';
     }).join(''));
 }
-function obPlan(goal){
+/* One tap, and it decides which of the 343 foods you are ever offered, plus how
+   the B12 and omega-3 guidance is framed. Vegan is a separate answer from
+   vegetarian on purpose: the supplement advice genuinely differs. */
+function obDiet(goal){
   OB.goal=goal;
+  openSheet('<h3>How do you eat?</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 14px">This filters the food search to things you actually eat, and changes the supplement advice. Change it any time in Settings.</p>'+
+    [['nonveg','Non-vegetarian','Everything: meat, fish, eggs and dairy'],
+     ['egg','Eggetarian','Eggs and dairy, no meat or fish'],
+     ['veg','Vegetarian','Dairy, no eggs, meat or fish'],
+     ['vegan','Vegan','Plants only: no dairy, eggs, meat or fish']].map(function(d){
+      return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obPlan(\''+goal+'\',\''+d[0]+'\')"><span><b>'+d[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+d[2]+'</span></span></button>';
+    }).join(''));
+}
+function obPlan(goal, diet){
+  OB.goal=goal;
+  if(diet) OB.diet=diet;
   openSheet('<h3>Your training week</h3>'+
     '<p class="tiny muted" style="margin:-6px 0 14px">The Today screen will tell you what to do each day. Swap any day later in Edit weekly plan.</p>'+
     [['ppl3','3 days a week','Push · Pull · Legs with rest between: the honest starting point'],
      ['ppl6','6 days a week','Full Push-Pull-Legs ×2, for experienced lifters'],
+     ['cardio','Strength + VO2max','Push · Pull · Legs plus two 4×4 interval sessions, the best-evidenced cardio there is'],
      ['gentle','Gentle start','3 joint-friendly days + mobility, returning after a break or injury']].map(function(p){
       return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obFinish(\''+p[0]+'\')"><span><b>'+p[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+p[2]+'</span></span></button>';
     }).join(''));
@@ -5352,6 +5499,7 @@ function obFinish(planKey){
   /* the onboarding already asks for these for the BMR maths; keep them, or
      VO2max banding has nothing to work with later */
   st.age=String(age); st.sex=(OB.sex==='f'?'f':'m'); st.fiberGoal=30;
+  st.diet=DIET_ALLOWS[OB.diet]?OB.diet:'veg';
   const bmr = 10*w + 6.25*hgt - 5*age + (OB.sex==='f' ? -161 : 5);
   const adj = OB.goal==='gain' ? 300 : (OB.goal==='lose' ? -350 : 0);
   st.calGoal = Math.round((bmr*1.5 + adj)/50)*50;
@@ -5361,15 +5509,13 @@ function obFinish(planKey){
   st.waterGoal = Math.round(w*35/250)*250;
   st.goalWeight = OB.goal==='gain' ? String(Math.round(w+4)) : (OB.goal==='lose' ? String(Math.round(w-4)) : '');
   if(w>0 && !S.weights.length) S.weights.push({date:today(), kg:w});
-  /* friendlier public names for the joint-friendly routines */
-  S.routines.forEach(function(r){
-    r.name=r.name.replace(': wrist-safe return',': joint-friendly')
-                 .replace(': knee-safe return',': joint-friendly (legs)')
-                 .replace('Rehab: knee & wrist (~15 min)','Joint prep (~15 min)');
-  });
   function rid(n){ const r=S.routines.find(function(x){return x.name===n;}); return r?r.id:''; }
   if(planKey==='ppl6') S.plan={1:rid('Push day'),2:rid('Pull day'),3:rid('Legs day'),4:rid('Push day'),5:rid('Pull day'),6:rid('Legs day'),0:''};
   else if(planKey==='gentle') S.plan={1:rid('Push: joint-friendly'),2:rid('Joint prep (~15 min)'),3:rid('Pull: joint-friendly'),4:'',5:rid('Legs: joint-friendly (legs)'),6:rid('Mobility & flexibility (~20 min)'),0:''};
+  /* Lifting on the odd days, 4×4 intervals on the even ones: hard cardio never
+     lands the day before legs, and the two interval sessions sit three days
+     apart, which is the spacing the Norwegian protocol was tested at. */
+  else if(planKey==='cardio') S.plan={1:rid('Push day'),2:rid('VO2max intervals (4×4)'),3:rid('Pull day'),4:'',5:rid('Legs day'),6:rid('VO2max intervals (4×4)'),0:''};
   else S.plan={1:rid('Push day'),2:'',3:rid('Pull day'),4:'',5:rid('Legs day'),6:rid('Mobility & flexibility (~20 min)'),0:''};
   S.programStart=today();
   S.lastPhase=null; st.onboarded=true;
