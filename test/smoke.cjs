@@ -998,6 +998,13 @@ function check(name, cond, detail) {
     'samosa', 'wrap', 'shake', 'coffee', 'ravioli', 'cajun', 'waffle', 'tres leches',
     'rabri ghewar', 'kachori', 'poha', 'thali', 'dal chawal', 'greek yogurt', 'espresso',
     'mocha', 'cold brew', 'matcha', 'lemonade', 'paneer roll', 'soya chaap', 'rajma',
+    /* the local sabzis, and the transliteration variants of the same dish */
+    'pattod', 'patod', 'patode', 'pattode', 'patra', 'aloo vadi',
+    'besan ki sabzi', 'besan sabzi', 'mangodi', 'moong badi', 'gatta', 'launji',
+    'govind gatte', 'kumatiya', 'raab', 'dal dhokli', 'khoba', 'lehsun chutney',
+    'patta gobi', 'cabbage', 'kathal', 'shalgam', 'chukandar', 'drumstick', 'kachnar',
+    'bharwan baingan', 'bharwan mirch', 'aloo pyaaz', 'aloo tamatar', 'sem phali',
+    'french beans', 'nutrela', 'lobia', 'baby corn', 'zucchini', 'broccoli',
   ];
   const search = await page.evaluate((words) => {
     const all = fdbAllFoods();
@@ -1048,8 +1055,8 @@ function check(name, cond, detail) {
       blackCoffeeVegan: foodDiet('Espresso (single shot)') === 'veg' && foodDiet('Cold brew black (glass)') === 'veg',
     };
   }, searchWords);
-  check('470+ foods, all six fields, no duplicates',
-    search.rows >= 470 && search.shape && search.dupes.length === 0, { rows: search.rows, dupes: search.dupes });
+  check('550+ foods, all six fields, no duplicates',
+    search.rows >= 550 && search.shape && search.dupes.length === 0, { rows: search.rows, dupes: search.dupes });
   check('every row\'s calories match its macros (fiber and alcohol aware)',
     search.outliers.length === 0, search.outliers);
   check('every word from the ask finds at least one food', search.misses.length === 0, search.misses);
@@ -1060,6 +1067,62 @@ function check(name, cond, detail) {
   check('no sabzi, wrap or cafe drink is tagged nonveg or egg', search.badDiet.length === 0, search.badDiet);
   check('milk-based cafe drinks and muesli count as dairy', search.milkIsDairy);
   check('black coffee stays vegan', search.blackCoffeeVegan);
+
+  console.log('spelling tolerance and the estimator');
+  const est = await page.evaluate(() => {
+    const all = fdbAllFoods();
+    const hits = (q) => all.filter((f) => foodMatches(f.name, foodTokens(q))).map((f) => f.name);
+    /* the nonveg rows are filtered out of fdbAllFoods for a vegetarian, so the
+       maas classification is asserted against FOODDB itself */
+    const nonveg = FOODDB.map((r) => r[0]).filter((n) => foodDiet(n) === 'nonveg');
+    const combos = [];
+    SABZI_TPL.forEach((t) => SABZI_PORTION.forEach((o) => {
+      const e = sabziEstimate(t.key, o[1]);
+      const atw = 4 * e.p + 4 * Math.max(0, e.c - e.fb) + 2 * e.fb + 9 * e.f;
+      combos.push([t.key + '/' + o[0], Math.abs(atw - e.kcal) <= Math.max(30, e.kcal * 0.18),
+        e.kcal > 0 && e.p >= 0 && e.c >= 0 && e.f >= 0]);
+    }));
+    /* the dead end: a query nothing matches must still offer a way through */
+    FDMEAL = 'l'; addFoodForm('l');
+    document.querySelector('#fdbQ').value = 'zzz nonsense dish';
+    fdbSearch('zzz nonsense dish');
+    const deadEnd = { res: FDRES.length, offersEstimator: document.querySelector('#fdbRes').textContent.includes('Estimate') };
+    /* and the estimate is labelled as one, everywhere it lands */
+    SABZI_PICK = { tpl: 'besan', g: 250 };
+    sabziLog();
+    const logged = (S.food[today()].l || []).slice(-1)[0];
+    SABZI_PICK = { tpl: 'dal', g: 150 };
+    sabziSave();
+    const saved = S.myFoods.slice(-1)[0];
+    return {
+      spellings: ['pattod', 'patod', 'patode', 'pattode'].map((w) => hits(w).join('|')),
+      gatta: hits('gatta').length > 0 && hits('gatta').join(' ').toLowerCase().includes('gatte'),
+      stems: [foodStem('pattod'), foodStem('patode'), foodStem('gatta'), foodStem('gatte')],
+      maas: ['Laal maas (bowl)', 'Safed maas (bowl)', 'Junglee maas (bowl)'].every((n) => nonveg.includes(n)),
+      newRowsVeg: FOODDB.map((r) => r[0])
+        .filter((n) => /pattod|besan|mangodi|kumatiya|launji|gatte|shalgam|kathal|kachnar|nutrela/i.test(n))
+        .filter((n) => foodDiet(n) !== 'veg' && foodDiet(n) !== 'dairy'),
+      combos,
+      deadEnd,
+      loggedName: logged.name, loggedEst: logged.est === true, loggedKcal: logged.kcal,
+      savedName: saved.name, savedEst: saved.est === true,
+    };
+  });
+  check('every spelling of one dish finds the same row',
+    new Set(est.spellings).size === 1 && est.spellings[0].length > 0, est.spellings);
+  check('the stemmer collapses transliteration variants',
+    est.stems[0] === est.stems[1] && est.stems[2] === est.stems[3], est.stems);
+  check('gatta finds gatte', est.gatta);
+  check('laal, safed and junglee maas classify as non-vegetarian', est.maas);
+  check('no new local row is misclassified as meat or egg', est.newRowsVeg.length === 0, est.newRowsVeg);
+  check('every estimator template and portion gives consistent macros',
+    est.combos.every((c) => c[1] && c[2]), est.combos.filter((c) => !c[1] || !c[2]));
+  check('a query nothing matches offers the estimator instead of dead-ending',
+    est.deadEnd.res === 0 && est.deadEnd.offersEstimator, est.deadEnd);
+  check('a logged estimate is marked as an estimate, in the name and on the entry',
+    /~est/.test(est.loggedName) && est.loggedEst && est.loggedKcal > 0, est);
+  check('saving keeps the typed name and the estimate flag',
+    /~est/.test(est.savedName) && est.savedEst, est.savedName);
   check('substring traps classify by meaning, not by letters',
     search.substringTraps.length === 0, search.substringTraps);
 
