@@ -545,6 +545,7 @@ const SEED_QK=[
   {name:'Hung curd 150g',kcal:130,p:15,c:6,f:5,fb:0},{name:'Moong sprouts (bowl)',kcal:120,p:9,c:18,f:1,fb:6},
   {name:'Peanuts 30g',kcal:170,p:8,c:5,f:14,fb:2.5},
   {name:'Rajma/chole (bowl)',kcal:210,p:11,c:33,f:4,fb:8},{name:'Oats 50g + milk',kcal:330,p:14,c:45,f:9,fb:5},
+  {name:'Muesli 50g + milk',kcal:340,p:13,c:45,f:10,fb:5},
   {name:'Peanut butter (tbsp)',kcal:95,p:4,c:3,f:8,fb:1},{name:'Banana',kcal:105,p:1,c:27,f:0,fb:3}
 ];
 function defaults(){
@@ -4517,7 +4518,95 @@ const FOODDB=[
 /* fruits */
 ['Apple (1)',80,0.4,21,0.3,2.5],['Mango (1 medium)',150,1.5,35,0.6,2.5],['Orange (1)',60,1,15,0.2,2.5],
 ['Papaya (bowl)',60,1,15,0.2,2.5],['Grapes (bowl)',100,1,26,0.2,2.5],['Watermelon (bowl)',45,1,11,0.2,2.5],
-['Pomegranate / anaar (1)',105,2,26,1.5,2.5],['Guava (1)',60,2,14,1,2.5],['Chikoo (1)',80,0.5,20,1,2.5]
+['Pomegranate / anaar (1)',105,2,26,1.5,2.5],['Guava (1)',60,2,14,1,2.5],['Chikoo (1)',80,0.5,20,1,2.5],
+/* ---- the everyday sabzis. A "bowl" is a katori, roughly 150g of the finished
+   dish, which is the unit the rest of this section already uses. Fiber runs
+   high here because these are vegetables cooked whole, not gravies. */
+['Parwal sabzi (bowl)',130,3,12,8,4],['Bharwan parwal (bowl)',200,5,14,14,4.5],
+['Turai sabzi (bowl)',95,2,9,6,3.5],['Turai chana dal (bowl)',160,7,16,8,6],
+['Kaddu ki sabzi (bowl)',140,2,18,7,3.5],['Khatta meetha kaddu (bowl)',170,2,24,8,3.5],
+['Arbi ki sabzi dry (bowl)',180,3,22,9,3.5],['Arbi masala gravy (bowl)',200,3,20,12,3.5],
+['Kande ki sabzi (bowl)',150,3,15,9,3],['Kachri ki sabzi (bowl)',120,3,12,7,4],
+['Palak ki sabzi (bowl)',120,4,9,8,4],['Palak corn (bowl)',210,7,20,12,4.5],
+['Sarson ka saag (bowl)',180,6,12,12,6],['Methi aloo (bowl)',170,4,20,9,4.5],
+['Aloo palak (bowl)',160,4,20,7,4.5],['Aloo shimla mirch (bowl)',150,3,18,8,4],
+['Bhindi masala (bowl)',150,3,13,10,5],['Bharwan bhindi (bowl)',210,4,15,15,5],
+['Kundru sabzi (bowl)',110,2,10,7,4],['Gawar aloo (bowl)',150,4,16,8,5],
+['Sev bhaji (bowl)',260,7,20,17,3],['Sev tamatar gravy (bowl)',240,6,18,16,3],
+['Lauki ke gufte (bowl)',280,9,20,18,4],['Lauki ke gufte chile (bowl)',300,9,22,19,4],
+['Gatte ki kadhi (bowl)',270,9,22,16,3.5],['Papad mangodi (bowl)',210,8,20,11,4],
+['Chana masala (bowl)',230,10,30,8,9],['Rajma masala (bowl)',240,11,32,8,10],
+['Soya chaap masala (bowl)',330,20,18,20,4],['Matar mushroom (bowl)',190,7,14,12,4.5],
+['Paneer makhani (bowl)',360,14,16,27,1.5],['Paneer lababdar (bowl)',350,14,15,26,1.5],
+['Paneer tikka masala (bowl)',340,16,14,24,2],['Chana saag (bowl)',220,9,22,10,7],
+/* ---- combined plates, because a meal is eaten as a meal. Logging roti and
+   sabzi as two rows every single day is friction that ends in not logging. */
+['Roti + sabzi (2 roti + bowl)',330,8,42,13,9],
+['Roti + dal + sabzi (2 roti + 2 bowls)',480,17,64,16,17],
+['Roti + dal + sabzi + rice (full plate)',680,21,108,17,18],
+['Veg thali (standard)',750,22,105,26,18],['Rajasthani thali (full)',950,25,120,40,20],
+['Dal chawal (plate)',350,13,57,6,9],['Kadhi chawal (plate)',360,10,56,10,3],
+['Rajma chawal (plate)',440,15,76,9,11],['Chole chawal (plate)',430,14,74,9,10],
+['Dal baati churma (full plate, 3 baati)',1100,22,130,52,12],
+['Idli sambhar (3 idli + sambhar)',280,10,50,4,6],
+['Dosa sambhar chutney (plate)',390,9,52,16,6],
+['Medu vada sambhar (2 vada)',330,9,38,16,5],
+['Poori sabzi (4 poori + aloo)',560,10,66,28,5],
+/* ---- breakfast, including the muesli that replaced the oats */
+['Muesli plain (50g)',190,5,32,4,5],['Muesli + milk (bowl)',340,13,45,10,5],
+['High-protein muesli + milk (bowl)',390,25,42,11,6],
+['Muesli + curd (bowl)',310,12,40,9,5],['Overnight oats (jar)',350,12,50,11,6],
+['Vegetable poha with peanuts (plate)',330,8,48,11,4],
+['Kande poha (plate)',290,6,46,9,3],['Poha jalebi (plate)',520,8,80,19,3],
+['Rava upma with veg (bowl)',270,7,38,10,4],['Vermicelli upma (bowl)',260,6,40,8,3],
+['Moong dal chilla (2)',220,13,22,8,5],['Besan chilla stuffed paneer (1)',230,12,13,14,3],
+['Uttapam (1)',210,5,32,7,2],['Rava dosa (1)',200,4,26,9,1.5],
+['Paneer paratha (1)',330,12,34,16,3.5],['Gobi paratha (1)',270,6,36,11,4],
+['Methi thepla (2)',240,6,34,9,5],['French toast eggless (2 slices)',290,7,38,12,1.5],
+['Muesli bar / granola bar (1)',180,4,26,7,2.5],['Fruit + curd bowl',200,9,30,4,4],
+/* ---- chaat and street, the ones missing from the list above */
+['Dahi puri (6)',280,7,38,11,3],['Dahi bhalla (2)',260,8,32,11,3],
+['Raj kachori (1)',400,9,45,20,5],['Matar kachori (1)',210,5,22,11,3],
+['Aloo tikki plain (2)',220,4,30,9,3],['Chole tikki chaat (plate)',420,12,52,17,9],
+['Pav bhaji extra butter (plate)',600,12,62,33,9],['Masala pav (2)',330,7,42,14,4],
+['Dabeli (1)',260,5,34,11,3],['Corn chaat (bowl)',180,5,30,5,4],
+['Fruit chaat (bowl)',150,2,34,1,5],['Chana chaat (bowl)',220,10,30,7,9],
+['Aloo chaat (plate)',280,4,38,13,4],['Kachori sev chaat (plate)',430,8,48,23,4],
+/* ---- rolls and wraps */
+['Paneer roll (1)',400,16,42,19,4],['Paneer tikka wrap (1)',430,18,44,20,4],
+['Veg wrap (1)',350,9,45,15,5],['Aloo roll (1)',360,7,48,15,4],
+['Hara bhara kabab wrap (1)',380,11,46,17,6],['Veg frankie double cheese (1)',480,15,48,25,4],
+/* ---- dairy, salad and the packets */
+['Greek yogurt plain (100g)',97,9,4,5,0],['Greek yogurt flavoured (cup, 100g)',120,9,14,3,0],
+['Flavoured yogurt cup (85g)',110,6,16,2,0],['Curd with sugar (bowl)',180,7,25,6,0],
+['Kheera / cucumber (1 whole)',30,1.5,7,0.2,2],['Tomato (1)',20,1,4,0.2,1.2],
+['Carrot (1)',25,0.6,6,0.1,1.7],['Beetroot (1 small)',35,1.3,8,0.1,2],
+['Green salad, no dressing (plate)',45,2,9,0.3,3.5],['Sprouts salad (bowl)',150,10,20,2,7],
+['Mango achar (1 tsp)',30,0,1,3,0.2],['Nimbu achar (1 tsp)',15,0,2,0.7,0.2],
+['Mixed achar (1 tsp)',30,0,1,3,0.2],['Mirchi achar (1 tsp)',25,0,1,2.5,0.3],
+['Lays magic masala (small packet, 26g)',140,2,15,8,1],
+['Doritos / nacho chips (small pack)',150,2,17,8,1],
+['Banana chips (30g)',160,1,17,10,1.5],['Salted peanuts (30g)',170,7,5,14,2.5],
+['Aloo sev (30g)',160,3,15,10,1.5],['Ratlami sev (30g)',165,4,14,10,1.5],
+['Chana jor garam (30g)',120,6,18,3,5],['Sing bhujia (30g)',165,5,13,11,2],
+/* ---- cafe drinks by type. These are typical cafe-portion figures, not any one
+   shop's recipe: a house special can swing 150 kcal either way on syrup and
+   cream alone. Save the exact one to My Foods the first time you order it. */
+['Espresso (single shot)',5,0,1,0,0],['Doppio (double shot)',10,0,2,0,0],
+['Cortado (cup)',70,4,5,4,0],['Flat white (cup)',130,7,10,7,0],
+['Macchiato (cup)',20,1,2,1,0],['Mocha (cup)',250,8,30,11,1.5],
+['Affogato (1)',180,4,20,9,0.5],['Cold brew black (glass)',15,0,3,0,0],
+['Cold brew with milk (glass)',110,5,12,5,0],['Caramel latte (cup)',260,8,35,10,0],
+['Hazelnut latte (cup)',260,8,34,10,0],['Vanilla latte (cup)',250,8,33,10,0],
+['Caramel frappe with cream (glass)',420,7,58,18,0.5],
+['Matcha latte (cup)',180,7,24,6,1],['Chai latte (cup)',190,6,28,6,0.5],
+['Filter coffee / South Indian (cup)',90,4,10,4,0],['Irish-style coffee, no alcohol (cup)',230,5,26,12,0],
+['Thick shake, any flavour (glass)',450,10,60,18,1],['Brownie shake (glass)',520,11,68,22,1.5],
+['Nutella shake (glass)',540,11,70,24,1.5],['Biscoff shake (glass)',530,9,72,23,1],
+['Lemonade (glass)',130,0,33,0,0.3],['Cucumber mint cooler (glass)',90,1,22,0,1],
+['Blue lagoon (glass)',150,0,38,0,0],['Green apple mojito (glass)',140,0,35,0,0.3],
+['Watermelon cooler (glass)',110,1,27,0,0.6],['Kokum / aam panna (glass)',120,0,30,0,0.5],
+['Hot chocolate with cream (cup)',340,9,38,17,2],['Affogato brownie (plate)',480,8,58,25,2]
 ];
 let FDMEAL='s', FDRES=[], FDITEM=null, FDQ='', PLATE=[];
 /* The leaders' logging-speed advantage comes almost entirely from not making
@@ -4567,7 +4656,10 @@ const DIET_TAGS=[
   [/chicken|mutton|lamb|keema|fish|prawn|shrimp|shawarma/i, 'nonveg'],
   /* no loose "bhurji": egg bhurji is caught by \begg\b and anda, whereas a
      bare bhurji match hid paneer bhurji from vegetarians */
-  [/\begg\b|eggs|omelette|anda|half fry|sunny side/i, 'egg'],
+  /* every alternative is word-bounded: an unanchored "anda" is a substring of
+     "standard", which tagged a vegetarian thali as egg and hid it from
+     vegetarians. The same trap waits in any loose three-letter alternative. */
+  [/\begg\b|\beggs\b|\bomelette\b|\banda\b|\bhalf fry\b|\bsunny side\b/i, 'egg'],
   [/paneer|milk|curd|dahi|lassi|ghee|butter|cheese|cream|malai|khoya|mawa|rabri|kheer|shrikhand|kulfi|ice cream|softy|choco bar|cassata|whey|casein|chaas|buttermilk|hung curd|latte|cappuccino|frappe|cold coffee|hot chocolate|milkshake|shake|cold cocoa/i, 'dairy']
 ];
 function foodDiet(name){
@@ -4594,20 +4686,128 @@ function fdbAllFoods(){
     /* your own saved foods are never filtered: you made them on purpose */
     .concat((S.myFoods||[]).map(function(m){ return {name:m.name, kcal:m.kcal, p:m.p, c:m.c, f:m.f, fb:m.fb||0, mine:true, id:m.id}; }));
 }
+/* ---------- search synonyms ----------
+   The rows are named the way the food is called here, which means half of them
+   are invisible to the other name for the same thing: searching "cucumber"
+   found nothing because the row says kheera, and you would reasonably conclude
+   the food was missing. Each entry is [what you might type, what the rows
+   actually say] — a matched phrase is consumed and becomes ONE alternatives
+   group, so "pani patashi" is a single concept rather than two words that must
+   both appear. Same shape as PAT_EX, SUPP_INFO and DIET_TAGS. */
+const FOOD_ALIAS=[
+  /* multi-word first: they must be consumed before their words are tokenised */
+  [/\bpani\s*patashi\b|\bgol\s*gappa?e?s?\b|\bpuchkas?\b/i, ['pani puri','golgappa']],
+  [/\blady\s*fingers?\b|\bokra\b/i,          ['bhindi']],
+  [/\bcottage\s*cheese\b/i,                  ['paneer']],
+  [/\bridge\s*gourd\b/i,                     ['turai']],
+  [/\bbottle\s*gourd\b/i,                    ['lauki']],
+  [/\bpointed\s*gourd\b/i,                   ['parwal']],
+  [/\bbitter\s*(gourd|melon)\b/i,            ['karela']],
+  [/\bbell\s*pepper\b|\bcapsicum\b/i,        ['shimla']],
+  [/\bkidney\s*beans?\b/i,                   ['rajma']],
+  [/\bchick\s*peas?\b|\bgarbanzos?\b/i,      ['chole','chana']],
+  [/\bclarified\s*butter\b/i,                ['ghee']],
+  [/\bsoft\s*drinks?\b|\bcokes?\b|\bpepsi\b|\bsodas?\b/i, ['cold drink']],
+  [/\bfrench\s*fries\b/i,                    ['fries']],
+  [/\bice[\s-]*creams?\b/i,                  ['ice cream']],
+  /* run-together spellings of things that are two words in the rows */
+  [/\bbhelpuri\b/i,                          ['bhel puri']],
+  [/\bsevpuri\b/i,                           ['sev puri']],
+  [/\bdahipuri\b/i,                          ['dahi puri']],
+  [/\bpanipuri\b/i,                          ['pani puri']],
+  /* single words */
+  [/^cucumbers?$/i,      ['kheera','cucumber']],
+  [/^yogh?urts?$/i,      ['curd','dahi','yogurt']],
+  [/^pumpkins?$/i,       ['kaddu']],
+  [/^spinach$/i,         ['palak']],
+  [/^fenugreek$/i,       ['methi']],
+  [/^potatoe?s?$/i,      ['aloo','potato']],
+  [/^onions?$|^kanda$/i, ['pyaaz','kande','onion']],
+  [/^cauliflower$/i,     ['gobi']],
+  [/^peas$/i,            ['matar']],
+  [/^(eggplants?|aubergines?|brinjals?)$/i, ['baingan']],
+  [/^(colocasia|taro)$/i,['arbi']],
+  [/^lentils?$/i,        ['dal']],
+  [/^flatbreads?$/i,     ['roti']],
+  [/^noodles?$/i,        ['noodles','chowmein']],
+  [/^(chips|crisps|wafers?)$/i, ['chips','chipps','lays','kurkure','bingo']],
+  [/^koftas?$|^guftes?$/i,['kofta','gufte']],
+  [/^granola$/i,         ['muesli','granola']],
+  [/^sabj(i|ee)$/i,      ['sabzi']],
+  [/^(chapat(i|hi)|phulka)$/i, ['roti','chapati','phulka']],
+  [/^murgh$/i,           ['chicken']],
+  [/^(gosht|lamb)$/i,    ['mutton','lamb']],
+  [/^machh?li$/i,        ['fish']],
+  [/^(jhinga|shrimps?)$/i,['prawn']],
+  [/^anda$/i,            ['egg','anda']],
+  [/^doodh$/i,           ['milk']],
+  [/^kela$/i,            ['banana']],
+  [/^(seb|apples?)$/i,   ['apple']],
+  [/^aam$/i,             ['mango']],
+  [/^badam$/i,           ['almond','badam']],
+  [/^kaju$/i,            ['cashew','kaju']],
+  [/^(moongfali|groundnuts?)$/i, ['peanut']],
+  [/^kishmish$/i,        ['raisin']],
+  [/^akhrot$/i,          ['walnut']],
+  [/^cheeni$/i,          ['sugar']],
+  [/^amrood$/i,          ['guava']],
+  [/^lok(i|hi)$/i,       ['lauki','loki']],
+  [/^tomatoe?s?$/i,      ['tamatar','tomato']],
+  [/^vegetables?$/i,     ['veg']]
+];
+/* Hindi and English joining words carry no meaning here, and requiring them
+   made "loki ke gufte" miss a row literally called "Lauki ke gufte" because
+   the alias fired on lauki and left "ke" as a token of its own. */
+const FOOD_STOP=/^(ke|ki|ka|aur|se|with|and|the|of|in|a|an)$/i;
+/* A query becomes a list of alternatives-groups. Every group must match the
+   name somewhere; within a group, any one alternative is enough. */
+function foodTokens(q){
+  let s=String(q||'').toLowerCase().trim();
+  const groups=[];
+  /* pass 1, on the whole string: a multi-word alias has to be consumed before
+     tokenising, or "pani patashi" becomes two words that must both appear */
+  FOOD_ALIAS.forEach(function(a){
+    if(/\\s/.test(a[0].source) && a[0].test(s)){ s=s.replace(a[0],' '); groups.push(a[1]); }
+  });
+  const words=s.split(/\s+/).filter(Boolean);
+  const kept=words.filter(function(t){ return !FOOD_STOP.test(t); });
+  /* if the query was nothing BUT joining words, keep them rather than
+     silently searching for everything */
+  /* pass 2, per word: the single-word aliases are anchored, so they only ever
+     matched when the whole query was that one word */
+  (kept.length||groups.length? kept : words).forEach(function(t){
+    let alts=null;
+    for(let i=0;i<FOOD_ALIAS.length && !alts;i++) if(FOOD_ALIAS[i][0].test(t)) alts=FOOD_ALIAS[i][1];
+    groups.push(alts? alts.concat([t]) : [t]);
+  });
+  return groups;
+}
+function foodMatches(name, groups){
+  const n=String(name||'').toLowerCase();
+  return groups.every(function(alts){
+    return alts.some(function(a){ return n.indexOf(a)>-1; });
+  });
+}
 function fdbSearch(q){
   FDQ=(q||'').trim();
   const box=$('#fdbRes'); FDITEM=null; $('#fdbSel').innerHTML='';
   if(!FDQ){ box.innerHTML=''; return; }
-  const toks=FDQ.toLowerCase().split(/\s+/);
+  const groups=foodTokens(FDQ);
+  const first=(groups[0]||[''])[0];
   const hist=foodHistoryCounts();
   FDRES=fdbAllFoods().filter(function(f){
-    const n=f.name.toLowerCase();
-    return toks.every(function(t){ return n.indexOf(t)>-1; });
+    return foodMatches(f.name, groups);
   }).sort(function(a,b){
-    /* what you log often should not be buried under what you never eat */
+    /* what you log often should not be buried under what you never eat, but a
+       name that STARTS with what you typed beats history: typing "dal" wants
+       Dal tadka, not Moong dal halwa. */
+    const pa=a.name.toLowerCase().indexOf(first)===0?1:0, pb=b.name.toLowerCase().indexOf(first)===0?1:0;
+    if(pa!==pb) return pb-pa;
     const ca=(hist[a.name]||{}).n||0, cb=(hist[b.name]||{}).n||0;
     return cb-ca;
-  }).slice(0,8);
+    /* 12, not 8: with 480 rows a broad word like "paneer" overflowed the list
+       and the row you wanted was cut off with no way to see it */
+  }).slice(0,12);
   box.innerHTML = FDRES.map(function(f,i){
     return '<div class="listrow" style="cursor:pointer" onclick="fdbPick('+i+')"><span class="small">'+esc(f.name)+
       (f.mine? ' <span class="tiny" style="color:var(--wk)">★ mine</span>':'')+'</span>'+
@@ -4884,11 +5084,12 @@ function barcodeLink(code){
 let BCRES=[];
 function bcSearch(q){
   const box=$('#bcRes'); if(!box) return;
-  const toks=String(q||'').trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if(!toks.length){ box.innerHTML=''; BCRES=[]; return; }
+  const groups=foodTokens(q);
+  if(!groups.length){ box.innerHTML=''; BCRES=[]; return; }
+  /* same synonym layer as the food search: a packet you know as "cucumber"
+     should still find the kheera row to attach the barcode to */
   BCRES=fdbAllFoods().filter(function(f){
-    const n=f.name.toLowerCase();
-    return toks.every(function(t){ return n.indexOf(t)>-1; });
+    return foodMatches(f.name, groups);
   }).slice(0,6);
   box.innerHTML=BCRES.map(function(f,i){
     return '<div class="listrow" style="cursor:pointer" onclick="bcAttach('+i+')"><span class="small">'+esc(f.name)+'</span>'+

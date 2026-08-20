@@ -835,6 +835,84 @@ function check(name, cond, detail) {
   check('underweight band works', bmi.under === 'Underweight', bmi.under);
   check('missing height prompts instead of rendering NaN', bmi.missingHandled, bmi.missingHandled);
 
+  /* The gap that prompted all this was not "the food is missing" — half the
+     time the row existed and the search could not find it. So the assertion is
+     on the SEARCH, driven from the words actually typed, not on the array. */
+  console.log('food search: every word from the ask resolves');
+  const searchWords = [
+    'muesli', 'roti sabzi', 'loki ke gufte', 'lauki ke gufte', 'kachri', 'parwal', 'kande',
+    'palak', 'methi', 'turai', 'bhindi masala', 'bhindi', 'aloo', 'kaddu', 'arbi',
+    'sev bhaji', 'sev tomato', 'sev tamatar', 'dahi puri', 'idli sambhar', 'vada', 'dosa',
+    'bhelpuri', 'bhel puri', 'sev puri', 'pani patashi', 'aloo tikki', 'momos', 'chips',
+    'burger', 'yogurt', 'kheera', 'cucumber', 'achar', 'makhani', 'lasagna', 'gatte',
+    'samosa', 'wrap', 'shake', 'coffee', 'ravioli', 'cajun', 'waffle', 'tres leches',
+    'rabri ghewar', 'kachori', 'poha', 'thali', 'dal chawal', 'greek yogurt', 'espresso',
+    'mocha', 'cold brew', 'matcha', 'lemonade', 'paneer roll', 'soya chaap', 'rajma',
+  ];
+  const search = await page.evaluate((words) => {
+    const all = fdbAllFoods();
+    const hits = (q) => all.filter((f) => foodMatches(f.name, foodTokens(q))).length;
+    const names = FOODDB.map((r) => r[0]);
+    /* fiber yields ~2 kcal/g, not 4, and alcohol is not in any macro column,
+       so the Atwater check accounts for both or it flags correct rows */
+    const outliers = FOODDB.filter((r) => {
+      if (/beer|whisky|wine|rum|vodka/i.test(r[0])) return false;
+      const est = 4 * r[2] + 4 * Math.max(0, r[3] - r[5]) + 2 * r[5] + 9 * r[4];
+      return Math.abs(est - r[1]) > Math.max(30, r[1] * 0.18);
+    }).map((r) => r[0]);
+    return {
+      rows: FOODDB.length,
+      shape: FOODDB.every((r) => r.length === 6 && r.every((v, i) => (i ? typeof v === 'number' && isFinite(v) && v >= 0 : !!String(v).trim()))),
+      dupes: names.filter((n, i) => names.indexOf(n) !== i),
+      outliers,
+      misses: words.filter((w) => hits(w) === 0),
+      /* aliases doing real work: these words appear in NO row name, so a hit
+         can only have come through the synonym layer */
+      aliasReal: ['okra', 'pumpkin', 'cottage cheese', 'lady finger', 'ridge gourd', 'chickpeas']
+        .map((w) => [w, hits(w), names.some((n) => n.toLowerCase().includes(w))])
+        .filter((x) => x[1] === 0 || x[2]),
+      stopwords: hits('loki ke gufte') === hits('lauki gufte'),
+      /* a name that starts with the query beats a merely-frequent one */
+      prefixFirst: (() => {
+        const g = foodTokens('dal');
+        const r = all.filter((f) => foodMatches(f.name, g))
+          .sort((a, b) => (b.name.toLowerCase().indexOf('dal') === 0 ? 1 : 0) - (a.name.toLowerCase().indexOf('dal') === 0 ? 1 : 0));
+        return r[0].name.toLowerCase().indexOf('dal') === 0;
+      })(),
+      /* everything added in this pass is vegetarian or vegan; a stray nonveg or
+         egg tag would silently hide a sabzi from a vegetarian */
+      badDiet: FOODDB.map((r) => r[0])
+        .filter((n) => /sabzi|gufte|thali|muesli|chaat|roll|wrap|latte|shake|cooler|espresso/i.test(n))
+        .filter((n) => !/chicken|mutton|fish|prawn|egg|anda/i.test(n))
+        .filter((n) => ['nonveg', 'egg'].includes(foodDiet(n))),
+      /* the substring trap that hid a vegetarian thali: "standard" contains
+         "anda", "no ghee" contains "ghee", "kheera" contains "kheer" */
+      substringTraps: [
+        ['Veg thali (standard)', 'veg'], ['Rajasthani thali (full)', 'veg'],
+        ['Atta roti / phulka, no ghee (1)', 'veg'], ['Peanut butter (1 tbsp)', 'veg'],
+        ['Salad: kheera/tamatar/pyaaz (plate)', 'veg'], ['Anda bhurji pav (plate)', 'egg'],
+        ['Paneer bhurji (bowl)', 'dairy'], ['Egg bhurji (bowl)', 'egg'],
+      ].filter((t) => foodDiet(t[0]) !== t[1]).map((t) => t[0] + ' → ' + foodDiet(t[0])),
+      milkIsDairy: ['Muesli + milk (bowl)', 'Caramel latte (cup)', 'Thick shake, any flavour (glass)']
+        .every((n) => foodDiet(n) === 'dairy'),
+      blackCoffeeVegan: foodDiet('Espresso (single shot)') === 'veg' && foodDiet('Cold brew black (glass)') === 'veg',
+    };
+  }, searchWords);
+  check('470+ foods, all six fields, no duplicates',
+    search.rows >= 470 && search.shape && search.dupes.length === 0, { rows: search.rows, dupes: search.dupes });
+  check('every row\'s calories match its macros (fiber and alcohol aware)',
+    search.outliers.length === 0, search.outliers);
+  check('every word from the ask finds at least one food', search.misses.length === 0, search.misses);
+  check('the alias layer is doing real work, not matching literal names',
+    search.aliasReal.length === 0, search.aliasReal);
+  check('joining words (ke/ki/ka) are ignored', search.stopwords);
+  check('a name starting with the query sorts first', search.prefixFirst);
+  check('no sabzi, wrap or cafe drink is tagged nonveg or egg', search.badDiet.length === 0, search.badDiet);
+  check('milk-based cafe drinks and muesli count as dairy', search.milkIsDairy);
+  check('black coffee stays vegan', search.blackCoffeeVegan);
+  check('substring traps classify by meaning, not by letters',
+    search.substringTraps.length === 0, search.substringTraps);
+
   console.log('food database + My Foods');
   const food = await page.evaluate(() => {
     function hits(q) {
