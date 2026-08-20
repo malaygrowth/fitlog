@@ -335,6 +335,7 @@
   @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} #splash{display:none} }
 
   .empty{color:var(--ink3); font-size:14px; text-align:center; padding:18px 8px}
+  .seg.three{grid-template-columns:1fr 1fr 1fr}
   .seg{display:grid; grid-template-columns:1fr 1fr; gap:6px; background:var(--raised); border:1px solid var(--line); border-radius:12px; padding:4px}
   .seg button{padding:8px; border-radius:9px; font-family:var(--fd-disp); font-weight:600; font-size:13px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink2)}
   .seg button.on{background:var(--bg); color:var(--ink)}
@@ -5059,6 +5060,9 @@ const FOODDB=[
 ['Fish curry (bowl)',280,26,7,16,1.5],['Fish fry (2 pieces)',300,28,8,18,0.5],
 ['Tandoori fish (2 pieces)',240,30,3,12,0.5],['Prawn curry (bowl)',260,24,8,14,1.5],
 ['Prawn fry (100g)',220,22,5,12,0.5],
+/* the Rajasthani meats, which the non-vegetarian block was missing entirely */
+['Laal maas (bowl)',480,27,7,38,1.5],['Safed maas (bowl)',460,26,9,35,1.5],
+['Junglee maas (bowl)',440,26,4,36,0.5],['Mutton sula (4 pieces)',330,32,4,20,0.5],
 /* drinks */
 ['Chai with milk + sugar (1 cup)',90,2,12,3.5,1],['Chai no sugar (1 cup)',45,2,4,2.5,0],['Black coffee (1 cup)',5,0,0,0,0],
 ['Nimbu pani with sugar (glass)',60,0,15,0,0.3],['Chaas / buttermilk (glass)',40,2,3,1.5,1],['Sweet lassi (glass)',220,6,30,8,1],
@@ -5138,6 +5142,46 @@ const FOODDB=[
 ['Banana chips (30g)',160,1,17,10,1.5],['Salted peanuts (30g)',170,7,5,14,2.5],
 ['Aloo sev (30g)',160,3,15,10,1.5],['Ratlami sev (30g)',165,4,14,10,1.5],
 ['Chana jor garam (30g)',120,6,18,3,5],['Sing bhujia (30g)',165,5,13,11,2],
+/* ---- the Marwari kitchen. A bowl is a katori, roughly 150 g of the finished
+   dish. Besan runs through most of this cuisine because the desert had no fresh
+   vegetables to speak of, which is why these carry real protein for sabzis. */
+['Pattod steamed (4 pieces)',210,9,22,10,3],['Pattod fried (4 pieces)',300,9,24,19,3],
+['Besan ki sabzi (bowl)',260,10,20,16,3],['Besan pakodi ki sabzi (bowl)',290,11,22,18,3],
+['Besan cheele ki sabzi (bowl)',270,12,21,16,3.5],
+['Mangodi ki sabzi (bowl)',240,12,24,11,5],['Mangodi aloo (bowl)',270,11,30,12,5],
+['Govind gatte (bowl)',330,11,24,21,4],['Masala gatte (bowl)',270,9,22,16,4],
+['Palak gatte (bowl)',290,11,22,18,4.5],
+['Kumatiya ki sabzi (bowl)',220,10,20,12,7],['Ker ki sabzi (bowl)',170,4,14,11,6],
+['Sangri ki sabzi (bowl)',190,4,16,12,7],
+['Kairi / amchur ki sabzi (bowl)',150,2,18,8,2.5],
+['Tamatar ki launji (katori)',140,2,16,8,2],['Aam ki launji (katori)',180,1,30,6,1.5],
+['Kairi launji (katori)',150,1,24,6,1.5],
+['Bajre ki raab (glass)',180,5,28,5,4],['Dal dhokli (plate)',420,16,58,13,10],
+['Khoba roti (1)',180,5,30,4,4],['Khichiya papad roasted (1)',35,1,7,0.3,0.5],
+['Lehsun ki chutney (1 tbsp)',45,1,3,3.5,0.6],['Besan chakki (1 piece)',180,4,20,9,0.8],
+['Rajasthani kadhi (bowl)',180,7,13,10,2],['Bati plain (1)',180,5,26,6,2.5],
+/* ---- the everyday vegetables that were still missing */
+['Patta gobi / cabbage sabzi (bowl)',110,3,11,6,4],['Patta gobi matar (bowl)',140,5,14,7,5],
+['French beans sabzi (bowl)',120,3,12,7,4.5],['Sem phali sabzi (bowl)',130,4,13,7,5],
+['Shalgam ki sabzi (bowl)',110,2,13,6,3],['Aloo shalgam (bowl)',150,3,18,8,3.5],
+['Kathal ki sabzi (bowl)',210,3,22,13,4],['Chukandar ki sabzi (bowl)',120,3,15,6,4],
+['Drumstick / sahjan sabzi (bowl)',130,3,12,8,4.5],['Kachnar ki sabzi (bowl)',120,3,11,7,4],
+['Bharwan baingan (bowl)',230,5,16,17,5],['Bharwan mirch (2)',180,4,12,13,3],
+['Aloo pyaaz ki sabzi (bowl)',170,3,20,9,3],['Aloo tamatar ki sabzi (bowl)',150,3,19,7,3],
+['Aloo baingan (bowl)',170,3,19,9,4],['Aloo chana dal (bowl)',210,8,26,8,6],
+['Mixed veg dry (bowl)',140,4,14,8,4.5],['Soyabean / nutrela ki sabzi (bowl)',230,18,15,11,6],
+['Moong ki sabzi (bowl)',180,11,22,5,7],['Baby corn masala (bowl)',180,5,20,9,4],
+['Zucchini sabzi (bowl)',100,2,9,6,3],['Broccoli sabzi (bowl)',120,4,10,7,4],
+['Kaddu aloo (bowl)',160,3,20,8,3.5],['Gobi matar (bowl)',150,5,15,8,5],
+['Gobi aloo dry (bowl)',160,4,18,8,4.5],['Baingan aloo bharta (bowl)',160,3,14,10,4.5],
+['Turai aloo (bowl)',130,3,15,7,3.5],['Lauki chana dal (bowl)',180,8,20,7,6],
+['Lauki kofta (bowl)',330,8,20,24,4],['Palak aloo methi (bowl)',160,5,17,8,5],
+['Sarson palak saag (bowl)',170,6,12,11,6],['Chane ki sabzi (bowl)',230,11,28,8,9],
+['Rajma sukha (bowl)',200,11,28,5,10],['Lobia ki sabzi (bowl)',210,11,27,6,9],
+['Matar ki sabzi (bowl)',160,7,18,7,6],['Matar aloo dry (bowl)',170,5,21,7,5],
+['Sev matar (bowl)',250,7,20,16,4],['Aloo methi (bowl)',170,4,19,9,4.5],
+['Karela pyaaz (bowl)',140,3,12,9,4.5],['Tinda aloo (bowl)',120,3,14,6,4],
+['Parwal aloo (bowl)',150,3,16,8,4],['Kundru aloo (bowl)',140,3,15,7,4],
 /* ---- cafe drinks by type. These are typical cafe-portion figures, not any one
    shop's recipe: a house special can swing 150 kcal either way on syrup and
    cream alone. Save the exact one to My Foods the first time you order it. */
@@ -5202,7 +5246,11 @@ const DIET_EXCEPT=[
   [/no ghee|without ghee|peanut butter|almond butter|kheera/i, 'veg']
 ];
 const DIET_TAGS=[
-  [/chicken|mutton|lamb|keema|fish|prawn|shrimp|shawarma/i, 'nonveg'],
+  /* \bmaas\b, not loose: laal maas, safed maas and junglee maas are mutton and
+     were classifying as vegetarian, which is the worst direction for this
+     mistake to go. gosht, murgh, machli and jhinga are here for the same reason
+     - the dish is not always named in English. */
+  [/chicken|mutton|lamb|keema|fish|prawn|shrimp|shawarma|\bmaas\b|\bgosht\b|\bmurgh\b|\bmachh?li\b|\bjhinga\b/i, 'nonveg'],
   /* no loose "bhurji": egg bhurji is caught by \begg\b and anda, whereas a
      bare bhurji match hid paneer bhurji from vegetarians */
   /* every alternative is word-bounded: an unanchored "anda" is a substring of
@@ -5260,6 +5308,8 @@ const FOOD_ALIAS=[
   [/\bfrench\s*fries\b/i,                    ['fries']],
   [/\bice[\s-]*creams?\b/i,                  ['ice cream']],
   /* run-together spellings of things that are two words in the rows */
+  [/\bpatra\b|\baloo\s*vadi\b|\barbi\s*ke?\s*patte\b/i, ['pattod','patra']],
+  [/\bmoong\s*badi\b|\bmoong\s*ki\s*badi\b/i,   ['mangodi']],
   [/\bbhelpuri\b/i,                          ['bhel puri']],
   [/\bsevpuri\b/i,                           ['sev puri']],
   [/\bdahipuri\b/i,                          ['dahi puri']],
@@ -5331,10 +5381,30 @@ function foodTokens(q){
   });
   return groups;
 }
+/* Transliterated Hindi has no fixed spelling: pattod, patod, patode and pattode
+   are one dish, and nobody should have to guess which one the row used. Collapse
+   doubled letters and drop a trailing vowel, and they all land on "patod". */
+function foodStem(w){
+  return String(w||'').toLowerCase()
+    .replace(/[^a-z0-9]+/g,'')
+    .replace(/([a-z])\1+/g,'$1')
+    .replace(/[aeiou]+$/,'');
+}
+function nameStems(name){
+  return String(name||'').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(foodStem);
+}
 function foodMatches(name, groups){
   const n=String(name||'').toLowerCase();
+  let stems=null;
   return groups.every(function(alts){
-    return alts.some(function(a){ return n.indexOf(a)>-1; });
+    if(alts.some(function(a){ return n.indexOf(a)>-1; })) return true;
+    /* Stems are compared whole word to whole word, never as a substring: an
+       over-stemmed fragment used as a substring would match half the database. */
+    if(!stems) stems=nameStems(name);
+    return alts.some(function(a){
+      const st=foodStem(a);
+      return st.length>2 && stems.indexOf(st)>-1;
+    });
   });
 }
 function fdbSearch(q){
@@ -5363,7 +5433,13 @@ function fdbSearch(q){
       '<span class="row" style="gap:8px"><span class="tiny muted num">'+f.kcal+' kcal · P'+f.p+'</span>'+
       (f.mine? '<button class="btn ghost sm danger" onclick="event.stopPropagation();delMyFood(\''+f.id+'\')">✕</button>':'')+'</span></div>';
   }).join('')
-  + '<div class="tiny" style="padding:8px 2px"><a href="#" style="color:var(--wk)" onclick="myFoodForm();return false">＋ Not here? Save “'+esc(FDQ)+'” as my food</a></div>';
+  + (FDRES.length
+      ? '<div class="tiny" style="padding:8px 2px"><a href="#" style="color:var(--wk)" onclick="myFoodForm();return false">＋ Not here? Save “'+esc(FDQ)+'” as my food</a></div>'
+      /* a dead end here is why a dish goes unlogged: asking for four macro
+         numbers nobody knows is not an offer, it is a refusal */
+      : '<div style="padding:6px 2px 2px"><div class="tiny muted" style="margin-bottom:8px; line-height:1.5">Nothing matched “'+esc(FDQ)+'”. Home cooking has a longer tail than any database — estimate it instead.</div>'+
+        '<button class="btn food wide" onclick="sabziSheet()">Estimate “'+esc(FDQ)+'”</button>'+
+        '<div class="tiny" style="padding:8px 2px"><a href="#" style="color:var(--wk)" onclick="myFoodForm();return false">＋ Or enter the numbers yourself</a></div></div>');
 }
 function fdbPick(i){
   FDITEM=FDRES[i]; if(!FDITEM) return;
@@ -5454,6 +5530,103 @@ function fdbAdd(){
   (day[FDMEAL]=day[FDMEAL]||[]).push(e);
   save(); closeSheet(); renderFood();
   toast(e.name+': '+e.kcal+' kcal logged');
+}
+/* ---------- the sabzi estimator ----------
+   Three rounds of "I cannot find X" said the same thing: the tail of Indian
+   home cooking has no end, and 553 rows still will not cover one household.
+   The old dead end asked for calories, protein, carbs and fat, none of which
+   anyone knows for their mother's pattod — so the honest choices were to log
+   something wrong or log nothing.
+
+   Six shapes cover almost all of it. Per-100g figures, calibrated against the
+   component rows already in the database (Dry sabzi / Sabzi gravy only / Dal
+   plain boiled, per katori) so the estimates agree with it rather than
+   inventing a second scale. Marked as estimates wherever they appear: a guess
+   must never look like a measurement. */
+const SABZI_TPL=[
+  {key:'dry',   name:'Dry sabzi',        note:'Vegetable, oil, masala. Bhindi, aloo, gobi, cabbage.',
+   per100:[75,2,7,4.5,2.8]},
+  {key:'gravy', name:'Gravy sabzi',      note:'Onion-tomato base, more oil. Aloo matar, mixed veg.',
+   per100:[95,2.5,9,5.5,2.6]},
+  {key:'besan', name:'Besan-based',      note:'Gatte, pattod, pakodi, mangodi. Carries real protein.',
+   per100:[165,7,14,9,2.5]},
+  {key:'stuff', name:'Stuffed / bharwan',note:'Bharwan baingan or mirch: vegetable, filling and the oil it cooked in.',
+   per100:[140,3,10,10,3.2]},
+  {key:'dal',   name:'Dal',              note:'Any lentil, tadka included.',
+   per100:[95,6,14,2,5.2]},
+  {key:'leafy', name:'Leafy / saag',     note:'Palak, methi, sarson.',
+   per100:[80,3.5,6,4.5,3.4]}
+];
+const SABZI_PORTION=[['katori',150],['bowl',250],['plate',350]];
+let SABZI_PICK={tpl:'dry', g:150};
+function sabziEstimate(key, grams){
+  const t=SABZI_TPL.find(function(x){ return x.key===key; })||SABZI_TPL[0];
+  const k=grams/100;
+  const r=function(v,d){ const m=Math.pow(10,d||0); return Math.round(v*k*m)/m; };
+  return {kcal:r(t.per100[0]), p:r(t.per100[1],1), c:r(t.per100[2],1),
+          f:r(t.per100[3],1), fb:r(t.per100[4],1), tpl:t};
+}
+function sabziSheet(){
+  const e=sabziEstimate(SABZI_PICK.tpl, SABZI_PICK.g);
+  const label=(SABZI_PORTION.find(function(x){ return x[1]===SABZI_PICK.g; })||['',0])[0];
+  openSheet('<h3>Estimate a dish</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 14px; line-height:1.55">No database can hold every dish cooked at home. '+
+      'Pick the shape it is closest to and roughly how much — near enough beats not logging it. '+
+      'The entry is marked as an estimate so you can tell it apart later.</p>'+
+    '<div class="field"><label for="sbName">What was it?</label>'+
+      '<input id="sbName" value="'+esc(FDQ)+'" placeholder="e.g. pattod"></div>'+
+    '<div class="tiny muted" style="font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin:6px 0 6px">Closest shape</div>'+
+    SABZI_TPL.map(function(t){
+      /* selection is shown with a border and an accent title, not .btn.primary:
+         that class uppercases everything inside it, which turned the one-line
+         explanation into unreadable amber capitals */
+      const on=(SABZI_PICK.tpl===t.key);
+      return '<button class="btn wide" style="margin-bottom:7px; justify-content:flex-start; text-align:left'+
+        (on?'; border-color:var(--wk); background:#f2a03d1a':'')+'" '+
+        'onclick="sabziPick(\'tpl\',\''+t.key+'\')"><span><b'+(on?' style="color:var(--wk)"':'')+'>'+
+        (on?'✓ ':'')+t.name+'</b>'+
+        '<span class="tiny muted" style="display:block; font-weight:500; text-transform:none; letter-spacing:0">'+esc(t.note)+'</span></span></button>';
+    }).join('')+
+    '<div class="tiny muted" style="font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin:12px 0 6px">How much</div>'+
+    '<div class="seg three">'+SABZI_PORTION.map(function(o){
+      return '<button class="'+(SABZI_PICK.g===o[1]?'on':'')+'" onclick="sabziPick(\'g\','+o[1]+')">'+o[0]+'</button>';
+    }).join('')+'</div>'+
+    '<div class="card" style="background:var(--raised); margin:14px 0 4px">'+
+      '<div class="spread"><b class="small">'+esc(e.tpl.name)+', one '+label+'</b>'+
+      '<span class="num" style="font-size:26px; font-family:var(--fd-disp); font-weight:700">'+e.kcal+'</span></div>'+
+      '<div class="tiny muted num" style="margin-top:2px">kcal · P '+e.p+' · C '+e.c+' · F '+e.f+' · Fib '+e.fb+'</div></div>'+
+    '<div class="row" style="gap:8px; margin-top:10px">'+
+      '<button class="btn food grow" onclick="sabziLog()">Log it</button>'+
+      '<button class="btn grow" onclick="sabziSave()">Save as my food</button></div>'+
+    '<p class="tiny muted" style="margin-top:12px; line-height:1.55">Saving it keeps the name you typed, so the second time it is yours. '+
+      'If you ever weigh the real thing, edit it there and the estimate is gone for good.</p>');
+}
+function sabziPick(k,v){ SABZI_PICK[k]= (k==='g')? +v : v; sabziSheet(); }
+function sabziName(){
+  const el=$('#sbName'), n=(el? el.value.trim() : '') || FDQ || 'Dish';
+  const label=(SABZI_PORTION.find(function(x){ return x[1]===SABZI_PICK.g; })||['',0])[0];
+  /* the tilde is the whole point: six months later you can still tell which
+     numbers you measured and which you guessed */
+  return n+' ('+label+', ~est)';
+}
+function sabziLog(){
+  const e=sabziEstimate(SABZI_PICK.tpl, SABZI_PICK.g);
+  const day=S.food[foodDate]=S.food[foodDate]||{};
+  (day[FDMEAL]=day[FDMEAL]||[]).push({id:uid(), name:sabziName(),
+    kcal:e.kcal, p:e.p, c:e.c, f:e.f, fb:e.fb, est:true});
+  save(); vib(12); closeSheet(); renderFood();
+  toast(sabziName()+': '+e.kcal+' kcal logged');
+}
+function sabziSave(){
+  const e=sabziEstimate(SABZI_PICK.tpl, SABZI_PICK.g);
+  const name=sabziName();
+  S.myFoods.push({id:uid(), name:name, kcal:e.kcal, p:e.p, c:e.c, f:e.f, fb:e.fb, est:true});
+  save(); vib(12);
+  const keep=PLATE;
+  addFoodForm(FDMEAL);
+  PLATE=keep; renderPlate();
+  const q=$('#fdbQ'); if(q){ q.value=name; fdbSearch(name); }
+  toast(name+' saved to your foods');
 }
 function myFoodForm(){
   openSheet('<h3>Save a “my food”</h3>'+
