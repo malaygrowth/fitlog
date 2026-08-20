@@ -42,7 +42,7 @@ function check(name, cond, detail) {
     weights: S.weights.length,
     shake: S.myFoods.some((m) => /post-workout shake/i.test(m.name)),
   }));
-  check('38 imported sessions + the re-entered 10 August push', boot.sessions === 39, boot.sessions);
+  check('38 imported sessions, the 10 August push and the first VO2max block', boot.sessions === 40, boot.sessions);
   check('11 supplements seeded, including the shake', boot.supps === 11, boot.supps);
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
@@ -578,8 +578,13 @@ function check(name, cond, detail) {
     g.stats = routineStats(rt.exIds);
     const id = rt.exIds[0];
     const rx = prescribe(id);
-    g.tag = rx.tag; g.sets = rx.sets.length; g.mins = rx.sets[0].r;
-    g.hrInWhy = /158-177/.test(rx.why);
+    g.tag = rx.tag; g.sets = rx.sets.length;
+    /* the plan no longer pre-fills reps: 4 minutes is the same every session and
+       carries no information, so that column holds the peak heart rate now. The
+       protocol still has to be stated in the copy. */
+    g.mins = rx.sets[0].r;
+    g.minsInWhy = /4 × 4 min hard/.test(rx.why);
+    g.hrInWhy = /\b\d{3}-\d{3} bpm\b/.test(rx.why) && /full band is 167-177/.test(rx.why);
     g.hrMax = hrMax();
     // all four modalities carry the protocol
     g.modalities = ['bike', 'rower', 'SkiErg', 'incline walk'].map((m) => {
@@ -623,8 +628,9 @@ function check(name, cond, detail) {
   });
   check('the 4×4 routine exists', ivt.routine);
   check('it estimates ~28 min over 4 intervals, not a flat cardio guess', ivt.stats.mins >= 25 && ivt.stats.mins <= 32 && ivt.stats.sets === 4, ivt.stats);
-  check('it prescribes 4 work bouts of 4 minutes', ivt.tag === 'intervals' && ivt.sets === 4 && ivt.mins === 4, ivt);
-  check('heart-rate target from Tanaka (186 max, 158-177 band)', ivt.hrMax === 186 && ivt.hrInWhy, ivt);
+  check('it prescribes 4 work bouts of 4 minutes', ivt.tag === 'intervals' && ivt.sets === 4 && ivt.minsInWhy, ivt.why);
+  check('the reps column is left blank for the peak heart rate', ivt.mins === '', ivt.mins);
+  check('heart-rate target from Tanaka (186 max, full band 167-177)', ivt.hrMax === 186 && ivt.hrInWhy, ivt.why);
   check('all four modalities carry the protocol', ivt.modalities.every(Boolean), ivt.modalities);
   check('ordinary cardio still gets the steady prescription', ivt.plainCardio === 'steady', ivt.plainCardio);
   check('no age falls back to words, never NaN', ivt.noAgeSafe);
@@ -834,6 +840,53 @@ function check(name, cond, detail) {
     bmi.edge.join('|') === 'Overweight|Normal|Obese|Overweight', bmi.edge);
   check('underweight band works', bmi.under === 'Underweight', bmi.under);
   check('missing height prompts instead of rendering NaN', bmi.missingHandled, bmi.missingHandled);
+
+  console.log('VO2max intervals: the on-ramp, the recovery floor and the verdict');
+  const iv = await page.evaluate(() => {
+    const bike = S.exercises.find((e) => e.name === 'VO2max 4×4 (bike)').id;
+    const ses = S.sessions.filter((s) => /VO2max/.test(s.name));
+    const first = ses[0];
+    const keep = S.sessions.slice();
+    /* the ramp is driven by how many interval sessions are logged, so walk it */
+    const bands = [];
+    S.sessions = keep.filter((s) => !/VO2max/.test(s.name));
+    for (let n = 0; n <= 4; n++) {
+      const t = hrTarget();
+      bands.push([t.lo, t.hi]);
+      S.sessions = S.sessions.concat([{ id: 'x' + n, name: 'VO2max intervals (4×4)', date: today(), ex: [{ exId: bike, sets: [] }] }]);
+    }
+    S.sessions = keep;
+    const rx = prescribe(bike);
+    const t = hrTarget();
+    return {
+      logged: ses.length,
+      /* per-interval peak HR, not a constant 4 minutes */
+      hrs: first ? first.ex[0].sets.map((s) => s.r) : [],
+      noFakeDistance: first ? first.ex[0].sets.every((s) => !s.w) : false,
+      noteHonest: first ? /estimate/i.test(first.note) && /16\.42/.test(first.note) : false,
+      bands,
+      planBlank: rx.sets.every((s) => s.r === '' && s.w === ''),
+      why: rx.why,
+      verdicts: [hrVerdict(120).k, hrVerdict(145).k, hrVerdict(155).k, hrVerdict(200).k],
+      recovery: [t.recLo, t.recHi],
+      allHaveLever: Object.keys(EX_IV).every((k) => !!EX_IV[k].lever),
+    };
+  });
+  check('the first VO2max session is logged with per-interval peak HR',
+    iv.logged === 1 && iv.hrs.join(',') === '140,140,145,151', iv.hrs);
+  check('no per-interval distance invented from a flywheel total', iv.noFakeDistance);
+  check('the note says what was measured and what was estimated', iv.noteHonest);
+  check('the target band ramps over four sessions, then holds at 90-95%',
+    JSON.stringify(iv.bands) === JSON.stringify([[149, 162], [149, 162], [158, 167], [158, 167], [167, 177]]), iv.bands);
+  check('the prescription leaves both columns blank to fill, not pre-filled with 4', iv.planBlank);
+  check('the prescription names the recovery floor and the in-interval step-ups',
+    /112-130/.test(iv.why) && /2:00/.test(iv.why) && /do not stop/.test(iv.why), iv.why.slice(0, 80));
+  check('the prescription names the machine lever, not the console number',
+    /[Rr]esistance, not speed/.test(iv.why) && /Ignore the distance/.test(iv.why));
+  check('every interval machine has its own lever cue', iv.allHaveLever);
+  check('recovery floor is 60-70% of max', iv.recovery.join('-') === '112-130', iv.recovery);
+  check('the verdict reads under / near / in / over correctly',
+    iv.verdicts.join(',') === 'under,near,in,over', iv.verdicts);
 
   /* The gap that prompted all this was not "the food is missing" — half the
      time the row existed and the search could not find it. So the assertion is
