@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "CoachZ: personal health coach",
   "short_name": "CoachZ",
   "description": "Workouts, food, water, sleep and body, coached from one private app. All data stays on your device.",
@@ -8,6 +9,7 @@
   "orientation": "portrait",
   "background_color": "#0e1214",
   "theme_color": "#0e1214",
+  "categories": ["health", "fitness", "lifestyle"],
   "icons": [
     {
       "src": "icon-192.png",
@@ -32,6 +34,36 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/01-today.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Today: training, food, water and sleep on one screen"
+    },
+    {
+      "src": "screenshots/02-workout.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Every set prescribed from your own history"
+    },
+    {
+      "src": "screenshots/06-report.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "The weekly report across all five qualities"
+    },
+    {
+      "src": "screenshots/07-longevity.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Longevity tests read against your age band"
     }
   ]
 }

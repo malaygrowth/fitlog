@@ -889,6 +889,18 @@ function check(name, cond, detail) {
       powRest: exRest(jump),
       powNoWeightAdvice: !/pick a weight/.test(rx('Box jump').why) && /gets slower/.test(rx('Box jump').why),
       powerCount: S.exercises.filter((e) => e.group === 'Power').length,
+      /* the weight column on a box jump holds centimetres; counting it as
+         tonnage added 240 kg to the week for four jumps */
+      powerNoVolume: (() => {
+        const keepS = S.sessions.slice(), keepA = S.active;
+        startSession(); closeSheet();
+        addExToSession(jump);
+        setVal(0, 0, 'w', '60'); setVal(0, 0, 'r', '4'); toggleSet(0, 0); restSkip();
+        finishSession(); closeSheet();
+        const v = S.sessions[S.sessions.length - 1].vol;
+        S.sessions = keepS; S.active = keepA; save();
+        return v === 0;
+      })(),
       /* the four longevity tests + range, read in both directions */
       bands: {
         hangLow: testBand('hang', 15).label, hangHigh: testBand('hang', 65).label,
@@ -919,6 +931,8 @@ function check(name, cond, detail) {
   check('power is prescribed by quality: low reps, long rest',
     pil.powScheme.lo === 3 && pil.powScheme.hi === 6 && pil.powRest >= 120, [pil.powScheme, pil.powRest]);
   check('a power library exists', pil.powerCount >= 10, pil.powerCount);
+  check('power contributes no tonnage: a jump height is not a weight',
+    pil.powerNoVolume, pil.powerNoVolume);
   check('longevity bands read low and high correctly',
     pil.bands.hangLow === 'Below average' && pil.bands.hangHigh === 'Excellent'
     && pil.bands.gaitClinical === 'Below average' && pil.bands.stsGood === true, pil.bands);

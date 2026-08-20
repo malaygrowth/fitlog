@@ -1,0 +1,3 @@
+# publish.sh output — a build artefact, rebuilt by ./publish.sh on demand.
+# The screenshots under store/ ARE committed: they are deliverables.
+site/
