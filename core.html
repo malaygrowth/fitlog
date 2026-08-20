@@ -458,7 +458,12 @@
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
 const APP_VER='2.2.0';
-const K='fitlog.v1';
+/* localStorage is scoped to the ORIGIN, not the path. The public build is served
+   from the root of malaygrowth.github.io and the personal one from /fitlog/ on
+   the same host, so a shared key would put both apps in one store: the public
+   app would boot into forty real sessions and run its PUB-gated migrations over
+   them. Different key, different app, same origin. */
+const K = PUB ? 'coachz.v1' : 'fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
   ['Squat','Legs'],['Leg press','Legs'],['Romanian deadlift','Legs'],['Lunges','Legs'],['Calf raise','Legs'],
@@ -4365,7 +4370,10 @@ function finishSession(){
     let exPR=null;
     e.sets.forEach(function(s){
       nSets++;
-      if(g==='Cardio'||s.wu) return;
+      /* Power is excluded alongside Cardio: its weight column holds a jump
+         height or a throw distance, so counting it as tonnage adds "240 kg"
+         to the week for four box jumps. Neither group has tonnage to report. */
+      if(g==='Cardio'||g==='Power'||s.wu) return;
       const w=+s.w||0, r=+s.r||0, est=est1RM(w,r);
       vol+=w*r;
       if(tmd){

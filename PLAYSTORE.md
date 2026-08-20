@@ -1,102 +1,222 @@
-# Launching CoachZ on the Google Play Store — step by step
+# Shipping CoachZ to Google Play
 
-CoachZ is a PWA, so it goes to Play as a **Trusted Web Activity (TWA)** — a thin
-Android wrapper around the hosted web app. The `public` branch is the build to
-ship (onboarding, no personal data). Total cost: **$25 one-time** (Play Console).
+CoachZ is a PWA, so it goes to Play as a **Trusted Web Activity** — a thin
+Android wrapper around a hosted web app. Total cost: **$25 once** (Play Console).
 
-## Phase 0 — Decide the public URL
+**Decisions already made, and baked into the files:**
 
-The TWA points at a live HTTPS URL serving the **public build**. Options:
-- **A (free):** a second GitHub Pages site — e.g. repo `coachz-app` (or Pages
-  from the `public` branch at a separate repo) → `https://malaygrowth.github.io/coachz/`.
-  Note: your personal app stays at `/fitlog/` untouched.
-- **B (recommended before launch):** a custom domain (e.g. `coachz.fit`,
-  ~₹800/yr) pointed at Pages. Looks professional on the listing and in the URL bar
-  fallback.
+| | |
+|---|---|
+| Origin | `https://malaygrowth.github.io/` — a repo named exactly `malaygrowth.github.io` |
+| Application ID | `fit.coachz.app` — **permanent**, cannot change after publication |
+| Storage key | the public build uses `coachz.v1`, the personal one `fitlog.v1` |
 
-## Phase 1 — Digital Asset Links (proves you own the site)
+The origin has to be a **root**, not a subfolder: a TWA only reads
+`.well-known/assetlinks.json` from the origin root, so `…github.io/fitlog/`
+could not host its own. That is also why the storage keys differ — localStorage
+is scoped to the origin, not the path, so the public app at `/` and the personal
+app at `/fitlog/` would otherwise share one store.
 
-TWAs require `https://<ORIGIN>/.well-known/assetlinks.json`.
-For `malaygrowth.github.io/...` the ORIGIN is `malaygrowth.github.io`, so:
+---
 
-1. Create a repo named exactly **`malaygrowth.github.io`** (this becomes your
-   user site at that origin's root).
-2. Add the file `.well-known/assetlinks.json` (content comes from Phase 2 —
-   Bubblewrap prints it, including your app's SHA-256 signing fingerprint).
-3. Enable Pages on that repo (main / root). Verify the file loads at
-   `https://malaygrowth.github.io/.well-known/assetlinks.json`.
+## What is already done
 
-(With a custom domain, the file lives at that domain's root instead.)
+- `./publish.sh` builds `site/` — the exact folder to serve. Public build,
+  manifest, icons, privacy page, service worker, 125 exercise photos,
+  `.nojekyll`, `.well-known/assetlinks.json`, and the screenshots the manifest
+  references. No source files.
+- `./tools/assetlinks.sh` writes the real asset-links file from your keystore.
+- `./tools/shots.cjs` regenerates the ten store screenshots at 1080×1920.
+- `store/screenshots/` — ten screenshots, ready to upload.
+- Listing copy, data-safety and content-rating answers — below, ready to paste.
 
-## Phase 2 — Package the TWA with Bubblewrap (on your laptop)
+## What only you can do
 
-Prereqs: Node 18+, and Bubblewrap will auto-install JDK + Android SDK on first run.
+Play Console account, the signing keystore, the GitHub repo, the upload, and the
+twelve testers. None of it can be done from here.
+
+**Still needed and not built:** a **1024×500 feature graphic**. Play will not
+accept a store listing without one.
+
+---
+
+## 1. Put the site live
+
+```bash
+./publish.sh
+```
+
+Create a repo named **exactly** `malaygrowth.github.io` under your account, copy
+the *contents* of `site/` into its root, commit, push. Settings → Pages → deploy
+from `main` / root.
+
+Check, in a browser:
+- `https://malaygrowth.github.io/` — the app, opening on the onboarding sheet
+- `https://malaygrowth.github.io/privacy.html`
+- `https://malaygrowth.github.io/.well-known/assetlinks.json`
+
+Your personal app at `/fitlog/` is untouched and keeps its own storage.
+
+## 2. Build the Android wrapper
 
 ```bash
 npm i -g @bubblewrap/cli
 mkdir coachz-twa && cd coachz-twa
-bubblewrap init --manifest https://<YOUR-PUBLIC-URL>/manifest.webmanifest
+bubblewrap init --manifest https://malaygrowth.github.io/manifest.webmanifest
 ```
-Answer the prompts:
-- Application ID: `io.growleads.coachz` (reverse-domain, permanent — choose carefully)
-- Name / short name: CoachZ
-- Colors & icons: auto-read from the manifest (PNG icons are already in place)
-- Signing key: let it **create a new keystore** — set real passwords and
-  **BACK UP `android.keystore` + passwords somewhere safe. Lose it = you can
-  never update the app again.**
+
+At the prompts: Application ID **`fit.coachz.app`**, name CoachZ, and let it
+**create a new keystore**.
+
+> **Back up `android.keystore` and its passwords in two places before going
+> further.** Lose them and you can never update the app again — not a re-upload,
+> not a support ticket. A new key means a new listing.
 
 ```bash
 bubblewrap build
 ```
-Outputs: `app-release-signed.apk` (for local testing) and
-**`app-release-bundle.aab`** (what you upload to Play). It also prints the
-`assetlinks.json` content → put that into the Phase 1 repo now.
-Test locally: `adb install app-release-signed.apk` — the app must open
-full-screen with **no browser bar** (that's asset links working).
 
-## Phase 3 — Play Console setup
+Produces `app-release-signed.apk` (local testing) and `app-release-bundle.aab`
+(what Play wants).
 
-1. https://play.google.com/console → create a **personal developer account**
-   ($25, ID verification takes 1–2 days).
-2. **Create app** → App name: CoachZ · Type: App · Free.
-3. **Store listing:**
-   - Short description (80 chars): "Workouts, food, water & sleep — coached from one private app."
-   - Full description: features + "all data stays on your device".
-   - App icon: `icon-512.png` · Feature graphic: 1024×500 (make from the brand)
-   - Phone screenshots: at least 2 (use the app screenshots — dashboard,
-     workout, progress, food).
-4. **Privacy policy URL:** `https://<YOUR-PUBLIC-URL>/privacy.html` (already built).
-5. **Data safety form:** "Does your app collect or share user data?" → **No**.
-   (True: no accounts, no transmission, no analytics.)
-6. **Content rating questionnaire:** Health & Fitness → all "No" → rated Everyone.
-7. **Target audience:** 18+ (simplest for a fitness app).
-8. App access: "All functionality available without special access".
+## 3. Asset links — the step that fails silently
 
-## Phase 4 — Testing requirement (new personal accounts)
+```bash
+cd ../fitlog
+./tools/assetlinks.sh ~/coachz-twa/android.keystore android
+./publish.sh
+```
 
-Google requires new personal accounts to run a **closed test with at least 12
-testers opted-in for 14 consecutive days** before production access:
-1. Release → Testing → Closed testing → create track, upload the `.aab`.
-2. Add tester emails (friends/family/gym buddies — 12+), share the opt-in link.
-3. After 14 days, apply for Production access in the console.
+Push the site repo again. The fingerprint is 32 hex pairs; get one character
+wrong and nothing errors anywhere — the app just opens with a browser address
+bar forever. That is why the script extracts it rather than asking you to type it.
 
-## Phase 5 — Production
+If you enable **Play App Signing** (the default), Play re-signs with *its* key,
+so the fingerprint that matters is the one under **Setup → App signing** in the
+console. Take it from there and run:
 
-Promote the tested release to Production → countries (India first or worldwide)
-→ submit for review (typically 1–7 days). Done: CoachZ is on the Play Store.
+```bash
+./tools/assetlinks.sh --fingerprint "AA:BB:…"
+```
 
-## Updating the app after launch
+Test before uploading: `adb install app-release-signed.apk`. The app must open
+full-screen with **no browser bar**. A browser bar means asset links are wrong.
 
-Web content updates (features, fixes) ship instantly — just push to the public
-branch; the TWA loads the live site. You only rebuild/re-upload the `.aab` when
-the *wrapper* changes (icon, name, URL, or Play's target-API bumps ~once a year).
+## 4. Play Console
 
-## Pre-launch checklist
+Create app → CoachZ · App · Free.
 
-- [ ] Public URL live, serves public build (onboarding on fresh device)
-- [ ] `privacy.html` reachable
-- [ ] `assetlinks.json` at origin root with correct SHA-256
-- [ ] Keystore + passwords backed up (twice)
-- [ ] `test/public.cjs` and `test/smoke.cjs` green
-- [ ] Screenshots + feature graphic exported
+**Short description** (80 max, this is 74):
+
+```
+Workouts, food, water and sleep — coached, private, all on your phone.
+```
+
+**Full description:**
+
+```
+CoachZ is a coach, not a spreadsheet. It reads what you have already done and
+tells you what to do next — every set, every weight, every rep.
+
+TRAINING THAT PROGRESSES ITSELF
+Each set arrives with a target weight and rep range worked out from your own
+history. Sleep badly or drop weight and it holds the load steady instead of
+pushing. Miss a day and it tells you whether the week still needs that session.
+
+THE FIVE QUALITIES, NOT JUST THE ONE
+Strength is the easy one to track, so most apps stop there. CoachZ also covers
+aerobic base and VO2max intervals, power and agility, flexibility you can
+measure, and four longevity field tests — grip, balance, sit-to-stand and
+walking speed — read against your age band. The weekly report shows all five at
+a glance, so you can see the quality you have been quietly skipping.
+
+FOOD THAT KNOWS WHAT YOU ACTUALLY EAT
+550+ foods with an Indian-first database: sabzis, dals, thalis, street food,
+café menus, branded packets. Search in whichever name you use — cucumber finds
+kheera, okra finds bhindi, pattod finds it however you spell it. Nothing
+matched? Estimate it from six dish shapes in two taps, and it is marked as an
+estimate so you always know which numbers you measured.
+
+EVIDENCE, GRADED HONESTLY
+Every protocol and supplement carries an evidence tier, including the ones that
+do not hold up. Where a popular protocol is weaker than its reputation, it says
+so.
+
+ALSO: water, sleep and sleep regularity, breathwork, morning daylight, caffeine
+timing, a supplement schedule with doses and the gaps that matter, BMI on both
+ICMR and WHO cutoffs, measurements, progress photos, barcode scanning, timers
+and a plate calculator.
+
+COMPLETELY PRIVATE
+No account. No sign-up. No servers. Nothing leaves your phone — there is no
+analytics, no tracking, and nowhere for your data to go. Export a backup any
+time; it is a file on your device that only you can read.
+
+Not medical advice. If something hurts, see a doctor.
+```
+
+**Assets:**
+- App icon: `icon-512.png`
+- Feature graphic: 1024×500 — **still to make**
+- Phone screenshots: `store/screenshots/` (upload at least 2 of the 10)
+
+**Privacy policy URL:** `https://malaygrowth.github.io/privacy.html`
+
+**Data safety form** — every answer is "no", and it is true:
+
+| Question | Answer |
+|---|---|
+| Does your app collect or share any user data? | **No** |
+| Is all user data encrypted in transit? | N/A — nothing is transmitted |
+| Can users request data deletion? | N/A — Settings → Erase all data, held only on device |
+
+**Content rating:** category Health & Fitness. No violence, no sexual content,
+no profanity, no gambling, no user-generated content, no data sharing. Comes out
+as Everyone / PEGI 3.
+
+**Target audience:** 18+ — simplest for a fitness app, and it avoids the extra
+families-policy requirements.
+
+**App access:** all functionality available without special access.
+
+**Ads:** no.
+
+## 5. Twelve testers, fourteen days
+
+New personal developer accounts must run a closed test with **at least 12
+testers opted in for 14 consecutive days** before production access unlocks.
+
+Release → Testing → Closed testing → create a track → upload the `.aab` → add
+12+ tester emails → share the opt-in link. They must actually opt in and keep
+the app installed for the full fourteen days.
+
+## 6. Production
+
+Promote the tested release → pick countries → submit. Review is typically 1–7
+days.
+
+---
+
+## Updating after launch
+
+Web changes ship instantly — `./publish.sh`, push the site repo, done. The TWA
+loads the live site, so features and fixes need no Play release at all.
+
+Rebuild and re-upload the `.aab` only when the *wrapper* changes: icon, name,
+origin, or Play's annual target-API bump.
+
+## Checklist
+
+- [ ] `site/` live at the origin root, opening on onboarding on a fresh phone
+- [ ] `privacy.html` and `.well-known/assetlinks.json` both load
+- [ ] Keystore and passwords backed up twice
+- [ ] APK installs and opens with **no browser bar**
+- [ ] `node test/smoke.cjs` and `node test/public.cjs` green
+- [ ] Feature graphic made
 - [ ] 12 testers lined up
+
+## Not covered
+
+**iOS.** A different route — Safari's PWA support is weaker, and Apple
+scrutinises health apps more heavily. Worth treating as a separate project once
+Play is live.

@@ -76,6 +76,14 @@ async function freshOnboard(page, { goal, diet, plan, w = 70, h = 175, age = 30,
   await page.waitForTimeout(1800);
   const boot = await page.evaluate((PERSONAL) => ({
     pub: !!window.PUBLIC_BUILD,
+    key: K,
+    isolated: (function(){
+      localStorage.setItem('fitlog.v1', JSON.stringify({sessions:[{id:'personal'}]}));
+      const mine = JSON.parse(localStorage.getItem(K) || '{}');
+      const leaked = (mine.sessions || []).some(function(s){ return s.id === 'personal'; });
+      localStorage.removeItem('fitlog.v1');
+      return !leaked;
+    })(),
     sessions: S.sessions.length,
     weights: S.weights.length,
     breaks: S.breaks.length,
@@ -90,6 +98,12 @@ async function freshOnboard(page, { goal, diet, plan, w = 70, h = 175, age = 30,
     leaks: PERSONAL.filter((p) => JSON.stringify(S).toLowerCase().includes(p.toLowerCase())),
   }), PERSONAL);
   check('PUBLIC_BUILD flag set', boot.pub);
+  /* the two builds share an origin on GitHub Pages (root vs /fitlog/), and
+     localStorage is scoped to the origin rather than the path — so this is the
+     assertion that keeps the public app out of the personal store */
+  check('the public build has its own storage key', boot.key === 'coachz.v1', boot.key);
+  check('a store written by the personal build is invisible to the public one',
+    boot.isolated, boot.isolated);
   check('no personal sessions', boot.sessions === 0, boot.sessions);
   check('no personal weights', boot.weights === 0, boot.weights);
   check('no wedding break', boot.breaks === 0, boot.breaks);
@@ -332,7 +346,7 @@ async function freshOnboard(page, { goal, diet, plan, w = 70, h = 175, age = 30,
   console.log('upgrade path for an already-installed public user');
   const upgraded = await page.evaluate(() => {
     /* an install from before the launch work: old routine names, two supplements */
-    const old = JSON.parse(localStorage.getItem('fitlog.v1'));
+    const old = JSON.parse(localStorage.getItem(K));
     old.schemaVersion = 23;
     old.seedV24 = undefined; delete old.seedV24;
     old.routines = old.routines.map((r) => {
@@ -340,7 +354,7 @@ async function freshOnboard(page, { goal, diet, plan, w = 70, h = 175, age = 30,
       return back[r.name] ? Object.assign({}, r, { name: back[r.name] }) : r;
     });
     old.supps = old.supps.slice(0, 2);
-    localStorage.setItem('fitlog.v1', JSON.stringify(old));
+    localStorage.setItem(K, JSON.stringify(old));
     return true;
   });
   await page.goto(APP); await page.waitForTimeout(1200);
@@ -348,7 +362,7 @@ async function freshOnboard(page, { goal, diet, plan, w = 70, h = 175, age = 30,
     names: S.routines.map((r) => r.name),
     supps: S.supps.length,
     planIntact: Object.keys(S.plan).filter((k) => S.plan[k]).length,
-    snapshot: !!localStorage.getItem('fitlog.v1.bak'),
+    snapshot: !!localStorage.getItem(K + '.bak'),
   }));
   check('an old public store gets its routine names rewritten', upgraded &&
     !after.names.some((n) => /wrist-safe|Hyrox/i.test(n)), after.names.filter((n) => /wrist-safe|Hyrox/i.test(n)));
