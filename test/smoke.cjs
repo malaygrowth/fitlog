@@ -15,6 +15,12 @@ const SCHEMA = +require('fs')
   .readFileSync(path.resolve(__dirname, '..', 'core.html'), 'utf8')
   .match(/const SCHEMA=(\d+)/)[1];
 
+/* every pillar met its own threshold: strong>=2, healthy>=150 min, agile>=1,
+   flexible>=2, longevity>=1 */
+function PILLARS_OK(p) {
+  return p.strong >= 2 && p.healthy >= 150 && p.agile >= 1 && p.flexible >= 2 && p.longevity >= 1;
+}
+
 let failures = 0;
 function check(name, cond, detail) {
   if (cond) { console.log('  ✓ ' + name); }
@@ -840,6 +846,97 @@ function check(name, cond, detail) {
     bmi.edge.join('|') === 'Overweight|Normal|Obese|Overweight', bmi.edge);
   check('underweight band works', bmi.under === 'Underweight', bmi.under);
   check('missing height prompts instead of rendering NaN', bmi.missingHandled, bmi.missingHandled);
+
+  console.log('the five pillars');
+  const pil = await page.evaluate(() => {
+    const byName = (n) => (S.exercises.find((e) => e.name === n) || {}).id;
+    const rx = (n) => prescribe(byName(n));
+    const z2 = rx('Zone 2 (bike)'), thr = rx('Threshold 4×8 (bike)'), vo2 = rx('VO2max 4×4 (bike)');
+    const jump = byName('Box jump');
+    /* a week built to contain exactly the five, then one built to contain two */
+    const keep = S.sessions.slice(), keepT = (S.tests || []).slice();
+    const ws = wkMonday(today());
+    const ses = (day, names) => ({ id: 'p' + day, name: 'x', date: dShift(ws, day), vol: 0, prs: [],
+      ex: names.map((n) => ({ exId: byName(n), sets: [{ w: '', r: 45, done: true }] })) });
+    /* four zone 2 rides, because 150 min a week is the threshold and three
+       forty-five-minute sessions is 135 — the fixture has to clear the bar the
+       guideline actually sets, not the one that makes the test pass */
+    S.sessions = [
+      ses(0, ['Bench press', 'Zone 2 (bike)']), ses(1, ['Squat']),
+      ses(2, ['Box jump', 'Zone 2 (bike)']), ses(3, ['Cat-cow']), ses(4, ['Couch stretch']),
+      ses(5, ['Zone 2 (bike)']), ses(6, ['Zone 2 (bike)']),
+    ];
+    S.tests = [{ date: today(), key: 'hang', val: 50 }];
+    const full = pillarWeek(ws);
+    S.sessions = [ses(0, ['Bench press']), ses(1, ['Squat'])];
+    S.tests = [];
+    const thin = pillarWeek(ws);
+    S.sessions = keep; S.tests = keepT;
+    return {
+      /* each type gets its own band and never the other's */
+      z2Band: [hrTarget('z2').lo, hrTarget('z2').hi],
+      thrBand: [hrTarget('thr').lo, hrTarget('thr').hi],
+      vo2Band: [hrTarget('vo2').lo, hrTarget('vo2').hi],
+      z2Block: z2.sets.length === 1 && /continuous/.test(z2.why),
+      z2NoIntervalBand: !/167-177/.test(z2.why) && /112-130/.test(z2.why),
+      thrRounds: thr.sets.length === 4 && /8 min hard/.test(thr.why),
+      vo2Rounds: vo2.sets.length === 4 && /4 min hard/.test(vo2.why),
+      levers: ['Zone 2 (bike)', 'Threshold 4×8 (bike)', 'VO2max 4×4 (bike)'].every((n) => /Resistance, not speed/.test(rx(n).why)),
+      z2TooHard: hrVerdict(150, 'z2').k,
+      /* power: quality scheme, long rest, its own copy */
+      powTag: rx('Box jump').tag,
+      powScheme: schemeFor(jump),
+      powRest: exRest(jump),
+      powNoWeightAdvice: !/pick a weight/.test(rx('Box jump').why) && /gets slower/.test(rx('Box jump').why),
+      powerCount: S.exercises.filter((e) => e.group === 'Power').length,
+      /* the four longevity tests + range, read in both directions */
+      bands: {
+        hangLow: testBand('hang', 15).label, hangHigh: testBand('hang', 65).label,
+        gaitClinical: testBand('gait', 0.7).label,
+        stsGood: testBand('sts', 25).ok,
+        shoulderBigGap: testBand('shoulder', 12).label,
+        shoulderSmallGap: testBand('shoulder', 1).label,
+      },
+      roundTrip: (() => { saveTest('balance', 21); const l = lastTest('balance'); saveTest('balance', 24);
+        return l.val === 21 && lastTest('balance').val === 24 && testHistory('balance').length === 1; })(),
+      full, thin,
+      routines: S.routines.map((r) => r.name),
+      noHyrox: !S.routines.some((r) => /hyrox/i.test(r.name)) && !JSON.stringify(PROGRAM).match(/hyrox/i),
+      kitSurvived: ['Wall balls', 'Rowing (erg)', 'SkiErg', 'Sandbag lunges'].every((n) => !!byName(n)),
+      protos: PROTOCOLS.map((p) => p[0]),
+    };
+  });
+  check('each cardio type has its own band, none borrowing another',
+    pil.z2Band.join('-') === '112-130' && pil.thrBand.join('-') === '149-164' && pil.vo2Band.join('-') === '149-162',
+    [pil.z2Band, pil.thrBand, pil.vo2Band]);
+  check('zone 2 is one continuous block, never prescribed as rounds', pil.z2Block);
+  check('zone 2 never shows the interval band', pil.z2NoIntervalBand);
+  check('threshold and VO2max keep their own round shapes', pil.thrRounds && pil.vo2Rounds);
+  check('every bike session names the same machine lever', pil.levers);
+  check('going too hard on an easy day is flagged, not praised', pil.z2TooHard === 'over', pil.z2TooHard);
+  check('power gets its own prescription, not the lifting default',
+    pil.powTag === 'power' && pil.powNoWeightAdvice, pil.powTag);
+  check('power is prescribed by quality: low reps, long rest',
+    pil.powScheme.lo === 3 && pil.powScheme.hi === 6 && pil.powRest >= 120, [pil.powScheme, pil.powRest]);
+  check('a power library exists', pil.powerCount >= 10, pil.powerCount);
+  check('longevity bands read low and high correctly',
+    pil.bands.hangLow === 'Below average' && pil.bands.hangHigh === 'Excellent'
+    && pil.bands.gaitClinical === 'Below average' && pil.bands.stsGood === true, pil.bands);
+  check('a smaller-is-better test is not read upside down',
+    pil.bands.shoulderBigGap === 'Below average' && pil.bands.shoulderSmallGap === 'Excellent', pil.bands);
+  check('a test saves, reads back, and re-testing the same day replaces rather than duplicates', pil.roundTrip);
+  check('a week containing all five reports all five',
+    PILLARS_OK(pil.full), pil.full);
+  check('a week containing two reports exactly two',
+    pil.thin.strong >= 2 && pil.thin.agile === 0 && pil.thin.flexible === 0 && pil.thin.longevity === 0, pil.thin);
+  check('the new routines are seeded',
+    ['Zone 2 base (~45 min)', 'Threshold 4×8', 'Power & agility (~20 min)', 'Balance & bone (~10 min)', 'Deep flexibility (~20 min)']
+      .every((n) => pil.routines.includes(n)), pil.routines);
+  check('nothing Hyrox-specific remains in routines or the phase ladder', pil.noHyrox);
+  check('the conditioning kit survived the rename', pil.kitSurvived);
+  check('protocols cover grip, balance, power, bone and stretching',
+    ['Grip strength as a marker', 'Balance training', 'Power and jump training', 'Impact loading for bone', 'Stretching for range']
+      .every((n) => pil.protos.includes(n)), pil.protos.slice(0, 6));
 
   console.log('VO2max intervals: the on-ramp, the recovery floor and the verdict');
   const iv = await page.evaluate(() => {
