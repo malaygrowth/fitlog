@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "fit.coachz.app",
+      "sha256_cert_fingerprints": [
+        "REPLACE_ME_RUN_tools/assetlinks.sh_AFTER_BUBBLEWRAP_CREATES_THE_KEYSTORE"
+      ]
+    }
+  }
+]

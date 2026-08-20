@@ -315,6 +315,7 @@
   @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} #splash{display:none} }
 
   .empty{color:var(--ink3); font-size:14px; text-align:center; padding:18px 8px}
+  .seg.three{grid-template-columns:1fr 1fr 1fr}
   .seg{display:grid; grid-template-columns:1fr 1fr; gap:6px; background:var(--raised); border:1px solid var(--line); border-radius:12px; padding:4px}
   .seg button{padding:8px; border-radius:9px; font-family:var(--fd-disp); font-weight:600; font-size:13px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink2)}
   .seg button.on{background:var(--bg); color:var(--ink)}
@@ -457,7 +458,12 @@
 /* ============ state ============ */
 const PUB = !!window.PUBLIC_BUILD;
 const APP_VER='2.2.0';
-const K='fitlog.v1';
+/* localStorage is scoped to the ORIGIN, not the path. The public build is served
+   from the root of malaygrowth.github.io and the personal one from /fitlog/ on
+   the same host, so a shared key would put both apps in one store: the public
+   app would boot into forty real sessions and run its PUB-gated migrations over
+   them. Different key, different app, same origin. */
+const K = PUB ? 'coachz.v1' : 'fitlog.v1';
 const DEF_EX=[
   ['Bench press','Chest'],['Incline dumbbell press','Chest'],['Push-ups','Chest'],
   ['Squat','Legs'],['Leg press','Legs'],['Romanian deadlift','Legs'],['Lunges','Legs'],['Calf raise','Legs'],
@@ -485,6 +491,26 @@ const DEF_EX=[
      comparable, so they must not share a history */
   ['VO2max 4×4 (bike)','Cardio'],['VO2max 4×4 (rower)','Cardio'],
   ['VO2max 4×4 (SkiErg)','Cardio'],['VO2max 4×4 (incline walk)','Cardio'],
+  /* the easy end and the middle. Without their own entries the coach could not
+     tell a long easy ride from a set of intervals and prescribed the interval
+     band for both, which makes the easy day too hard and the hard day too easy */
+  ['Zone 2 (bike)','Cardio'],['Zone 2 (rower)','Cardio'],['Zone 2 (walk/run)','Cardio'],
+  ['Threshold 4×8 (bike)','Cardio'],['Threshold 4×8 (rower)','Cardio'],['Threshold 4×8 (run)','Cardio'],
+  /* Power. Separate from Conditioning on purpose: conditioning is about how
+     long you can keep going, power is about how fast you can produce force,
+     and it declines roughly twice as fast with age as strength does. It is
+     also the impact loading that keeps bone density up. */
+  ['Pogo hops','Power'],['Skater bounds','Power'],['Box jump','Power'],
+  ['Depth drop landing','Power'],['Countermovement jump','Power'],
+  ['Med-ball slam','Power'],['Med-ball rotational throw','Power'],
+  ['Med-ball chest pass','Power'],['A-skip','Power'],['Lateral shuffle','Power'],
+  ['Sprint 20 m','Power'],['Single-leg hop (control)','Power'],
+  /* end-range work: what turns range you can be put into into range you can
+     actually produce. Passive stretching alone does not do this. */
+  ['Jefferson curl (light)','Mobility'],['Loaded hamstring stretch','Mobility'],
+  ['End-range hip lift (90/90)','Mobility'],['Shoulder CARs','Mobility'],
+  ['Hip CARs','Mobility'],['Copenhagen plank','Mobility'],
+  ['Single-leg balance (eyes closed)','Mobility'],['Tandem stance','Mobility'],
   ['Wall balls','Conditioning'],['Burpee broad jump','Conditioning'],
   ['Sled push','Conditioning'],['Sled pull','Conditioning'],['Sandbag lunges','Conditioning'],
   ['Dumbbell bench press','Chest'],['Decline dumbbell press','Chest'],['Goblet squat','Legs'],
@@ -500,11 +526,32 @@ const SEED_RT=[
   {name:'Legs: knee-safe return', ex:['Glute bridge','Romanian deadlift','Hip thrust','Leg curl','Calf raise','Wall sit (pain-free)']},
   {name:'Rehab: knee & wrist (~15 min)', ex:['Wrist circles & prayer stretch','Straight-leg raise','Wall sit (pain-free)','Glute bridge','Ankle rocks','Deep squat hold']},
   {name:'Conditioning: joint-friendly', ex:['Cycling','Kettlebell swing','Farmer’s carry','Glute bridge','Plank']},
-  {name:'Hyrox stations', ex:['Rowing (erg)','Wall balls','Burpee broad jump','Farmer’s carry','Sandbag lunges','Kettlebell swing']},
+  /* the kit is excellent conditioning; it just is not organised around a race */
+  {name:'Conditioning circuit', ex:['Rowing (erg)','Wall balls','Burpee broad jump','Farmer’s carry','Sandbag lunges','Kettlebell swing']},
   {name:'Mobility & flexibility (~20 min)', ex:['Cat-cow','Downward dog to cobra',"World's greatest stretch",'90/90 hip switch','Deep squat hold','Couch stretch','Standing hamstring fold','Shoulder dislocates (stick)','Cossack squat','Dead hang']},
   {name:'Agility & conditioning', ex:['Jumping jacks','High knees','Mountain climbers','Cossack squat','Bear crawl','Burpees','Kettlebell swing']},
-  {name:'VO2max intervals (4×4)', ex:['VO2max 4×4 (bike)']}
+  {name:'VO2max intervals (4×4)', ex:['VO2max 4×4 (bike)']},
+  {name:'Zone 2 base (~45 min)', ex:['Zone 2 (bike)']},
+  {name:'Threshold 4×8', ex:['Threshold 4×8 (bike)']},
+  /* Power before anything that makes you tired: these are quality reps, and a
+     fatigued jump trains the opposite of what a jump is for. */
+  {name:'Power & agility (~20 min)', ex:['Pogo hops','Countermovement jump','Skater bounds','Box jump','Med-ball slam','Med-ball rotational throw','A-skip','Sprint 20 m']},
+  {name:'Balance & bone (~10 min)', ex:['Single-leg balance (eyes closed)','Tandem stance','Pogo hops','Single-leg hop (control)','Farmer’s carry']},
+  {name:'Deep flexibility (~20 min)', ex:['Jefferson curl (light)','Loaded hamstring stretch','End-range hip lift (90/90)','Shoulder CARs','Hip CARs','Copenhagen plank','Couch stretch','Dead hang']}
 ];
+/* The four injury-specific names describe one person's wrist and knee, and the
+   Hyrox branding is a niche race. Renaming them at onboarding was too late: a
+   public user browsing Exercises before finishing setup still saw them. Applied
+   to the seed instead, so those names never exist in a public store. */
+const RT_PUB_NAME={
+  'Push: wrist-safe return':   'Push: joint-friendly',
+  'Pull: wrist-safe return':   'Pull: joint-friendly',
+  'Legs: knee-safe return':    'Legs: joint-friendly (legs)',
+  'Rehab: knee & wrist (~15 min)': 'Joint prep (~15 min)',
+  'Hyrox stations':            'Conditioning circuit',
+  'Station circuit':           'Conditioning circuit'
+};
+if(PUB) SEED_RT.forEach(function(r){ if(RT_PUB_NAME[r.name]) r.name=RT_PUB_NAME[r.name]; });
 const SEED_QK=[
   {name:'Whey (1 scoop)',kcal:130,p:24,c:4,f:2,fb:0},{name:'Casein (1 scoop)',kcal:120,p:24,c:4,f:1,fb:0},
   {name:'Milk 250ml',kcal:150,p:8,c:12,f:8,fb:0},{name:'Curd (bowl, 200g)',kcal:120,p:7,c:9,f:6,fb:0},
@@ -513,16 +560,17 @@ const SEED_QK=[
   {name:'Hung curd 150g',kcal:130,p:15,c:6,f:5,fb:0},{name:'Moong sprouts (bowl)',kcal:120,p:9,c:18,f:1,fb:6},
   {name:'Peanuts 30g',kcal:170,p:8,c:5,f:14,fb:2.5},
   {name:'Rajma/chole (bowl)',kcal:210,p:11,c:33,f:4,fb:8},{name:'Oats 50g + milk',kcal:330,p:14,c:45,f:9,fb:5},
+  {name:'Muesli 50g + milk',kcal:340,p:13,c:45,f:10,fb:5},
   {name:'Peanut butter (tbsp)',kcal:95,p:4,c:3,f:8,fb:1},{name:'Banana',kcal:105,p:1,c:27,f:0,fb:3}
 ];
 function defaults(){
   return {
     settings:{name:'', unit:'kg', waterGoal:3000, calGoal:2600, proteinGoal:120, carbGoal:340, fatGoal:75,
-      rest:90, fiberGoal:30, height:(PUB?'':'176'), goalWeight:(PUB?'':'68'), waterRemind:true, waterEvery:75, workoutRemind:'',
+      rest:90, fiberGoal:30, diet:'veg', height:(PUB?'':'176'), goalWeight:(PUB?'':'68'), waterRemind:true, waterEvery:75, workoutRemind:'',
       sleepRemind:'22:30', sleepGoal:8, breathGoal:15, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], caff:{}, light:{}, sauna:{}, skipped:[], barcodes:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], tests:[], caff:{}, light:{}, sauna:{}, skipped:[], barcodes:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
   };
 }
 let S;
@@ -749,7 +797,7 @@ function seedV9(){
      dashboard tile with minutes and a streak (see seedV16) */
   save();
 }
-/* v5: Hyrox station exercises + routine */
+/* v5: conditioning station exercises + routine */
 function seedV5(){
   if(S.seedV5) return; S.seedV5=true;
   DEF_EX.forEach(function(e){
@@ -766,9 +814,19 @@ function seedV5(){
 /* v7: the user's actual supplement stack */
 function seedV7(){
   if(S.seedV7) return; S.seedV7=true;
+  /* A suggestion, not a prescription: the five with the strongest evidence, each
+     with a dose and a slot so the schedule, the conflict check and the 30-day
+     grid have something real to render on day one. Every one is deletable, and
+     suppInfo() shows the evidence tier next to it. */
   (PUB ? [
-    {name:'Creatine 5g: daily', kcal:0, p:0, c:0, f:0, logFood:false},
-    {name:'Whey protein (1 scoop)', kcal:130, p:24, c:4, f:2, logFood:true}
+    {name:'Creatine monohydrate', kcal:0, p:0, c:0, f:0, logFood:false, dose:'5 g', slot:'anytime'},
+    /* "protein powder", not "whey": the stack is seeded at boot, before
+       onboarding has asked how you eat, and a vegan should not open the app to
+       a dairy product already on their list. Plant blends hit the same macros. */
+    {name:'Protein powder (1 scoop)', kcal:130, p:24, c:4, f:2, logFood:true, dose:'1 scoop', slot:'post'},
+    {name:'Vitamin D3', kcal:0, p:0, c:0, f:0, logFood:false, dose:'2000 IU', slot:'morning'},
+    {name:'Vitamin B12', kcal:0, p:0, c:0, f:0, logFood:false, dose:'500 mcg', slot:'morning'},
+    {name:'Omega-3 (EPA+DHA)', kcal:0, p:0, c:0, f:0, logFood:false, dose:'2 g EPA+DHA', slot:'lunch'}
   ] : [
     {name:'Creatine 5g: GNC monohydrate', kcal:0, p:0, c:0, f:0, logFood:false},
     {name:'Whey: Avatar Malay Kulfi (1 scoop)', kcal:150, p:27.5, c:4, f:2, logFood:true},
@@ -1077,12 +1135,92 @@ function seedV23(){
   save();
 }
 
+/* v24: catches up public stores installed before the launch work. Two things:
+   the routine names, which used to be rewritten at onboarding rather than in
+   the seed, so an early install still holds "wrist-safe return" and "Hyrox
+   stations"; and the starter supplement stack, which grew from two items to
+   five. Renames keep the routine ids, so the weekly plan and every logged
+   session still point at them. Personal builds skip all of it: those names
+   describe a real wrist and a real knee. */
+function seedV24(){
+  if(!PUB){ S.seedV24=true; return; }
+  if(S.seedV24) return; S.seedV24=true;
+  (S.routines||[]).forEach(function(r){
+    if(RT_PUB_NAME[r.name]) r.name=RT_PUB_NAME[r.name];
+  });
+  /* Only the three that are new. Anything the user deleted stays deleted is not
+     achievable without a tombstone, but adding by name means a rename or a
+     re-add by hand is never duplicated. */
+  [{name:'Vitamin D3', dose:'2000 IU', slot:'morning', re:/\bd3\b|vitamin d/i},
+   {name:'Vitamin B12', dose:'500 mcg', slot:'morning', re:/b12|cobalamin/i},
+   {name:'Omega-3 (EPA+DHA)', dose:'2 g EPA+DHA', slot:'lunch', re:/omega|epa|dha/i}
+  ].forEach(function(sp){
+    if((S.supps||[]).some(function(x){ return sp.re.test(x.name); })) return;
+    S.supps.push({id:uid(), name:sp.name, kcal:0, p:0, c:0, f:0, logFood:false,
+      dose:sp.dose, slot:sp.slot});
+  });
+  save();
+}
+
+/* v25: the first VO2max session, 20 August, on the bike. Four four-minute
+   blocks with three minutes between, exactly the protocol.
+
+   Two honesty notes about the numbers. The console reported one average pulse
+   (~140) and one peak (151), not a value per interval, so intervals 1-3 carry
+   the average and the last carries the peak; the split is approximate and is
+   marked as such in the note. And the distance is deliberately NOT recorded per
+   interval: 16.42 km alongside 232 kcal in the same thirty minutes is a
+   flywheel count against light resistance, roughly half the energy a real 4x4
+   costs, so writing it into the per-interval field would set a "best interval"
+   record out of a number that measures the wrong thing. */
+function seedV25(){
+  if(PUB){ S.seedV25=true; return; }
+  if(S.seedV25) return; S.seedV25=true;
+  const DATE='2026-08-20';
+  if(S.sessions.some(function(s){ return s.date===DATE && /VO2max|interval/i.test(s.name); })){ save(); return; }
+  const bike=S.exercises.find(function(x){ return x.name==='VO2max 4×4 (bike)'; });
+  if(!bike){ save(); return; }
+  S.sessions.push({id:uid(), name:'VO2max intervals (4×4)', date:DATE, dur:1801, vol:0,
+    ex:[{exId:bike.id, sets:[
+      {w:'', r:140, done:true},{w:'', r:140, done:true},
+      {w:'', r:145, done:true},{w:'', r:151, done:true}
+    ]}],
+    note:'First one ever. Bike, 30:01 total, console said 16.42 km and 232 kcal. '+
+      'Pulse ~140 through the work blocks, peak 151, could not get above it. '+
+      'Per-interval pulse is an estimate: the console only gave an average and a peak.',
+    prs:[]});
+  S.sessions.sort(function(x,y){ return x.date<y.date?-1:1; });
+  save();
+}
+
+/* v26: the five-pillar build-out reaches existing stores. New exercises (zone 2,
+   threshold, power, end-range mobility, balance), the routines that use them,
+   and the Hyrox rename in the personal build too — that name described a race
+   the plan no longer builds toward, and the routine itself is unchanged. */
+function seedV26(){
+  if(S.seedV26) return; S.seedV26=true;
+  DEF_EX.forEach(function(e){
+    if(!S.exercises.some(function(x){return x.name===e[0];}))
+      S.exercises.push({id:uid(), name:e[0], group:e[1]});
+  });
+  SEED_RT.forEach(function(r){
+    if(S.routines.some(function(x){return x.name===r.name;})) return;
+    const ids=r.ex.map(function(n){ const e=S.exercises.find(function(x){return x.name===n;}); return e&&e.id; }).filter(Boolean);
+    if(ids.length) S.routines.push({id:uid(), name:r.name, exIds:ids});
+  });
+  /* keeps the id, so the weekly plan and every logged session still resolve */
+  (S.routines||[]).forEach(function(r){
+    if(r.name==='Hyrox stations'||r.name==='Station circuit') r.name='Conditioning circuit';
+  });
+  save();
+}
+
 /* ============ migration runner ============
    Ordered and append-only — this list IS the execution order (it preserves
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
-const SCHEMA=23;
+const SCHEMA=26;
 /* Snapshot the store as it was BEFORE this build's migrations touch it, so a bad
    upgrade is recoverable instead of permanent. Written once per schema bump. */
 (function(){
@@ -1094,7 +1232,8 @@ const SCHEMA=23;
   }catch(e){}
 })();
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
- seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20, seedV21, seedV22, seedV23].forEach(function(step){ step(); });
+ seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20, seedV21, seedV22, seedV23,
+ seedV24, seedV25, seedV26].forEach(function(step){ step(); });
 /* Persist the stamp explicitly. It used to ride along on whatever happened to
    call save() next, which made both the migration guards and the pre-upgrade
    snapshot depend on timing rather than intent. */
@@ -1219,14 +1358,14 @@ const QUOTES=[
 'Your body hears everything your mind says.',
 'Strength is built in the reps you didn’t feel like doing.',
 'Energy creates energy. Start moving.',
-'The wedding photos are being taken now, in the gym.',
+'The photos you’ll be glad about next year are being taken now, in the gym.',
 'Trust the boring weeks. They’re the ones that work.',
 'Your future self is watching through your memories.',
 'Champions train. Everyone else waits for motivation.'];
 const TIPS=[
 'Creatine works by saturation, not timing. The daily tick matters more than the clock.',
 'Protein within ~2 hours after training gives a small but real edge.',
-'In Jaipur’s dry heat you dehydrate without visible sweat. Sip before you feel thirsty.',
+'In dry heat you dehydrate without ever looking sweaty. Sip before you feel thirsty.',
 'Muscle is built during sleep. The gym only sends the signal.',
 'A 10-minute walk after meals blunts the blood-sugar spike from rice and rotis.',
 'Chai without sugar saves ~45 kcal a cup, so three cups a day is a laddu a week.',
@@ -1236,16 +1375,16 @@ const TIPS=[
 'Paneer or curd at dinner drip-feeds protein all night, like natural casein.',
 'Nasal breathing on easy runs builds your engine faster than harder mouth-breathing.',
 'Even 2% dehydration measurably costs you reps.',
-'The knee heals with pain-free motion, not rest alone.',
+'Joints heal with pain-free motion, not with rest alone.',
 'Three average workouts beat one heroic one, every single week.',
 'Caffeine within 8 hours of bed steals deep sleep even if you fall asleep fine.',
 'Photos every 2 weeks catch what the daily mirror hides.',
 'Goblet squats build the same legs as front squats without loading the wrists.',
 'Fibre from dal and sabzi keeps protein absorption steady. Thali wisdom is real.',
-'Late screens delay melatonin ~30 minutes. The 22:30 wind-down is physiology.',
+'Late screens delay melatonin ~30 minutes. A wind-down time is physiology, not discipline.',
 'A planned deload every 6–8 weeks makes you stronger, not weaker.',
 'Make the exhale longer than the inhale. That ratio, not the length, is what flips you into recovery.',
-'Wall balls test breathing more than muscles. That’s why Hyrox loves them.',
+'Wall balls test breathing more than muscles. Pace the breath, not the arms.',
 'Magnesium at night improves sleep quality. Watch your “woke rested” count.',
 'Volume drives muscle; intensity drives strength; consistency drives both.'];
 function dayIdx(){ return Math.floor(new Date(today()+'T12:00:00').getTime()/86400000); }
@@ -1304,7 +1443,7 @@ const CD_BY_GROUP={
   Back:'Lat stretch on the rack 40s/side · child’s pose 45s',
   Legs:'Quad, hamstring and couch stretch 45s each',
   Shoulders:'Cross-body stretch 30s/side',
-  Arms:'Wrist flexor stretch 30s/side, protect that wrist',
+  Arms:'Wrist flexor stretch 30s/side: the wrists take the load in every press',
   Core:'Cobra hold 30s',
   Conditioning:'3 min walk, breathing slowing down',
   Cardio:'3–5 min walk with nasal breathing'
@@ -1326,10 +1465,15 @@ const PROGRAM= PUB ? {start:null, phases:[
   {w:16,  name:'Phase 2: Build', desc:'Progressive overload. Chase the amber targets, grow your cardio base, hit protein daily. Exit test: visibly stronger across twelve weeks.'},
   {w:999, name:'Phase 3: Perform', desc:'Train for something: a race, a number, a photo. PRs, a deload every 6–8 weeks, and a streak that never dies.'}
 ]} : {start:'2026-08-09', phases:[
-  {w:4,  name:'Phase 0: Rebuild', desc:'Daily rehab block, the three return routines, daily breathwork, sleep by 11. Exit test: one fully pain-free week + a brisk 30-minute walk feeling easy.'},
-  {w:12, name:'Phase 1: Base', desc:'Run/walk intervals 3×/week, strength rebuilt to ~80% of May weights, full Push/Pull/Legs returns. Exit test: 5 km continuous run and squat 50×8, both pain-free.'},
-  {w:20, name:'Phase 2: Hyrox strength', desc:'Runs grow to 6–8 km with one weekly tempo. Hyrox stations once a week: wall balls light, burpee broad jumps low volume. Exit test: 8 km easy run, 50 unbroken wall balls.'},
-  {w:32, name:'Phase 3: Simulation', desc:'Weekly bricks (1 km run + station + 1 km run), half-simulation ~week 26, full simulation ~week 30, then enter the race.'}
+  /* Rewritten away from a Hyrox race ladder. Hyrox is a goal, not a health
+     input: everything it develops comes more cheaply from zone 2, 4x4s and
+     ordinary lifting, and the race-specific work carries injury cost with no
+     longevity return. These four phases build the five qualities instead, and
+     each exit test is something you can actually measure in the app. */
+  {w:4,  name:'Phase 0: Rebuild', desc:'Daily joint work, the three return routines, daily breathwork, sleep by 11. Exit test: one fully pain-free week and a brisk 30-minute walk that feels easy.'},
+  {w:12, name:'Phase 1: Base', desc:'Zone 2 three times a week, strength rebuilt toward May weights, full Push/Pull/Legs. Power work introduced light. Exit test: 45 minutes of zone 2 with nasal breathing intact, and squat 50×8 pain-free.'},
+  {w:22, name:'Phase 2: Build', desc:'One 4×4 and one threshold session a week on top of the base. Power and agility once a week, deep flexibility once. Exit test: VO2max measurably up, and every one of the four longevity tests inside its age band.'},
+  {w:99, name:'Phase 3: Keep it', desc:'The maintenance the rest of it was for: strength progressing slowly, one hard cardio session, one easy long one, power and balance defended weekly. Re-test every eight weeks and hold the bands.'}
 ]};
 function programWeek(){
   const startD = PUB ? (S.programStart||today()) : PROGRAM.start;
@@ -1343,7 +1487,7 @@ function currentPhase(){
 }
 function phaseInfo(){
   const wk=programWeek(), cur=currentPhase();
-  let from=1, h='<h3>'+(PUB?'Your training journey':'Your Hyrox comeback')+'</h3><p class="tiny muted" style="margin:-6px 0 12px">Week '+wk+' since '+(PUB?'you started':'restart')+' ('+fmtD(PUB?(S.programStart||today()):PROGRAM.start)+')</p>';
+  let from=1, h='<h3>Your training journey</h3><p class="tiny muted" style="margin:-6px 0 12px">Week '+wk+' since '+(PUB?'you started':'restart')+' ('+fmtD(PUB?(S.programStart||today()):PROGRAM.start)+')</p>';
   PROGRAM.phases.forEach(function(p){
     const on=p.name===cur.name;
     h+='<div style="border-left:3px solid '+(on?'var(--wk)':'var(--line)')+'; padding:2px 0 2px 12px; margin-bottom:14px'+(on?'':'; opacity:.65')+'">'+
@@ -1360,7 +1504,7 @@ function round25(x){ return Math.round(x/2.5)*2.5; }
    three sessions rather than a single top set, so a session that fell apart
    and one that was comfortable no longer look identical. */
 
-const RXLABEL={up:'↑', deload:'↓', reps:'→', comeback:'⟲', first:'•', progress:'↑', steady:'→', hold:'=', intervals:'⚡'};
+const RXLABEL={up:'↑', deload:'↓', reps:'→', comeback:'⟲', first:'•', progress:'↑', steady:'→', hold:'=', intervals:'⚡', power:'💥'};
 /* One banner explaining any readiness hold, so a lighter day is never a
    mystery. Returns '' when nothing is being held back. */
 function readinessBanner(){
@@ -1379,6 +1523,10 @@ function schemeFor(exId){
   if(iv) return {sets:iv.rounds, lo:0, hi:0};
   const g=exGroupOf(exId);
   if(g==='Cardio') return {sets:1, lo:0, hi:0};
+  /* Power is prescribed by quality, never by fatigue. Low reps, long rest, and
+     you stop when the reps get slower rather than when you cannot do more —
+     grinding out a tenth slow jump trains endurance and un-trains power. */
+  if(g==='Power') return {sets:4, lo:3, hi:6};
   if(g==='Mobility') return {sets:2, lo:30, hi:45};
   if(isTimedEx(exId)) return {sets:3, lo:20, hi:60};
   if(g==='Legs') return {sets:3, lo:8, hi:12};
@@ -1496,16 +1644,47 @@ function prescribe(exId){
 
   const iv=exIv(exId);
   if(iv){
-    const hr=hrTarget();
-    const mins=Math.round(iv.work/60);
+    const hr=hrTarget(iv.type);
     const prev=hist.length? hist[0].sets : null;
     const best=prev? Math.max.apply(null, prev.map(function(t){return +t.w||0;})) : 0;
-    return {sets:mk('', mins, iv.rounds),
-      why: iv.rounds+' × '+mins+' min hard, '+Math.round(iv.rest/60)+' min easy between. '+
-        (hr? 'Aim for '+hr.lo+'-'+hr.hi+' bpm, about 85-95% of your estimated max of '+hr.max+'.'
-           : 'Hard enough that talking is down to a few words at a time; set your age in Settings for a heart-rate target.')+
-        (best? ' Best interval so far '+best+' km.' : ' Log the distance of each interval so the next one has something to beat.'),
+    /* no age means no Tanaka estimate, so fall back to the talk test rather
+       than printing a band computed from nothing */
+    const band=hr? 'Aim for '+hr.lo+'-'+hr.hi+' bpm'
+      : 'Hard enough that talking is down to a few words at a time; set your age in Settings for a heart-rate target.';
+    /* Zone 2 is one continuous block, not rounds. Prescribing it as sets would
+       invite you to break it up, and the unbroken duration is the stimulus. */
+    if(iv.block){
+      return {sets:mk('', '', 1),
+        why: iv.mins+' min continuous, easy. '+band+
+          (hr? ' — '+hr.note+'.' : '')+' '+iv.check+
+          (iv.lever? ' '+iv.lever : '')+
+          (best? ' Last time '+best+' km.' : ''),
+        tag:'intervals', iv:iv};
+    }
+    const mins=Math.round(iv.work/60);
+    /* reps used to be prescribed as "4", which is the same 4 every session and
+       tells the next prescription nothing. The number that decides whether the
+       session worked is the peak heart rate, so that column holds it instead. */
+    return {sets:mk('', '', iv.rounds),
+      why: iv.rounds+' × '+mins+' min hard, '+Math.round(iv.rest/60)+' min between. '+
+        band+
+        (hr? ' ('+hr.note+(iv.ramp? '; the full band is '+hr.full : '')+'). '+
+             'Keep moving through the recovery at '+hr.recLo+'-'+hr.recHi+', do not stop. ' : ' ')+
+        iv.check+
+        (iv.lever? ' '+iv.lever : '')+
+        (best? ' Best interval so far '+best+' km.' : ''),
       tag:'intervals', iv:iv};
+  }
+  /* Power gets its own branch or it falls through to the lifting default and
+     tells you to pick a weight for a pogo hop. The rule it has to communicate
+     is the one that makes power training work: stop on quality, not on failure. */
+  if(g==='Power'){
+    const prevBest=hist.length? Math.max.apply(null, hist[0].sets.map(function(t){return +t.w||0;})) : 0;
+    return {sets:mk(prevBest||'', sc.hi),
+      why: sc.sets+' × '+sc.lo+'-'+sc.hi+', full recovery between. Stop the set the moment a rep '+
+        'gets slower or lands heavier — a tired jump trains the opposite of what a jump is for. '+
+        (prevBest? 'Last time '+prevBest+' '+unit()+' or height.' : 'Log height, distance or load, whichever the movement has.'),
+      tag:'power'};
   }
   if(g==='Cardio'){
     const cb=hist.length? hist[0].sets[0] : null;
@@ -1622,13 +1801,13 @@ const CUES={
   'Romanian deadlift':'Soft knees, hips back until the hamstrings load; bar slides along the thighs.',
   'Overhead press':'Glutes squeezed, ribs down; finish with the bar over mid-foot, wrists neutral.',
   'Barbell row':'Hinge ~45°, pull to the lower ribs; no jerking from the lower back.',
-  'Pull-ups':'Active shoulders, controlled negative; skip these until the wrist has a pain-free week.',
+  'Pull-ups':'Active shoulders, controlled negative; skip these while a wrist or elbow still hurts.',
   'Hip thrust':'Chin tucked, ribs down; squeeze the glutes at the top instead of arching the back.',
   'Lunges':'Long step, tall torso; back knee kisses the floor; drive through the front heel.',
   'Leg press':'Feet mid-platform; stay in the pain-free knee range; never slam into lockout.',
   'Wall balls':'It is a squat plus a push, not an arm throw; hit the same spot every rep.',
   'Kettlebell swing':'A hip hinge, not a squat; arms are ropes; the hips snap, the glutes finish.',
-  'Burpee broad jump':'Land soft with bent knees; step back instead of jumping back while the wrists heal.',
+  'Burpee broad jump':'Land soft with bent knees; step back instead of jumping back if the wrists complain.',
   'Farmer’s carry':'Tall posture, packed shoulders, quick small steps; tight grip, neutral wrists.',
   'Walking':'Nasal breathing only: recovery and aerobic engine in one.',
   'Treadmill run':'Easy pace, nasal breathing where possible; land soft, feet under the hips.',
@@ -1675,6 +1854,23 @@ const PATTERNS={
     '<circle cx="90" cy="22" r="6.5" class="fe"/><polyline points="90,29 90,62" class="fe"/><polyline points="90,62 87,86 88,110" class="fe"/><polyline points="90,62 94,86 93,110" class="fe"/>'+
     '<polyline points="90,36 94,62" class="fs"/><circle cx="95" cy="66" r="4" class="fs"/>'+
     '<polyline points="90,36 116,34" class="fe"/><circle cx="121" cy="34" r="4" class="fe"/><path d="M100,60 Q116,52 118,40" class="fa"/>'},
+  jump:{label:'Jump: soft landing, hips back, knees tracking', svg:
+    '<circle cx="100" cy="18" r="6.5" class="fe"/><polyline points="100,25 100,54" class="fe"/>'+
+    '<polyline points="100,30 78,18" class="fe"/><polyline points="100,30 122,18" class="fe"/>'+
+    '<polyline points="100,54 88,76 92,96" class="fe"/><polyline points="100,54 112,76 108,96" class="fe"/>'+
+    '<path d="M70,110 L130,110" class="fs"/><path d="M84,102 L84,110" class="fa"/><path d="M116,102 L116,110" class="fa"/>'},
+  throw:{label:'Throw: drive from the hips, arms follow', svg:
+    '<circle cx="92" cy="24" r="6.5" class="fe"/><polyline points="92,31 96,62" class="fe"/>'+
+    '<polyline points="93,38 116,28" class="fe"/><circle cx="124" cy="25" r="7" class="fs"/>'+
+    '<polyline points="93,38 74,34" class="fe"/>'+
+    '<polyline points="96,62 84,86 82,110" class="fe"/><polyline points="96,62 110,86 114,110" class="fe"/>'+
+    '<path d="M134,20 Q150,26 152,40" class="fa"/>'},
+  balance:{label:'Balance: one leg, tall, still', svg:
+    '<circle cx="100" cy="20" r="6.5" class="fe"/><polyline points="100,27 100,62" class="fe"/>'+
+    '<polyline points="100,36 84,44" class="fe"/><polyline points="100,36 116,44" class="fe"/>'+
+    '<polyline points="100,62 98,88 98,110" class="fe"/>'+
+    '<polyline points="100,62 114,78 106,92" class="fs"/>'+
+    '<path d="M78,110 L122,110" class="fs"/>'},
   cardio:{label:'Steady effort: a pace you could talk through', svg:
     '<circle cx="92" cy="20" r="6.5" class="fe"/><polyline points="92,27 100,56" class="fe"/><polyline points="94,34 106,42 114,34" class="fe"/><polyline points="94,34 84,44" class="fe"/><polyline points="100,56 114,74 110,96" class="fe"/><polyline points="100,56 90,80 80,102" class="fe"/><path d="M50,40 L66,40" class="fa"/><path d="M44,52 L60,52" class="fa"/>'}
 };
@@ -1691,6 +1887,9 @@ const PATTERN_STEPS={
   stretch:['Ease in, no bouncing.','Hold 45–60 seconds per side, breathing slowly.','Stretch to tension, never into sharp pain.'],
   curl:['Elbows pinned to your sides.','Curl up without swinging the body.','Lower slowly on a 2–3 count.'],
   raise:['Slight bend in the elbow throughout.','Raise to shoulder height, no higher.','Lead with the elbows, not the hands.'],
+  jump:['Load by sitting the hips back, not by bending the knees alone.','Drive up fast and reach full extension.','Land quietly, absorbing through hips and knees; stop the set when it stops being quiet.'],
+  throw:['Set the feet and brace before anything moves.','Drive from the hips and let the arms follow, not lead.','Throw at full effort or not at all: a half-speed throw trains nothing.'],
+  balance:['Stand tall, weight through the whole foot.','Fix your eyes, then close them.','Let the ankle do the correcting; stop the clock the moment a hand or foot moves.'],
   cardio:['Start easier than feels necessary.','Hold a pace where short sentences are possible.','Finish feeling able to do a little more.']
 };
 /* Movements with no honest photo in the public-domain set get their own drawing
@@ -1699,18 +1898,109 @@ const PATTERN_STEPS={
 /* The Norwegian 4x4: four minutes hard, three easy, four times. Long intervals
    rather than the fashionable 30/30, because 3-5 minute work bouts hold you
    above 90% VO2max for considerably longer. */
-const EX_IV={
-  'VO2max 4×4 (bike)':        {work:240, rest:180, rounds:4},
-  'VO2max 4×4 (rower)':       {work:240, rest:180, rounds:4},
-  'VO2max 4×4 (SkiErg)':      {work:240, rest:180, rounds:4},
-  'VO2max 4×4 (incline walk)':{work:240, rest:180, rounds:4}
+/* `lever` is the thing that actually raises heart rate on that machine, and it
+   is never the number the console shows biggest. On a bike, distance is a
+   flywheel revolution count: spinning fast against no resistance inflates it
+   while the effort stays easy, so distance and calories disagree. */
+/* Three cardio sessions, three different jobs, three different heart rates.
+   The app used to know only the 4x4, so a long easy ride and a set of intervals
+   were indistinguishable to the coach and both got the interval band - which
+   makes the easy day too hard and, because you arrive tired, the hard day too
+   easy. That is the single most common way an endurance week fails. */
+const IV_TYPE={
+  z2:  {label:'Zone 2', lo:0.60, hi:0.70, ramp:false, block:true, mins:45,
+        why:'The base. Mitochondria and fat oxidation improve at an intensity that costs almost nothing to recover from, which is the whole point: it has to be easy enough that it does not eat into the hard days.',
+        check:'If you cannot hold a conversation, or you cannot breathe through your nose, you are above zone 2 and getting less from it, not more.'},
+  thr: {label:'Threshold', lo:0.80, hi:0.88, ramp:false, work:480, rest:120, rounds:4,
+        why:'The pace you could hold for about an hour. This is what raises the ceiling on how hard you can go for a long time.',
+        check:'Comfortably hard: two or three words at a time, and it should feel repeatable at the end of the last block.'},
+  vo2: {label:'VO2max 4×4', ramp:true, work:240, rest:180, rounds:4,
+        why:'Four minutes hard, three easy, four times. Long intervals rather than the fashionable 30/30, because three-to-five minute work bouts hold you above 90% VO2max for considerably longer.',
+        check:'It should still be climbing at the four-minute mark: step up at 2:00 and again at 3:00.'}
 };
+/* `lever` is the thing that actually raises heart rate on that machine, and it
+   is never the number the console shows biggest. On a bike, distance is a
+   flywheel revolution count: spinning fast against no resistance inflates it
+   while the effort stays easy, so distance and calories disagree. */
+const IV_LEVER={
+  bike:  'Resistance, not speed. Set it so you cannot hold more than 90 rpm; if you can spin past 100 rpm it is too light. Ignore the distance readout.',
+  rower: 'Watts per stroke, not stroke rate. Keep the rate near 26-28 and pull harder, watching the split, not the metres.',
+  ski:   'Drive with the hips and lats, not the arms. Hold the split you set in the first minute rather than fading into a fast, light pull.',
+  walk:  'Incline first, speed second, and never hold the rails: holding on drops the cost of the work by roughly a fifth.',
+  run:   'Pace by breathing, not by the watch. On a treadmill add 1% incline so the effort matches running outside.'
+};
+const EX_IV_RAW={
+  'VO2max 4×4 (bike)':        {type:'vo2', lever:'bike'},
+  'VO2max 4×4 (rower)':       {type:'vo2', lever:'rower'},
+  'VO2max 4×4 (SkiErg)':      {type:'vo2', lever:'ski'},
+  'VO2max 4×4 (incline walk)':{type:'vo2', lever:'walk'},
+  'Zone 2 (bike)':            {type:'z2',  lever:'bike'},
+  'Zone 2 (rower)':           {type:'z2',  lever:'rower'},
+  'Zone 2 (walk/run)':        {type:'z2',  lever:'run'},
+  'Threshold 4×8 (bike)':     {type:'thr', lever:'bike'},
+  'Threshold 4×8 (rower)':    {type:'thr', lever:'rower'},
+  'Threshold 4×8 (run)':      {type:'thr', lever:'run'}
+};
+/* Flattened once at boot so every caller sees one object with work/rest/rounds
+   already resolved, exactly the shape the 4x4 code was written against. */
+const EX_IV=(function(){
+  const out={};
+  Object.keys(EX_IV_RAW).forEach(function(k){
+    const r=EX_IV_RAW[k], t=IV_TYPE[r.type];
+    out[k]=Object.assign({}, t, r, {lever:IV_LEVER[r.lever]||''});
+  });
+  return out;
+})();
 function exIv(exId){ return EX_IV[exName(exId)]||null; }
 /* Tanaka rather than 220-age: better fit in adults, and the app knows your age */
 function hrMax(){ const a=+S.settings.age||0; return a? Math.round(208 - 0.7*a) : null; }
-function hrTarget(){
+/* How many sessions have logged an interval exercise. Drives the on-ramp. */
+function ivSessions(){
+  return (S.sessions||[]).filter(function(s){
+    return (s.ex||[]).some(function(e){ return !!EX_IV[exName(e.exId)]; });
+  }).length;
+}
+/* The 4x4 is defined at 90-95% of max, but nobody reaches that on their first
+   attempt: you do not yet know what the effort feels like, and starting there
+   just produces a session that misses on both ends. So the band walks up over
+   the first four sessions, the same way prescribe() ramps a lift. */
+const HR_RAMP=[
+  {lo:0.80, hi:0.87, note:'first sessions: find the effort, do not chase the number'},
+  {lo:0.80, hi:0.87, note:'still calibrating: one step harder than last time'},
+  {lo:0.85, hi:0.90, note:'closing on the real zone now'},
+  {lo:0.85, hi:0.90, note:'one more step before the full band'}
+];
+/* `type` is a key of IV_TYPE. Only the 4x4 ramps: zone 2 and threshold are
+   defined by a physiological boundary, not by how brave you are feeling, so
+   walking those up would just be prescribing the wrong session. */
+function hrTarget(type){
   const m=hrMax(); if(!m) return null;
-  return {lo:Math.round(m*0.85), hi:Math.round(m*0.95), max:m};
+  const t=IV_TYPE[type||'vo2']||IV_TYPE.vo2;
+  let lo, hi, note;
+  if(t.ramp){
+    const step=HR_RAMP[ivSessions()] || {lo:0.90, hi:0.95, note:'the full 4×4 band'};
+    lo=step.lo; hi=step.hi; note=step.note;
+  } else {
+    lo=t.lo; hi=t.hi; note=t.label.toLowerCase()+' is a fixed band, not something to push';
+  }
+  return {lo:Math.round(m*lo), hi:Math.round(m*hi), max:m, note:note, label:t.label,
+    full:Math.round(m*0.90)+'-'+Math.round(m*0.95),
+    /* active recovery, not standing still: keeping the floor at 60-70% is what
+       lets intervals 3 and 4 climb higher than interval 1 */
+    recLo:Math.round(m*0.60), recHi:Math.round(m*0.70)};
+}
+/* Read back against the band that was in force when it was logged. */
+function hrVerdict(bpm, type){
+  const t=hrTarget(type); if(!t||!bpm) return null;
+  /* going too hard on an easy day is a real error, not a bonus: it is what
+     turns a three-session week into one good session and two mediocre ones */
+  if((type||'vo2')==='z2' && bpm > t.hi+6)
+    return {k:'over', s:'Above zone 2 — easy days have to stay easy or the hard days suffer'};
+  if(bpm < t.lo-8)  return {k:'under', s:'Well under the zone — the resistance was the limit, not you'};
+  if(bpm < t.lo)    return {k:'near',  s:'Just short. One step more resistance next time'};
+  if(bpm > t.max)   return {k:'over',  s:'Above your estimated max, so either the estimate is low or the reading is'};
+  if(bpm > t.hi+4)  return {k:'over',  s:'Above the band — back it off a touch and hold it longer'};
+  return {k:'in', s:'In the zone'};
 }
 const PAT_EX={
   'Dead hang':'exhang', 'Wall sit (pain-free)':'exwall', 'Deep squat hold':'exdsquat',
@@ -1835,7 +2125,18 @@ Object.assign(PATTERN_STEPS, {
 function patternOf(n,g){
   if(PAT_EX[n]) return PAT_EX[n];
   n=n.toLowerCase();
-  if(g==='Mobility') return /hang/.test(n) ? 'vpull' : 'stretch';
+  /* Power reads before everything else: a med-ball slam is a throw, not a
+     press, and a pogo hop is a jump, not a squat. */
+  if(/balance|tandem stance|single[- ]leg stand/.test(n)) return 'balance';
+  if(/med[- ]?ball|slam|throw|chest pass/.test(n)) return 'throw';
+  if(g==='Power') return 'jump';
+  if(g==='Mobility'){
+    if(/hang/.test(n)) return 'vpull';
+    if(/plank/.test(n)) return 'core';
+    if(/curl|hamstring|hip lift|90\/90/.test(n)) return 'hinge';
+    if(/cars|circles|dislocate/.test(n)) return 'raise';
+    return 'stretch';
+  }
   if(g==='Cardio') return 'cardio';
   if(/leg extension|leg curl|calf/.test(n)) return null;
   if(/bench|push[- ]?up|fly|crossover|dip/.test(n)) return 'hpush';
@@ -1937,7 +2238,7 @@ function skipMissed(d){
 function planEditor(){
   const days=[['1','Monday'],['2','Tuesday'],['3','Wednesday'],['4','Thursday'],['5','Friday'],['6','Saturday'],['0','Sunday']];
   openSheet('<h3>Weekly plan</h3>'+
-    '<p class="tiny muted" style="margin:-6px 0 12px">The Today screen suggests each day’s workout from this plan. When the knee and wrist have a fully pain-free week, swap the return routines for the full Push / Pull / Legs days.</p>'+
+    '<p class="tiny muted" style="margin:-6px 0 12px">The Today screen suggests each day’s workout from this plan. Once you have a fully pain-free week, swap the joint-friendly routines for the full Push / Pull / Legs days.</p>'+
     days.map(function(d){
       const cur=(S.plan||{})[d[0]]||'';
       return '<div class="field"><label>'+d[1]+'</label><select data-plan="'+d[0]+'">'+
@@ -2182,14 +2483,19 @@ const SUPP_PLAN=[
   [/calcium/i,         {dose:'500 mg',       slot:'lunch',   note:'Deliberately hours from magnesium and zinc: calcium blocks both when taken together. Skip it on a dairy-heavy day.'}],
   [/magnesium/i,       {dose:'200-400 mg',   slot:'bed',     note:'Glycinate or citrate for sleep. Kept away from the calcium.'}],
   [/zinc/i,            {dose:'15-25 mg',     slot:'bed',     note:'Away from calcium. Fine alongside magnesium at these doses.'}],
-  [/omega|epa|dha/i,   {dose:'2 g EPA+DHA',  slot:'lunch',   note:'With food. Must be algal to be vegetarian.'}],
+  [/omega|epa|dha/i,   {dose:'2 g EPA+DHA',  slot:'lunch',   note:function(d){ return d==='nonveg' ? 'With food. Fish oil is fine, or skip it on the days you eat oily fish.' : 'With food. Check the bottle says algal: most omega-3 on the shelf is fish oil.'; }}],
   [/theanine/i,        {dose:'100-200 mg',   slot:'evening', note:'Only if it helps you settle. Weak evidence either way.'}],
   [/iodine/i,          {dose:'150 mcg',      slot:'morning', note:'Only if your salt is not iodised.'}],
   [/beta-?alanine/i,   {dose:'3-5 g',        slot:'anytime', note:'Daily, and it takes weeks to load. Tingling is harmless.'}],
   [/shake/i,           {dose:'1 serving',    slot:'post',    note:'Carries the whey and creatine, so those are covered when this is ticked.'}]
 ];
 function suppPlan(name){
-  for(let i=0;i<SUPP_PLAN.length;i++) if(SUPP_PLAN[i][0].test(name||'')) return SUPP_PLAN[i][1];
+  const d=(S.settings&&S.settings.diet)||'veg';
+  for(let i=0;i<SUPP_PLAN.length;i++) if(SUPP_PLAN[i][0].test(name||'')){
+    const p=SUPP_PLAN[i][1];
+    /* a note may be a function of the diet; callers only ever want the string */
+    return typeof p.note==='function' ? Object.assign({}, p, {note:p.note(d)}) : p;
+  }
   return {dose:'', slot:'anytime', note:''};
 }
 function suppDose(sp){ return sp.dose || suppPlan(sp.name).dose; }
@@ -2214,20 +2520,34 @@ const SUPP_INFO=[
   [/creatine/i,'strong','Strength, lean mass and cognition. The best-evidenced supplement there is, and vegetarians respond more strongly because baseline muscle creatine sits lower.'],
   [/whey|casein|protein/i,'strong','Hitting a daily protein target. Nothing magic beyond the protein itself, which is rather the point.'],
   [/\bd3\b|vitamin d/i,'strong','Bone, immune and muscle function. Roughly 70-90% of Indians run low, so this is a real gap rather than insurance.'],
-  [/b12|cobalamin/i,'strong','Nerve function and red blood cells. Around 70% of Indian vegetarians are deficient and there is no reliable plant source, so this one is non-negotiable.'],
-  [/omega|epa|dha|fish oil|algal/i,'strong','Triglycerides and inflammation. Must be algal to be vegetarian: worth checking the bottle, since most omega-3 on the shelf is fish oil.'],
+  /* These two are the only entries whose advice genuinely changes with how you
+     eat, so their `why` is a function of the diet rather than a fixed string. */
+  [/b12|cobalamin/i,'strong',function(d){
+    if(d==='vegan') return 'Nerve function and red blood cells. Plants carry none of it at all, and the damage from a long deficiency is not fully reversible. On a vegan diet this is not optional.';
+    if(d==='nonveg'||d==='egg') return 'Nerve function and red blood cells. Meat, fish, eggs and dairy cover it, so supplement only if a test comes back low or you eat animal food rarely.';
+    return 'Nerve function and red blood cells. Around 70% of Indian vegetarians are deficient and there is no reliable plant source, so this one is non-negotiable.';
+  }],
+  [/omega|epa|dha|fish oil|algal/i,'strong',function(d){
+    if(d==='nonveg') return 'Triglycerides and inflammation. Two portions of oily fish a week does the same job; fish oil is the shortcut if you do not eat it.';
+    if(d==='vegan') return 'Triglycerides and inflammation. It must be algal oil: flax and chia give ALA, and the body converts only a few percent of it to EPA and almost no DHA.';
+    return 'Triglycerides and inflammation. Must be algal to be vegetarian: worth checking the bottle, since most omega-3 on the shelf is fish oil.';
+  }],
   [/magnesium/i,'moderate','Sleep quality and cramps. Decent evidence when intake is low, thinner when it is not.'],
   [/zinc/i,'moderate','Immune function and hormones when deficient. Vegetarian diets absorb less of it because of phytates.'],
   [/calcium/i,'moderate','Bone density alongside D3 and K2. Worth it when dairy is low, less so on a dairy-heavy day.'],
   [/\bk2\b|menaquinone/i,'moderate','Directs calcium to bone rather than arteries. Sensible paired with D3; standalone evidence is still developing.'],
   [/theanine/i,'limited','Calm without sedation, usually paired with caffeine. Small short trials: harmless, but do not expect much.'],
   [/iodine/i,'strong','Thyroid function, and a genuine vegetarian gap where iodised salt and dairy are low.'],
-  [/beta-?alanine/i,'strong','Buffers fatigue in efforts of one to four minutes, which is most of Hyrox. Vegetarians start lower on carnosine.'],
+  [/beta-?alanine/i,'strong','Buffers fatigue in efforts of one to four minutes: intervals, circuits and the last set of a hard rep range. Vegetarians start lower on carnosine.'],
   [/\biron\b|ferrous|ferritin/i,'test-first','Only after a ferritin test. Iron overload does real damage and is not something you feel early, so this is the one never to take blind.'],
   [/nmn|nad|resveratrol|testosterone booster|longevity blend/i,'skip','Marketed hard, evidenced thinly: short trials on surrogate markers, nothing on the outcome you actually want.']
 ];
 function suppInfo(name){
-  for(let i=0;i<SUPP_INFO.length;i++) if(SUPP_INFO[i][0].test(name||'')) return {tier:SUPP_INFO[i][1], why:SUPP_INFO[i][2]};
+  const d=(S.settings&&S.settings.diet)||'veg';
+  for(let i=0;i<SUPP_INFO.length;i++) if(SUPP_INFO[i][0].test(name||'')){
+    const w=SUPP_INFO[i][2];
+    return {tier:SUPP_INFO[i][1], why:(typeof w==='function'? w(d) : w)};
+  }
   return null;
 }
 const TIER_LABEL={strong:'Strong evidence', moderate:'Moderate evidence', limited:'Limited evidence',
@@ -2238,7 +2558,7 @@ function tierChip(t){
 }
 const SUPP_GAPS=[
   ['Iodine','strong','Thyroid function, and a genuine vegetarian gap if you are not on iodised salt.'],
-  ['Beta-alanine','strong','Buffers the one-to-four-minute efforts Hyrox is built from. Vegetarians start lower on carnosine.'],
+  ['Beta-alanine','strong','Buffers the one-to-four-minute efforts intervals and circuits are built from. Vegetarians start lower on carnosine.'],
   ['Iron','test-first','Get ferritin tested before touching it. Never supplement iron blind.']
 ];
 function suppEditor(){
@@ -2395,6 +2715,16 @@ function lightStreak(){
   return n;
 }
 const PROTOCOLS=[
+  ['Grip strength as a marker','strong','Dead hang, or a dynamometer if you own one.',
+   'Grip is not magic, it is a readout. In the 140,000-participant PURE study across 17 countries, each 5 kg drop in grip strength carried a 16% higher risk of death from any cause, predicting mortality better than systolic blood pressure did. It works because it indexes total muscle mass and neural drive, which is also why training the rest of the body moves it.'],
+  ['Balance training','strong','Single-leg stands, eyes closed, most days.',
+   'A cohort of 1,700 adults found those who could not hold a 10-second one-legged stand had roughly double the all-cause mortality over the following decade, adjusted for age, sex and comorbidities. Balance also responds fast, which is unusual: weeks, not years. Eyes closed is the version that matters, because vision compensates for the loss until it cannot.'],
+  ['Power and jump training','strong','Low reps, full recovery, stop when they slow.',
+   'Muscle power declines roughly twice as fast as maximal strength with age, and it is power, not strength, that governs whether you catch a stumble. Training it takes little volume: a few sets of a few fast reps, never to fatigue, since a slow rep trains the opposite quality.'],
+  ['Impact loading for bone','moderate','Hops and jumps, 50-100 contacts, a few days a week.',
+   'Bone responds to rate of loading rather than to time spent moving, which is why swimming and cycling do nothing for it. Trials of hopping protocols show meaningful hip bone density gains in a year. Modest effect sizes, but nothing else non-pharmacological does better, and it costs five minutes.'],
+  ['Stretching for range','moderate','Long holds, most days, measured every few weeks.',
+   'Static stretching does increase range, but much of the early gain is a change in how much stretch you will tolerate rather than in tissue length. That is why range trained passively vanishes if you never use it: end-range strength work and full-range lifting are what make it stick.'],
   ['Sleep regularity','strong','Same bed and wake time daily, within about half an hour.',
    'The strongest finding here. In 61,000 UK Biobank participants, regularity of sleep timing predicted all-cause mortality better than sleep duration did: the least regular quintile carried 20-48% higher risk, independent of how long they slept. Worth more than an extra hour in bed.'],
   ['Steam bath, 2-3+ times a week','moderate','15-20 minutes, as hot as is comfortable.',
@@ -2586,10 +2916,74 @@ function coachNotes(cur,prv,adh){
   else if(adh.planned>0 && adh.done>=adh.planned) n.push('You followed the plan '+adh.done+'/'+adh.planned+' days. This is the consistency that changes bodies.');
   else if(adh.planned>0) n.push('Plan adherence '+adh.done+'/'+adh.planned+'. Missed days happen. The rule is: never miss twice in a row.');
   if(cur.slN>=3 && cur.sleep<7) n.push('Sleep averaged '+cur.sleep+'h. Under 7 hours, strength and recovery stall. Protect the 22:30 wind-down.');
-  if(prv.vol>0 && cur.vol>prv.vol*1.25) n.push('Training volume jumped '+Math.round((cur.vol/prv.vol-1)*100)+'% vs last week. Keep increases near 10%. Your knee and wrist are watching.');
+  if(prv.vol>0 && cur.vol>prv.vol*1.25) n.push('Training volume jumped '+Math.round((cur.vol/prv.vol-1)*100)+'% vs last week. Keep increases near 10%. Your joints are keeping score.');
   if(cur.fdN>=3 && cur.prot<(+S.settings.proteinGoal||120)*0.8) n.push('Protein averaged '+cur.prot+'g against your '+S.settings.proteinGoal+'g goal. One more whey scoop or 100g paneer daily closes it.');
   if(cur.wLast && prv.wLast && cur.wLast<prv.wLast-0.3 && cur.vol>=prv.vol) n.push('Body weight fell while training rose. You are under-eating for a muscle-building goal. Add ~200 kcal/day.');
   return n.slice(0,3);
+}
+/* The five qualities, and whether the week actually contained each one. This is
+   the answer to "am I doing everything?", which no other screen answers: the
+   app could tell you your tonnage and your protein and still leave you unable
+   to see that you had not jumped, stretched or balanced in a month. */
+const PILLARS=[
+  {key:'strong', name:'Strong', need:2, what:'2 lifting sessions',
+   why:'Muscle and bone are the tissues you lose without a reason to keep them.'},
+  {key:'healthy', name:'Healthy', need:150, what:'150 min zone 2 or cardio',
+   why:'Aerobic base: the strongest single fitness predictor of how long you live.'},
+  {key:'agile', name:'Agile', need:1, what:'1 power session',
+   why:'Power fades about twice as fast as strength. Jumping and throwing defend it, and the impact loads bone.'},
+  {key:'flexible', name:'Flexible', need:2, what:'2 mobility sessions',
+   why:'Range you do not use is range you lose, and it goes quietly.'},
+  {key:'longevity', name:'Longevity', need:1, what:'a test in the last 8 weeks',
+   why:'Grip, balance, sit-to-stand and gait speed. Measured, not assumed.'}
+];
+function pillarWeek(ws){
+  const we=dShift(ws,6);
+  const out={strong:0, healthy:0, agile:0, flexible:0, longevity:0};
+  (S.sessions||[]).forEach(function(s){
+    if(s.date<ws||s.date>we) return;
+    const groups={};
+    s.ex.forEach(function(e){ groups[exGroupOf(e.exId)]=true; });
+    /* a session counts once per quality it contains, not once per exercise:
+       eight jumps in one session is one power session, not eight */
+    if(['Chest','Back','Legs','Shoulders','Arms','Core'].some(function(g){ return groups[g]; })) out.strong++;
+    if(groups.Power) out.agile++;
+    if(groups.Mobility) out.flexible++;
+  });
+  /* minutes, not sessions: 150 a week is the number the guidelines are built on */
+  out.healthy=cardioMins(ws, we);
+  out.longevity=(S.tests||[]).filter(function(r){ return daysSince(r.date)<=56; }).length;
+  return out;
+}
+/* Every cardio minute in the week, from the minutes column on cardio sets plus
+   the prescribed duration of any interval session that was actually done. */
+function cardioMins(ws, we){
+  let m=0;
+  (S.sessions||[]).forEach(function(s){
+    if(s.date<ws||s.date>we) return;
+    s.ex.forEach(function(e){
+      if(exGroupOf(e.exId)!=='Cardio') return;
+      const iv=exIv(e.exId);
+      const done=e.sets.filter(function(t){ return t.done!==false; }).length;
+      if(iv){
+        m += iv.block ? iv.mins : Math.round(done*(iv.work+iv.rest)/60);
+      } else {
+        e.sets.forEach(function(t){ m += (+t.r||0); });
+      }
+    });
+  });
+  return Math.round(m);
+}
+function pillarRows(ws){
+  const p=pillarWeek(ws);
+  return PILLARS.map(function(pl){
+    const v=p[pl.key], ok=v>=pl.need;
+    return '<div class="listrow"><span class="small">'+
+      '<span style="color:'+(ok?'var(--good)':'var(--ink3)')+'">'+(ok?'●':'○')+'</span> '+pl.name+
+      '<span class="tiny muted" style="display:block; margin-left:15px">'+esc(pl.what)+'</span></span>'+
+      '<span class="small num" style="text-align:right; color:'+(ok?'var(--good)':'var(--bad)')+'">'+v+
+      '<span class="tiny muted" style="display:block">of '+pl.need+'</span></span></div>';
+  }).join('');
 }
 function openReport(ws){
   ws = ws || wkMonday(today());
@@ -2620,6 +3014,8 @@ function openReport(ws){
     '<div class="datebar" style="margin-bottom:4px"><button class="btn sm" onclick="openReport(\''+dShift(ws,-7)+'\')">‹</button>'+
     '<b class="num">'+fmtD(ws)+' – '+fmtD(dShift(ws,6))+(ws===curWk?' (this week)':'')+'</b>'+
     '<button class="btn sm" onclick="openReport(\''+dShift(ws,7)+'\')" '+(ws>=curWk?'disabled style="opacity:.35"':'')+'>›</button></div>';
+  h+=sect('The five')+pillarRows(ws)+
+    '<div class="tiny muted" style="margin-top:6px; line-height:1.55">A filled dot is a quality this week actually contained. An empty one is not a failure, it is the next thing to schedule.</div>';
   h+=sect('Training')+
     row('Workouts', cur.ses, dif(cur.ses,prv.ses,''))+
     (adh.planned? row('Plan adherence', adh.done+' / '+adh.planned,'') : '')+
@@ -2979,6 +3375,23 @@ function achievements(){
     {i:'🥬', t:'Fiber goal ×7 days', ok:Object.keys(S.food||{}).filter(function(d){
       return foodTotals(d).fb >= (+S.settings.fiberGoal||30); }).length>=7},
     {i:'🫀', t:'First VO2max test', ok:(S.vo2||[]).length>=1},
+    {i:'🤙', t:'First longevity test', ok:(S.tests||[]).some(function(r){ return (fieldTest(r.key)||{}).group==='longevity'; })},
+    {i:'🧬', t:'All four longevity tests done', ok:(function(){
+      const keys=['hang','balance','sts','gait'];
+      return keys.every(function(k){ return testHistory(k).length>0; });
+    })()},
+    {i:'🏅', t:'Every longevity test inside its band', ok:(function(){
+      const keys=['hang','balance','sts','gait'];
+      return keys.every(function(k){ const l=lastTest(k); const b=l&&testBand(k,l.val); return b&&b.ok; });
+    })()},
+    {i:'📐', t:'Range of motion measured', ok:(S.tests||[]).some(function(r){ return (fieldTest(r.key)||{}).group==='range'; })},
+    {i:'💥', t:'First power session', ok:(S.sessions||[]).some(function(ss){
+      return ss.ex.some(function(e){ return exGroupOf(e.exId)==='Power'; }); })},
+    {i:'🕸', t:'A week covering all five', ok:(function(){
+      const p=pillarWeek(wkMonday(today()));
+      return PILLARS.every(function(pl){ return p[pl.key]>=pl.need; });
+    })()},
+    {i:'🦴', t:'60 s dead hang', ok:(function(){ const l=lastTest('hang'); return !!l && l.val>=60; })()},
     {i:'📈', t:'VO2max improved', ok:(function(){
       const v=S.vo2||[]; if(v.length<2) return false;
       return v[v.length-1].val > v[0].val; })()},
@@ -3028,7 +3441,10 @@ function holdBest(exId){
   });
   return best;
 }
-function fmtSet(s, grp, timed){
+function fmtSet(s, grp, timed, iv){
+  /* on an interval machine the second column is peak heart rate, not minutes:
+     "140min" read as a forty-minute interval, which is nonsense */
+  if(iv) return (s.w? s.w+'km/' : '')+(s.r? s.r+'bpm' : '-');
   if(grp==='Cardio') return s.w+'km/'+s.r+'min'+(s.z?' Z2':'');
   if(timed) return ((+s.w)? s.w+'kg · ':'')+(s.r||0)+'s';
   return s.w+'×'+s.r;
@@ -3042,8 +3458,8 @@ function prevArr(exId){
   return null;
 }
 function prevSets(exId){
-  const grp=exGroupOf(exId), tmd=isTimedEx(exId), pa=prevArr(exId);
-  return pa ? pa.map(function(s){ return fmtSet(s,grp,tmd); }).join('  ') : '';
+  const grp=exGroupOf(exId), tmd=isTimedEx(exId), pa=prevArr(exId), iv=!!exIv(exId);
+  return pa ? pa.map(function(s){ return fmtSet(s,grp,tmd,iv); }).join('  ') : '';
 }
 function cardioBest(exId){
   let km=0, pace=null;
@@ -3331,6 +3747,190 @@ function vo2Band(v, age, sex){
   return {label:'Excellent', ok:true};
 }
 function lastVo2(){ const l=(S.vo2||[]); return l.length? l[l.length-1] : null; }
+
+/* ============ field tests: longevity and range ============
+   The app was good at prescribing and blind at assessing: outside strength and
+   body weight it could not tell you whether any of it was working. These are
+   the tests worth having — every one needs no equipment beyond a bar, a chair
+   and a wall, and the first four are among the best-validated predictors of
+   how the next thirty years go.
+
+   `norm` returns the cut-offs for an age and sex as [poor, fair, good], read
+   the same way vo2Band reads VO2_BANDS. Where the published norms are thin
+   for young adults the entry says so rather than inventing precision. */
+const FIELD_TESTS=[
+  {key:'hang', group:'longevity', name:'Dead hang', unit:'s', better:'up',
+   how:'Hang from a bar, arms straight, feet off the floor. Time it until you drop. Do not kip or re-grip.',
+   why:'A proxy for grip strength, which tracks all-cause mortality more closely than almost any other single measure. Grip is not the cause — it is the readout of total body strength and neural health.',
+   norm:function(){ return [20,40,60]; },
+   normNote:'A general adult guide rather than a published band: hang time has no large reference dataset. 60 s is a good target for anyone under 40.'},
+  {key:'grip', group:'longevity', name:'Grip (dynamometer)', unit:'kg', better:'up', optional:true,
+   how:'Squeeze a hand dynamometer, best of three per hand, standing with the elbow at 90°. Record the better hand.',
+   why:'The measured version of the dead hang. Worth doing if you own the device; the norms below are the ones the research uses.',
+   norm:function(age,sexM){
+     const m=[[30,[41,49,57]],[40,[41,49,56]],[50,[38,46,53]],[60,[35,42,49]],[99,[29,36,43]]];
+     const f=[[30,[25,30,35]],[40,[24,29,34]],[50,[22,27,32]],[60,[20,24,29]],[99,[17,21,25]]];
+     const rows=sexM?m:f; for(let i=0;i<rows.length;i++) if(age<=rows[i][0]) return rows[i][1];
+     return rows[rows.length-1][1];
+   }},
+  {key:'balance', group:'longevity', name:'Single-leg balance, eyes closed', unit:'s', better:'up',
+   how:'Stand on one leg, hands on hips, eyes closed. Stop the clock when a foot moves, the hands come off, or the eyes open. Best of three.',
+   why:'One of the sharpest fall and mortality signals there is, and the quality that declines first and most quietly. Eyes closed is the whole test: with eyes open, vision hides the loss.',
+   norm:function(age){
+     const rows=[[30,[8,15,25]],[40,[7,12,20]],[50,[5,9,15]],[60,[4,7,11]],[99,[2,4,7]]];
+     for(let i=0;i<rows.length;i++) if(age<=rows[i][0]) return rows[i][1];
+     return rows[rows.length-1][1];
+   }},
+  {key:'sts', group:'longevity', name:'30-second sit-to-stand', unit:'reps', better:'up',
+   how:'From a standard chair, arms crossed on the chest, stand fully and sit fully as many times as you can in 30 seconds.',
+   why:'Leg power and the ability to get off a chair unaided, which is the difference between independent and not in later life. Rikli–Jones norms.',
+   norm:function(age,sexM){
+     const m=[[40,[17,22,27]],[60,[14,18,22]],[70,[12,16,20]],[99,[10,13,17]]];
+     const f=[[40,[15,20,25]],[60,[12,16,20]],[70,[11,14,18]],[99,[9,12,16]]];
+     const rows=sexM?m:f; for(let i=0;i<rows.length;i++) if(age<=rows[i][0]) return rows[i][1];
+     return rows[rows.length-1][1];
+   }},
+  {key:'gait', group:'longevity', name:'4-metre gait speed', unit:'m/s', better:'up',
+   how:'Mark 4 metres. Walk it at your normal comfortable pace, timed, from a standing start. Best of two.',
+   why:'Usual walking speed predicts survival across every adult age band studied. Under 0.8 m/s is a clinical flag; healthy adults sit well above 1.2.',
+   norm:function(){ return [1.0,1.2,1.4]; },
+   normNote:'Under 0.8 m/s is the clinical threshold at any age.'},
+  /* range of motion: the flexibility work had no way of telling you it worked */
+  {key:'sitreach', group:'range', name:'Sit-and-reach', unit:'cm', better:'up',
+   how:'Sit with legs straight, feet against a box or wall. Reach forward slowly. Measure past the toes as positive, short of them as negative.',
+   why:'Posterior chain length. The classic field measure, and the one most responsive to consistent hamstring work.',
+   norm:function(age,sexM){ return sexM? [-5,3,11] : [0,8,16]; }},
+  {key:'ankle', group:'range', name:'Ankle dorsiflexion (knee to wall)', unit:'cm', better:'up',
+   how:'Foot square to a wall, drive the knee forward to touch it without the heel lifting. Slide the foot back until it only just touches. Measure toe to wall.',
+   why:'The single most common limiter of squat depth and a real factor in Achilles and knee load. Under 10 cm restricts almost everyone.',
+   norm:function(){ return [8,10,13]; }},
+  {key:'shoulder', group:'range', name:'Shoulder flexion (wall gap)', unit:'cm', better:'down',
+   how:'Back flat to a wall, knees bent, low back pressed down. Raise straight arms overhead and measure the gap between wrists and wall.',
+   why:'Overhead range without stealing it from the lower back. A large gap is why overhead pressing hurts for most people who think it is a shoulder problem.',
+   norm:function(){ return [10,5,2]; }},
+  {key:'hipir', group:'range', name:'Hip internal rotation', unit:'°', better:'up',
+   how:'Sit on a bench, knee bent to 90°, let the lower leg swing outward. Estimate the angle from vertical.',
+   why:'Loss here shows up long before hip pain does, and it changes how you squat and run whether you notice or not.',
+   norm:function(){ return [20,30,40]; }},
+  {key:'thoracic', group:'range', name:'Thoracic rotation', unit:'°', better:'up',
+   how:'On all fours, one hand behind the head, rotate the chest open. Estimate the angle the elbow travels from the floor.',
+   why:'Upper-back rotation, which the lower back and shoulders both pay for when it is missing.',
+   norm:function(){ return [35,45,55]; }}
+];
+function fieldTest(key){ return FIELD_TESTS.find(function(t){ return t.key===key; })||null; }
+/* Same three-band read as vo2Band, but `better:'down'` inverts it: on the wall
+   gap a smaller number is the good one, and reading it the other way would
+   congratulate you for the worst shoulders in the room. */
+function testBand(key, val){
+  const t=fieldTest(key); if(!t||val===''||val==null||isNaN(+val)) return null;
+  const st=S.settings, age=+st.age||30, sexM=st.sex!=='f';
+  const c=t.norm(age, sexM), v=+val;
+  const up=(t.better!=='down');
+  const pass=function(cut){ return up ? v>=cut : v<=cut; };
+  if(!pass(c[0])) return {label:'Below average', ok:false, cuts:c};
+  if(!pass(c[1])) return {label:'Fair', ok:false, cuts:c};
+  if(!pass(c[2])) return {label:'Good', ok:true, cuts:c};
+  return {label:'Excellent', ok:true, cuts:c};
+}
+function testHistory(key){ return (S.tests||[]).filter(function(r){ return r.key===key; }); }
+function lastTest(key){ const h=testHistory(key); return h.length? h[h.length-1] : null; }
+/* One screen for everything measurable that is not a lift or a weigh-in. Split
+   by what the number is for, because "how long can you hang" and "how far can
+   you reach" answer completely different questions. */
+/* A compact read of every field test with a result, plus how stale it is. Eight
+   weeks is the re-test interval these move on; anything fresher is noise. */
+function fieldTestSummary(){
+  const st=S.settings;
+  const done=FIELD_TESTS.map(function(t){ return {t:t, last:lastTest(t.key)}; })
+    .filter(function(r){ return !!r.last; });
+  const stale=done.filter(function(r){ return daysSince(r.last.date)>70; }).length;
+  let h='<div class="osec"><h2><span class="dot" style="background:var(--good)"></span>Longevity &amp; range</h2>';
+  if(!done.length){
+    h+='<div class="empty">Grip, balance, sit-to-stand and walking speed predict the next thirty years better than almost anything else you can measure at home. None of them take equipment.</div>';
+  } else {
+    h+=done.map(function(r){
+      const b=testBand(r.t.key, r.last.val);
+      return '<div class="listrow"><span class="small">'+esc(r.t.name)+
+        '<span class="tiny muted num" style="display:block">'+fmtD(r.last.date)+
+        (daysSince(r.last.date)>70? ' · due a re-test':'')+'</span></span>'+
+        '<span class="small num" style="text-align:right">'+r.last.val+' '+r.t.unit+
+        (b? '<span class="tiny" style="display:block; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:'+
+            (b.ok?'var(--good)':'var(--bad)')+'">'+b.label+'</span>':'')+'</span></div>';
+    }).join('');
+    if(stale) h+='<div class="tiny" style="color:var(--wk); margin-top:8px">'+stale+' test'+(stale===1?'':'s')+' older than 10 weeks.</div>';
+  }
+  h+='<div class="row" style="gap:8px; margin-top:10px">'+
+    '<button class="btn grow" onclick="assessSheet(\'longevity\')">Longevity tests</button>'+
+    '<button class="btn grow" onclick="assessSheet(\'range\')">Range of motion</button></div></div>';
+  return h;
+}
+function assessSheet(grp){
+  const g=grp||'longevity';
+  const st=S.settings;
+  const rows=FIELD_TESTS.filter(function(t){ return t.group===g; });
+  let h='<h3>'+(g==='longevity'?'Longevity tests':'Range of motion')+'</h3>'+
+    '<div class="seg" style="margin:-2px 0 12px">'+
+      '<button class="'+(g==='longevity'?'on':'')+'" onclick="assessSheet(\'longevity\')">Longevity</button>'+
+      '<button class="'+(g==='range'?'on':'')+'" onclick="assessSheet(\'range\')">Range</button></div>'+
+    '<p class="tiny muted" style="margin:-4px 0 14px; line-height:1.55">'+
+    (g==='longevity'
+      ? 'Nothing here needs equipment beyond a bar, a chair and four metres of floor. Re-test every 8 weeks — these move slowly, and checking weekly just measures noise.'
+      : 'Measure cold, before training, always the same way. The point is the trend, so an imperfect method repeated identically beats a perfect one done differently each time.')+
+    '</p>';
+  if(!st.age) h+='<div class="card" style="border-left:3px solid var(--wk); padding:10px 12px"><div class="tiny" style="color:var(--wk)">Set your age and sex in Settings — every band below is age-referenced.</div></div>';
+  rows.forEach(function(t){
+    const last=lastTest(t.key), b=last? testBand(t.key, last.val) : null;
+    const hist=testHistory(t.key);
+    const prev=hist.length>1? hist[hist.length-2] : null;
+    let delta='';
+    if(prev && last){
+      const d=Math.round((last.val-prev.val)*100)/100;
+      if(d!==0){
+        const good=(t.better==='down')? d<0 : d>0;
+        delta='<span class="tiny num" style="color:'+(good?'var(--good)':'var(--bad)')+'">'+(d>0?'+':'')+d+' vs last</span>';
+      }
+    }
+    h+='<div style="border-bottom:1px solid var(--line); padding:12px 0">'+
+      '<div class="spread"><b class="small">'+esc(t.name)+(t.optional?' <span class="tiny muted">optional</span>':'')+'</b>'+
+      (b? '<span class="tiny" style="font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:'+
+          (b.ok?'var(--good)':'var(--bad)')+'">'+b.label+'</span>' : '')+'</div>'+
+      '<div class="tiny muted" style="line-height:1.5; margin-top:3px">'+esc(t.how)+'</div>'+
+      '<div class="tiny" style="color:var(--ink2); line-height:1.5; margin-top:4px">'+esc(t.why)+'</div>'+
+      (b? '<div class="tiny muted num" style="margin-top:4px">Your '+last.val+' '+t.unit+
+          ' · bands '+b.cuts.join(' / ')+' '+t.unit+' for '+(+st.age||30)+
+          (t.normNote? '. '+esc(t.normNote) : '')+'</div>'
+        : (t.normNote? '<div class="tiny muted" style="margin-top:4px">'+esc(t.normNote)+'</div>' : ''))+
+      '<div class="row" style="gap:8px; margin-top:8px; align-items:center">'+
+        '<input id="ft_'+t.key+'" type="number" inputmode="decimal" step="0.1" placeholder="'+(last? last.val : t.unit)+
+        '" style="max-width:110px; padding:9px 10px; font-size:15px">'+
+        '<span class="tiny muted">'+t.unit+'</span>'+
+        '<button class="btn sm" onclick="saveTestFrom(\''+t.key+'\')">Save</button>'+
+        delta+
+      '</div></div>';
+  });
+  h+='<p class="tiny muted" style="margin-top:14px; line-height:1.6">Bands are population reference ranges, not a diagnosis. '+
+    'A number below the band is a reason to train the quality, not a reason to worry.</p>';
+  openSheet(h);
+}
+function saveTestFrom(key){
+  const el=$('#ft_'+key); if(!el) return;
+  if(!saveTest(key, el.value)){ toast('Enter a number first'); return; }
+  const t=fieldTest(key), b=testBand(key, el.value);
+  vib(12);
+  toast(t.name+': '+el.value+' '+t.unit+(b? ' — '+b.label : ''));
+  assessSheet(t.group);
+}
+function saveTest(key, val){
+  const t=fieldTest(key); if(!t) return false;
+  const v=+val;
+  if(val===''||isNaN(v)) return false;
+  S.tests=(S.tests||[]).filter(function(r){ return !(r.key===key && r.date===today()); });
+  S.tests.push({date:today(), key:key, val:v});
+  S.tests.sort(function(a,b){ return a.date<b.date?-1:1; });
+  save();
+  return true;
+}
+
 /* Zone 2 is conversational pace: only sets flagged as such count. */
 function zone2Mins(days){
   const from=dShift(today(), -(days||7));
@@ -3364,6 +3964,9 @@ function cardioHTML(){
   h+='<div class="row" style="gap:8px; margin-top:10px">'+
     '<button class="btn grow" onclick="vo2Form(\'rockport\')">Walk test</button>'+
     '<button class="btn grow" onclick="vo2Form(\'cooper\')">Run test</button></div></div>';
+  /* The other four tests, given the same weight as VO2max on the same screen.
+     Buried one tap deeper they would simply never get done. */
+  h+=fieldTestSummary();
   const z=zone2Mins(7), lo=150, hi=300;
   h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Zone 2 this week</h2>'+
     '<div class="row" style="align-items:baseline; gap:8px"><span class="num" style="font-size:34px; font-family:var(--fd-disp); font-weight:700">'+z+'</span>'+
@@ -3377,7 +3980,7 @@ function vo2Form(kind){
   const st=S.settings, cooper=(kind==='cooper');
   openSheet('<h3>'+(cooper?'Cooper 12-minute run':'Rockport 1-mile walk')+'</h3>'+
     '<p class="tiny muted" style="margin:-6px 0 12px">'+(cooper
-      ? 'Run as far as you can in exactly 12 minutes on a flat course, then enter the distance. Hard effort, so only when the knee is happy.'
+      ? 'Run as far as you can in exactly 12 minutes on a flat course, then enter the distance. Hard effort, so only when everything is pain-free.'
       : 'Walk one mile (1.61 km) as fast as you comfortably can, then enter your time and the heart rate you finish on.')+'</p>'+
     (cooper
       ? '<div class="field"><label for="v2d">Distance covered (metres)</label><input id="v2d" type="number" inputmode="numeric" placeholder="2400"></div>'
@@ -3521,9 +4124,15 @@ function sessionHTML(){
       '<span class="row" style="gap:6px"><button class="btn ghost sm" onclick="restPicker(\''+e.exId+'\')">⏱ '+fmtRest(exRest(e.exId))+'</button>'+
       '<button class="btn ghost sm danger" onclick="rmSessionEx('+ei+')">✕</button></span></div>';
     const rx=prescribe(e.exId), tg=rx.why;
-    if(rx.tag==='intervals')
+    /* a continuous block wants a countdown, not the rounds timer: offering
+       rounds on a zone 2 ride invites breaking up the one thing that must not
+       be broken up */
+    if(rx.tag==='intervals' && !rx.iv.block)
       h+='<button class="btn primary wide" style="margin-top:10px" onclick="startIntervals(\''+e.exId+'\')">'+
         '⚡ Start the '+rx.iv.rounds+' × '+Math.round(rx.iv.work/60)+' min timer</button>';
+    if(rx.tag==='intervals' && rx.iv.block)
+      h+='<button class="btn primary wide" style="margin-top:10px" onclick="go(\'timers\')">'+
+        '⏱ '+rx.iv.mins+' min — open the stopwatch</button>';
     if(pv||tg){
       h+='<div style="background:var(--raised); border-radius:10px; padding:8px 10px; margin-top:8px">';
       if(pv) h+='<div class="tiny muted num">prev &nbsp;'+pv+'</div>';
@@ -3536,7 +4145,9 @@ function sessionHTML(){
       h+='</div>';
     }
     const tmd=isTimedEx(e.exId);
-    const c1=tmd?'secs':(grp==='Cardio'?'km':unit()), c2=tmd?'timer':(grp==='Cardio'?'min':'reps');
+    const ivEx=!!exIv(e.exId);
+    const c1=tmd?'secs':(grp==='Cardio'?'km':unit());
+    const c2=tmd?'timer':(ivEx?'peak bpm':(grp==='Cardio'?'min':'reps'));
     const liftRow=(!tmd && grp!=='Cardio');
     h+= liftRow
       ? '<div class="sethead lift"><span>Set</span><span></span><span style="text-align:center">'+c1+'</span><span></span><span></span><span style="text-align:center">'+c2+'</span><span></span><span></span></div>'
@@ -3568,6 +4179,14 @@ function sessionHTML(){
           [['easy','Easy'],['ok','Right'],['hard','Hard']].map(function(o){
             return '<button class="eff'+(st.e===o[0]?' on '+o[0]:'')+'" onclick="setEffort('+ei+','+si+',\''+o[0]+'\')">'+o[1]+'</button>';
           }).join('')+'</div>';
+      }
+      /* An interval that missed the band is the whole signal. Saying so on the
+         row, while the next interval is still ahead of you, is worth far more
+         than a verdict after the session has ended. */
+      if(ivEx && st.done && +st.r){
+        const v=hrVerdict(+st.r, exIv(e.exId).type);
+        if(v) h+='<div class="tiny" style="margin:-2px 0 8px 45px; color:'+
+          (v.k==='in'?'var(--good)':v.k==='near'?'var(--wk)':'var(--bad)')+'">'+esc(v.s)+'</div>';
       }
     });
     h+='<button class="btn sm wide ghost" style="border:1px dashed var(--line)" onclick="addSet('+ei+')">+ Add set</button></div>';
@@ -3637,11 +4256,17 @@ function toggleSet(ei,si){
   const g=exGroupOf(ex.exId);
   if(st.done && g!=='Cardio') startRest(exRest(ex.exId));
 }
+const POW_REST=150;
 const MOB_REST=25;   /* long enough to switch sides, short enough to keep flowing */
 function exRest(exId){
   const e=S.exercises.find(function(x){return x.id===exId;});
   if(e && e.rest) return e.rest;
-  return exGroupOf(exId)==='Mobility' ? MOB_REST : S.settings.rest;
+  const g=exGroupOf(exId);
+  if(g==='Mobility') return MOB_REST;
+  /* Power needs full recovery between efforts, not the lifting default: the
+     rep is the point, and a rushed jump is a worse jump. */
+  if(g==='Power') return POW_REST;
+  return S.settings.rest;
 }
 function fmtRest(s){ return s<60 ? s+'s' : (s%60===0 ? (s/60)+'m' : Math.floor(s/60)+':'+pad(s%60)); }
 function restPicker(exId){
@@ -3745,7 +4370,10 @@ function finishSession(){
     let exPR=null;
     e.sets.forEach(function(s){
       nSets++;
-      if(g==='Cardio'||s.wu) return;
+      /* Power is excluded alongside Cardio: its weight column holds a jump
+         height or a throw distance, so counting it as tonnage adds "240 kg"
+         to the week for four box jumps. Neither group has tonnage to report. */
+      if(g==='Cardio'||g==='Power'||s.wu) return;
       const w=+s.w||0, r=+s.r||0, est=est1RM(w,r);
       vol+=w*r;
       if(tmd){
@@ -3835,7 +4463,7 @@ function historyHTML(){
       '<div><b>'+esc(s.name)+'</b><div class="tiny muted">'+fmtD(s.date)+' · '+mins+' min · '+Math.round(s.vol).toLocaleString()+' '+unit()+prTag+'</div></div><span class="muted">›</span></div></summary>';
     s.ex.forEach(function(e){
       const g=exGroupOf(e.exId), tmd=isTimedEx(e.exId);
-      h+='<div class="small" style="margin-top:8px"><b>'+esc(exName(e.exId))+'</b> <span class="muted num">'+e.sets.map(function(t){return (t.wu?'W ':'')+fmtSet(t,g,tmd);}).join('  ')+'</span></div>';
+      h+='<div class="small" style="margin-top:8px"><b>'+esc(exName(e.exId))+'</b> <span class="muted num">'+e.sets.map(function(t){return (t.wu?'W ':'')+fmtSet(t,g,tmd,!!exIv(e.exId));}).join('  ')+'</span></div>';
     });
     if(s.prs&&s.prs.length) s.prs.forEach(function(p){ h+='<div class="tiny" style="margin-top:6px; color:var(--good)">🏆 '+esc(p.ex)+' · '+p.txt+'</div>'; });
     if(s.note) h+='<div class="tiny muted" style="margin-top:8px">“'+esc(s.note)+'”</div>';
@@ -4031,7 +4659,7 @@ function openExInfo(exId){
   const rec=[];
   for(let i=S.sessions.length-1; i>=0 && rec.length<5; i--){
     const s=S.sessions[i], e=s.ex.find(function(x){return x.exId===exId;});
-    if(e) rec.push({date:s.date, line:e.sets.map(function(t){return (t.wu?'W ':'')+fmtSet(t,g,isTimedEx(exId));}).join('  ')});
+    if(e) rec.push({date:s.date, line:e.sets.map(function(t){return (t.wu?'W ':'')+fmtSet(t,g,isTimedEx(exId),!!exIv(exId));}).join('  ')});
   }
   if(rec.length){
     h+='<div class="tiny muted" style="margin:14px 0 2px; font-weight:700; letter-spacing:.07em; text-transform:uppercase">Recent</div>';
@@ -4402,6 +5030,27 @@ const FOODDB=[
 ['Tandoori momos (6)',340,12,34,16,3],['Afghani momos (6)',400,13,32,24,3],
 ['Chilli momos (6)',380,11,40,18,3],['Kurkure momos (6)',420,11,42,22,3],
 ['Cheese corn momos (6)',340,12,36,15,3],['Momo soup (bowl)',180,8,24,5,3],
+/* non-vegetarian, in the preparations they are actually eaten in here.
+   Fiber is 0 for plain meat and non-zero only where the dish carries
+   vegetables, pulses or grain. */
+['Egg boiled (1)',78,6.3,0.6,5.3,0],['Egg white boiled (1)',17,3.6,0.2,0.1,0],
+['Egg omelette (2 eggs)',220,13,2,17,0.4],['Egg bhurji (bowl)',260,14,4,20,1],
+['Egg curry (2 eggs)',330,14,10,26,2],['Half fry / sunny side up (1)',110,6.5,0.6,9,0],
+['Egg paratha (1)',330,12,38,14,3],['Anda bhurji pav (plate)',420,17,42,21,3],
+['Chicken breast grilled (100g)',165,31,0,3.6,0],['Chicken tikka (6 pieces)',290,36,6,13,0.5],
+['Butter chicken (bowl)',430,28,12,30,1.5],['Chicken curry (bowl)',320,26,8,20,2],
+['Chicken biryani (plate)',600,30,70,22,3],['Tandoori chicken (2 pieces)',300,34,4,16,0.5],
+['Chicken 65 (plate)',380,28,18,22,1],['Chicken momos steamed (6)',280,16,32,9,2],
+['Chicken shawarma roll (1)',480,26,48,20,4],['Grilled chicken salad (plate)',330,32,12,17,4],
+['Chicken soup (bowl)',150,12,10,6,1],['Chicken keema (bowl)',350,26,8,24,2],
+['Mutton curry / rogan josh (bowl)',450,26,8,34,1.5],['Mutton keema (bowl)',400,24,6,31,1.5],
+['Mutton biryani (plate)',700,32,70,32,3],
+['Fish curry (bowl)',280,26,7,16,1.5],['Fish fry (2 pieces)',300,28,8,18,0.5],
+['Tandoori fish (2 pieces)',240,30,3,12,0.5],['Prawn curry (bowl)',260,24,8,14,1.5],
+['Prawn fry (100g)',220,22,5,12,0.5],
+/* the Rajasthani meats, which the non-vegetarian block was missing entirely */
+['Laal maas (bowl)',480,27,7,38,1.5],['Safed maas (bowl)',460,26,9,35,1.5],
+['Junglee maas (bowl)',440,26,4,36,0.5],['Mutton sula (4 pieces)',330,32,4,20,0.5],
 /* drinks */
 ['Chai with milk + sugar (1 cup)',90,2,12,3.5,1],['Chai no sugar (1 cup)',45,2,4,2.5,0],['Black coffee (1 cup)',5,0,0,0,0],
 ['Nimbu pani with sugar (glass)',60,0,15,0,0.3],['Chaas / buttermilk (glass)',40,2,3,1.5,1],['Sweet lassi (glass)',220,6,30,8,1],
@@ -4410,7 +5059,135 @@ const FOODDB=[
 /* fruits */
 ['Apple (1)',80,0.4,21,0.3,2.5],['Mango (1 medium)',150,1.5,35,0.6,2.5],['Orange (1)',60,1,15,0.2,2.5],
 ['Papaya (bowl)',60,1,15,0.2,2.5],['Grapes (bowl)',100,1,26,0.2,2.5],['Watermelon (bowl)',45,1,11,0.2,2.5],
-['Pomegranate / anaar (1)',105,2,26,1.5,2.5],['Guava (1)',60,2,14,1,2.5],['Chikoo (1)',80,0.5,20,1,2.5]
+['Pomegranate / anaar (1)',105,2,26,1.5,2.5],['Guava (1)',60,2,14,1,2.5],['Chikoo (1)',80,0.5,20,1,2.5],
+/* ---- the everyday sabzis. A "bowl" is a katori, roughly 150g of the finished
+   dish, which is the unit the rest of this section already uses. Fiber runs
+   high here because these are vegetables cooked whole, not gravies. */
+['Parwal sabzi (bowl)',130,3,12,8,4],['Bharwan parwal (bowl)',200,5,14,14,4.5],
+['Turai sabzi (bowl)',95,2,9,6,3.5],['Turai chana dal (bowl)',160,7,16,8,6],
+['Kaddu ki sabzi (bowl)',140,2,18,7,3.5],['Khatta meetha kaddu (bowl)',170,2,24,8,3.5],
+['Arbi ki sabzi dry (bowl)',180,3,22,9,3.5],['Arbi masala gravy (bowl)',200,3,20,12,3.5],
+['Kande ki sabzi (bowl)',150,3,15,9,3],['Kachri ki sabzi (bowl)',120,3,12,7,4],
+['Palak ki sabzi (bowl)',120,4,9,8,4],['Palak corn (bowl)',210,7,20,12,4.5],
+['Sarson ka saag (bowl)',180,6,12,12,6],['Methi aloo (bowl)',170,4,20,9,4.5],
+['Aloo palak (bowl)',160,4,20,7,4.5],['Aloo shimla mirch (bowl)',150,3,18,8,4],
+['Bhindi masala (bowl)',150,3,13,10,5],['Bharwan bhindi (bowl)',210,4,15,15,5],
+['Kundru sabzi (bowl)',110,2,10,7,4],['Gawar aloo (bowl)',150,4,16,8,5],
+['Sev bhaji (bowl)',260,7,20,17,3],['Sev tamatar gravy (bowl)',240,6,18,16,3],
+['Lauki ke gufte (bowl)',280,9,20,18,4],['Lauki ke gufte chile (bowl)',300,9,22,19,4],
+['Gatte ki kadhi (bowl)',270,9,22,16,3.5],['Papad mangodi (bowl)',210,8,20,11,4],
+['Chana masala (bowl)',230,10,30,8,9],['Rajma masala (bowl)',240,11,32,8,10],
+['Soya chaap masala (bowl)',330,20,18,20,4],['Matar mushroom (bowl)',190,7,14,12,4.5],
+['Paneer makhani (bowl)',360,14,16,27,1.5],['Paneer lababdar (bowl)',350,14,15,26,1.5],
+['Paneer tikka masala (bowl)',340,16,14,24,2],['Chana saag (bowl)',220,9,22,10,7],
+/* ---- combined plates, because a meal is eaten as a meal. Logging roti and
+   sabzi as two rows every single day is friction that ends in not logging. */
+['Roti + sabzi (2 roti + bowl)',330,8,42,13,9],
+['Roti + dal + sabzi (2 roti + 2 bowls)',480,17,64,16,17],
+['Roti + dal + sabzi + rice (full plate)',680,21,108,17,18],
+['Veg thali (standard)',750,22,105,26,18],['Rajasthani thali (full)',950,25,120,40,20],
+['Dal chawal (plate)',350,13,57,6,9],['Kadhi chawal (plate)',360,10,56,10,3],
+['Rajma chawal (plate)',440,15,76,9,11],['Chole chawal (plate)',430,14,74,9,10],
+['Dal baati churma (full plate, 3 baati)',1100,22,130,52,12],
+['Idli sambhar (3 idli + sambhar)',280,10,50,4,6],
+['Dosa sambhar chutney (plate)',390,9,52,16,6],
+['Medu vada sambhar (2 vada)',330,9,38,16,5],
+['Poori sabzi (4 poori + aloo)',560,10,66,28,5],
+/* ---- breakfast, including the muesli that replaced the oats */
+['Muesli plain (50g)',190,5,32,4,5],['Muesli + milk (bowl)',340,13,45,10,5],
+['High-protein muesli + milk (bowl)',390,25,42,11,6],
+['Muesli + curd (bowl)',310,12,40,9,5],['Overnight oats (jar)',350,12,50,11,6],
+['Vegetable poha with peanuts (plate)',330,8,48,11,4],
+['Kande poha (plate)',290,6,46,9,3],['Poha jalebi (plate)',520,8,80,19,3],
+['Rava upma with veg (bowl)',270,7,38,10,4],['Vermicelli upma (bowl)',260,6,40,8,3],
+['Moong dal chilla (2)',220,13,22,8,5],['Besan chilla stuffed paneer (1)',230,12,13,14,3],
+['Uttapam (1)',210,5,32,7,2],['Rava dosa (1)',200,4,26,9,1.5],
+['Paneer paratha (1)',330,12,34,16,3.5],['Gobi paratha (1)',270,6,36,11,4],
+['Methi thepla (2)',240,6,34,9,5],['French toast eggless (2 slices)',290,7,38,12,1.5],
+['Muesli bar / granola bar (1)',180,4,26,7,2.5],['Fruit + curd bowl',200,9,30,4,4],
+/* ---- chaat and street, the ones missing from the list above */
+['Dahi puri (6)',280,7,38,11,3],['Dahi bhalla (2)',260,8,32,11,3],
+['Raj kachori (1)',400,9,45,20,5],['Matar kachori (1)',210,5,22,11,3],
+['Aloo tikki plain (2)',220,4,30,9,3],['Chole tikki chaat (plate)',420,12,52,17,9],
+['Pav bhaji extra butter (plate)',600,12,62,33,9],['Masala pav (2)',330,7,42,14,4],
+['Dabeli (1)',260,5,34,11,3],['Corn chaat (bowl)',180,5,30,5,4],
+['Fruit chaat (bowl)',150,2,34,1,5],['Chana chaat (bowl)',220,10,30,7,9],
+['Aloo chaat (plate)',280,4,38,13,4],['Kachori sev chaat (plate)',430,8,48,23,4],
+/* ---- rolls and wraps */
+['Paneer roll (1)',400,16,42,19,4],['Paneer tikka wrap (1)',430,18,44,20,4],
+['Veg wrap (1)',350,9,45,15,5],['Aloo roll (1)',360,7,48,15,4],
+['Hara bhara kabab wrap (1)',380,11,46,17,6],['Veg frankie double cheese (1)',480,15,48,25,4],
+/* ---- dairy, salad and the packets */
+['Greek yogurt plain (100g)',97,9,4,5,0],['Greek yogurt flavoured (cup, 100g)',120,9,14,3,0],
+['Flavoured yogurt cup (85g)',110,6,16,2,0],['Curd with sugar (bowl)',180,7,25,6,0],
+['Kheera / cucumber (1 whole)',30,1.5,7,0.2,2],['Tomato (1)',20,1,4,0.2,1.2],
+['Carrot (1)',25,0.6,6,0.1,1.7],['Beetroot (1 small)',35,1.3,8,0.1,2],
+['Green salad, no dressing (plate)',45,2,9,0.3,3.5],['Sprouts salad (bowl)',150,10,20,2,7],
+['Mango achar (1 tsp)',30,0,1,3,0.2],['Nimbu achar (1 tsp)',15,0,2,0.7,0.2],
+['Mixed achar (1 tsp)',30,0,1,3,0.2],['Mirchi achar (1 tsp)',25,0,1,2.5,0.3],
+['Lays magic masala (small packet, 26g)',140,2,15,8,1],
+['Doritos / nacho chips (small pack)',150,2,17,8,1],
+['Banana chips (30g)',160,1,17,10,1.5],['Salted peanuts (30g)',170,7,5,14,2.5],
+['Aloo sev (30g)',160,3,15,10,1.5],['Ratlami sev (30g)',165,4,14,10,1.5],
+['Chana jor garam (30g)',120,6,18,3,5],['Sing bhujia (30g)',165,5,13,11,2],
+/* ---- the Marwari kitchen. A bowl is a katori, roughly 150 g of the finished
+   dish. Besan runs through most of this cuisine because the desert had no fresh
+   vegetables to speak of, which is why these carry real protein for sabzis. */
+['Pattod steamed (4 pieces)',210,9,22,10,3],['Pattod fried (4 pieces)',300,9,24,19,3],
+['Besan ki sabzi (bowl)',260,10,20,16,3],['Besan pakodi ki sabzi (bowl)',290,11,22,18,3],
+['Besan cheele ki sabzi (bowl)',270,12,21,16,3.5],
+['Mangodi ki sabzi (bowl)',240,12,24,11,5],['Mangodi aloo (bowl)',270,11,30,12,5],
+['Govind gatte (bowl)',330,11,24,21,4],['Masala gatte (bowl)',270,9,22,16,4],
+['Palak gatte (bowl)',290,11,22,18,4.5],
+['Kumatiya ki sabzi (bowl)',220,10,20,12,7],['Ker ki sabzi (bowl)',170,4,14,11,6],
+['Sangri ki sabzi (bowl)',190,4,16,12,7],
+['Kairi / amchur ki sabzi (bowl)',150,2,18,8,2.5],
+['Tamatar ki launji (katori)',140,2,16,8,2],['Aam ki launji (katori)',180,1,30,6,1.5],
+['Kairi launji (katori)',150,1,24,6,1.5],
+['Bajre ki raab (glass)',180,5,28,5,4],['Dal dhokli (plate)',420,16,58,13,10],
+['Khoba roti (1)',180,5,30,4,4],['Khichiya papad roasted (1)',35,1,7,0.3,0.5],
+['Lehsun ki chutney (1 tbsp)',45,1,3,3.5,0.6],['Besan chakki (1 piece)',180,4,20,9,0.8],
+['Rajasthani kadhi (bowl)',180,7,13,10,2],['Bati plain (1)',180,5,26,6,2.5],
+/* ---- the everyday vegetables that were still missing */
+['Patta gobi / cabbage sabzi (bowl)',110,3,11,6,4],['Patta gobi matar (bowl)',140,5,14,7,5],
+['French beans sabzi (bowl)',120,3,12,7,4.5],['Sem phali sabzi (bowl)',130,4,13,7,5],
+['Shalgam ki sabzi (bowl)',110,2,13,6,3],['Aloo shalgam (bowl)',150,3,18,8,3.5],
+['Kathal ki sabzi (bowl)',210,3,22,13,4],['Chukandar ki sabzi (bowl)',120,3,15,6,4],
+['Drumstick / sahjan sabzi (bowl)',130,3,12,8,4.5],['Kachnar ki sabzi (bowl)',120,3,11,7,4],
+['Bharwan baingan (bowl)',230,5,16,17,5],['Bharwan mirch (2)',180,4,12,13,3],
+['Aloo pyaaz ki sabzi (bowl)',170,3,20,9,3],['Aloo tamatar ki sabzi (bowl)',150,3,19,7,3],
+['Aloo baingan (bowl)',170,3,19,9,4],['Aloo chana dal (bowl)',210,8,26,8,6],
+['Mixed veg dry (bowl)',140,4,14,8,4.5],['Soyabean / nutrela ki sabzi (bowl)',230,18,15,11,6],
+['Moong ki sabzi (bowl)',180,11,22,5,7],['Baby corn masala (bowl)',180,5,20,9,4],
+['Zucchini sabzi (bowl)',100,2,9,6,3],['Broccoli sabzi (bowl)',120,4,10,7,4],
+['Kaddu aloo (bowl)',160,3,20,8,3.5],['Gobi matar (bowl)',150,5,15,8,5],
+['Gobi aloo dry (bowl)',160,4,18,8,4.5],['Baingan aloo bharta (bowl)',160,3,14,10,4.5],
+['Turai aloo (bowl)',130,3,15,7,3.5],['Lauki chana dal (bowl)',180,8,20,7,6],
+['Lauki kofta (bowl)',330,8,20,24,4],['Palak aloo methi (bowl)',160,5,17,8,5],
+['Sarson palak saag (bowl)',170,6,12,11,6],['Chane ki sabzi (bowl)',230,11,28,8,9],
+['Rajma sukha (bowl)',200,11,28,5,10],['Lobia ki sabzi (bowl)',210,11,27,6,9],
+['Matar ki sabzi (bowl)',160,7,18,7,6],['Matar aloo dry (bowl)',170,5,21,7,5],
+['Sev matar (bowl)',250,7,20,16,4],['Aloo methi (bowl)',170,4,19,9,4.5],
+['Karela pyaaz (bowl)',140,3,12,9,4.5],['Tinda aloo (bowl)',120,3,14,6,4],
+['Parwal aloo (bowl)',150,3,16,8,4],['Kundru aloo (bowl)',140,3,15,7,4],
+/* ---- cafe drinks by type. These are typical cafe-portion figures, not any one
+   shop's recipe: a house special can swing 150 kcal either way on syrup and
+   cream alone. Save the exact one to My Foods the first time you order it. */
+['Espresso (single shot)',5,0,1,0,0],['Doppio (double shot)',10,0,2,0,0],
+['Cortado (cup)',70,4,5,4,0],['Flat white (cup)',130,7,10,7,0],
+['Macchiato (cup)',20,1,2,1,0],['Mocha (cup)',250,8,30,11,1.5],
+['Affogato (1)',180,4,20,9,0.5],['Cold brew black (glass)',15,0,3,0,0],
+['Cold brew with milk (glass)',110,5,12,5,0],['Caramel latte (cup)',260,8,35,10,0],
+['Hazelnut latte (cup)',260,8,34,10,0],['Vanilla latte (cup)',250,8,33,10,0],
+['Caramel frappe with cream (glass)',420,7,58,18,0.5],
+['Matcha latte (cup)',180,7,24,6,1],['Chai latte (cup)',190,6,28,6,0.5],
+['Filter coffee / South Indian (cup)',90,4,10,4,0],['Irish-style coffee, no alcohol (cup)',230,5,26,12,0],
+['Thick shake, any flavour (glass)',450,10,60,18,1],['Brownie shake (glass)',520,11,68,22,1.5],
+['Nutella shake (glass)',540,11,70,24,1.5],['Biscoff shake (glass)',530,9,72,23,1],
+['Lemonade (glass)',130,0,33,0,0.3],['Cucumber mint cooler (glass)',90,1,22,0,1],
+['Blue lagoon (glass)',150,0,38,0,0],['Green apple mojito (glass)',140,0,35,0,0.3],
+['Watermelon cooler (glass)',110,1,27,0,0.6],['Kokum / aam panna (glass)',120,0,30,0,0.5],
+['Hot chocolate with cream (cup)',340,9,38,17,2],['Affogato brownie (plate)',480,8,58,25,2]
 ];
 let FDMEAL='s', FDRES=[], FDITEM=null, FDQ='', PLATE=[];
 /* The leaders' logging-speed advantage comes almost entirely from not making
@@ -4444,31 +5221,213 @@ function logAgain(meal,i){
   save(); vib(12); closeSheet(); renderFood();
   toast(f.name+': '+Math.round(f.kcal)+' kcal logged');
 }
+/* ---------- diet ----------
+   Classified by name rather than a seventh column, so the 343 rows keep the
+   six-field shape everything else relies on. This filters what is OFFERED only:
+   entries you already logged and barcodes you already taught are snapshots, and
+   must never be filtered out from under you. */
+/* Substring matching has predictable false positives: "no ghee" contains ghee,
+   "peanut butter" contains butter, "kheera" contains kheer. Tested BEFORE
+   DIET_TAGS so the tag wins outright, rather than patching three names and
+   waiting for the next food that says butter. */
+const DIET_EXCEPT=[
+  [/no ghee|without ghee|peanut butter|almond butter|kheera/i, 'veg']
+];
+const DIET_TAGS=[
+  /* \bmaas\b, not loose: laal maas, safed maas and junglee maas are mutton and
+     were classifying as vegetarian, which is the worst direction for this
+     mistake to go. gosht, murgh, machli and jhinga are here for the same reason
+     - the dish is not always named in English. */
+  [/chicken|mutton|lamb|keema|fish|prawn|shrimp|shawarma|\bmaas\b|\bgosht\b|\bmurgh\b|\bmachh?li\b|\bjhinga\b/i, 'nonveg'],
+  /* no loose "bhurji": egg bhurji is caught by \begg\b and anda, whereas a
+     bare bhurji match hid paneer bhurji from vegetarians */
+  /* every alternative is word-bounded: an unanchored "anda" is a substring of
+     "standard", which tagged a vegetarian thali as egg and hid it from
+     vegetarians. The same trap waits in any loose three-letter alternative. */
+  [/\begg\b|\beggs\b|\bomelette\b|\banda\b|\bhalf fry\b|\bsunny side\b/i, 'egg'],
+  [/paneer|milk|curd|dahi|lassi|ghee|butter|cheese|cream|malai|khoya|mawa|rabri|kheer|shrikhand|kulfi|ice cream|softy|choco bar|cassata|whey|casein|chaas|buttermilk|hung curd|latte|cappuccino|frappe|cold coffee|hot chocolate|milkshake|shake|cold cocoa/i, 'dairy']
+];
+function foodDiet(name){
+  const n=name||'';
+  for(let i=0;i<DIET_EXCEPT.length;i++) if(DIET_EXCEPT[i][0].test(n)) return DIET_EXCEPT[i][1];
+  /* egg bhurji is egg; paneer bhurji is dairy, so nonveg and egg are tested first */
+  for(let i=0;i<DIET_TAGS.length;i++) if(DIET_TAGS[i][0].test(n)) return DIET_TAGS[i][1];
+  return 'veg';
+}
+const DIET_ALLOWS={
+  nonveg:['nonveg','egg','dairy','veg'],
+  egg:['egg','dairy','veg'],
+  veg:['dairy','veg'],
+  vegan:['veg']
+};
+function dietAllows(name, diet){
+  const allow=DIET_ALLOWS[diet||'veg']||DIET_ALLOWS.veg;
+  return allow.indexOf(foodDiet(name))>-1;
+}
 function fdbAllFoods(){
-  return FOODDB.map(function(f){ return {name:f[0], kcal:f[1], p:f[2], c:f[3], f:f[4], fb:f[5]||0}; })
+  const diet=S.settings.diet||'veg';
+  return FOODDB.filter(function(f){ return dietAllows(f[0], diet); })
+    .map(function(f){ return {name:f[0], kcal:f[1], p:f[2], c:f[3], f:f[4], fb:f[5]||0}; })
+    /* your own saved foods are never filtered: you made them on purpose */
     .concat((S.myFoods||[]).map(function(m){ return {name:m.name, kcal:m.kcal, p:m.p, c:m.c, f:m.f, fb:m.fb||0, mine:true, id:m.id}; }));
+}
+/* ---------- search synonyms ----------
+   The rows are named the way the food is called here, which means half of them
+   are invisible to the other name for the same thing: searching "cucumber"
+   found nothing because the row says kheera, and you would reasonably conclude
+   the food was missing. Each entry is [what you might type, what the rows
+   actually say] — a matched phrase is consumed and becomes ONE alternatives
+   group, so "pani patashi" is a single concept rather than two words that must
+   both appear. Same shape as PAT_EX, SUPP_INFO and DIET_TAGS. */
+const FOOD_ALIAS=[
+  /* multi-word first: they must be consumed before their words are tokenised */
+  [/\bpani\s*patashi\b|\bgol\s*gappa?e?s?\b|\bpuchkas?\b/i, ['pani puri','golgappa']],
+  [/\blady\s*fingers?\b|\bokra\b/i,          ['bhindi']],
+  [/\bcottage\s*cheese\b/i,                  ['paneer']],
+  [/\bridge\s*gourd\b/i,                     ['turai']],
+  [/\bbottle\s*gourd\b/i,                    ['lauki']],
+  [/\bpointed\s*gourd\b/i,                   ['parwal']],
+  [/\bbitter\s*(gourd|melon)\b/i,            ['karela']],
+  [/\bbell\s*pepper\b|\bcapsicum\b/i,        ['shimla']],
+  [/\bkidney\s*beans?\b/i,                   ['rajma']],
+  [/\bchick\s*peas?\b|\bgarbanzos?\b/i,      ['chole','chana']],
+  [/\bclarified\s*butter\b/i,                ['ghee']],
+  [/\bsoft\s*drinks?\b|\bcokes?\b|\bpepsi\b|\bsodas?\b/i, ['cold drink']],
+  [/\bfrench\s*fries\b/i,                    ['fries']],
+  [/\bice[\s-]*creams?\b/i,                  ['ice cream']],
+  /* run-together spellings of things that are two words in the rows */
+  [/\bpatra\b|\baloo\s*vadi\b|\barbi\s*ke?\s*patte\b/i, ['pattod','patra']],
+  [/\bmoong\s*badi\b|\bmoong\s*ki\s*badi\b/i,   ['mangodi']],
+  [/\bbhelpuri\b/i,                          ['bhel puri']],
+  [/\bsevpuri\b/i,                           ['sev puri']],
+  [/\bdahipuri\b/i,                          ['dahi puri']],
+  [/\bpanipuri\b/i,                          ['pani puri']],
+  /* single words */
+  [/^cucumbers?$/i,      ['kheera','cucumber']],
+  [/^yogh?urts?$/i,      ['curd','dahi','yogurt']],
+  [/^pumpkins?$/i,       ['kaddu']],
+  [/^spinach$/i,         ['palak']],
+  [/^fenugreek$/i,       ['methi']],
+  [/^potatoe?s?$/i,      ['aloo','potato']],
+  [/^onions?$|^kanda$/i, ['pyaaz','kande','onion']],
+  [/^cauliflower$/i,     ['gobi']],
+  [/^peas$/i,            ['matar']],
+  [/^(eggplants?|aubergines?|brinjals?)$/i, ['baingan']],
+  [/^(colocasia|taro)$/i,['arbi']],
+  [/^lentils?$/i,        ['dal']],
+  [/^flatbreads?$/i,     ['roti']],
+  [/^noodles?$/i,        ['noodles','chowmein']],
+  [/^(chips|crisps|wafers?)$/i, ['chips','chipps','lays','kurkure','bingo']],
+  [/^koftas?$|^guftes?$/i,['kofta','gufte']],
+  [/^granola$/i,         ['muesli','granola']],
+  [/^sabj(i|ee)$/i,      ['sabzi']],
+  [/^(chapat(i|hi)|phulka)$/i, ['roti','chapati','phulka']],
+  [/^murgh$/i,           ['chicken']],
+  [/^(gosht|lamb)$/i,    ['mutton','lamb']],
+  [/^machh?li$/i,        ['fish']],
+  [/^(jhinga|shrimps?)$/i,['prawn']],
+  [/^anda$/i,            ['egg','anda']],
+  [/^doodh$/i,           ['milk']],
+  [/^kela$/i,            ['banana']],
+  [/^(seb|apples?)$/i,   ['apple']],
+  [/^aam$/i,             ['mango']],
+  [/^badam$/i,           ['almond','badam']],
+  [/^kaju$/i,            ['cashew','kaju']],
+  [/^(moongfali|groundnuts?)$/i, ['peanut']],
+  [/^kishmish$/i,        ['raisin']],
+  [/^akhrot$/i,          ['walnut']],
+  [/^cheeni$/i,          ['sugar']],
+  [/^amrood$/i,          ['guava']],
+  [/^lok(i|hi)$/i,       ['lauki','loki']],
+  [/^tomatoe?s?$/i,      ['tamatar','tomato']],
+  [/^vegetables?$/i,     ['veg']]
+];
+/* Hindi and English joining words carry no meaning here, and requiring them
+   made "loki ke gufte" miss a row literally called "Lauki ke gufte" because
+   the alias fired on lauki and left "ke" as a token of its own. */
+const FOOD_STOP=/^(ke|ki|ka|aur|se|with|and|the|of|in|a|an)$/i;
+/* A query becomes a list of alternatives-groups. Every group must match the
+   name somewhere; within a group, any one alternative is enough. */
+function foodTokens(q){
+  let s=String(q||'').toLowerCase().trim();
+  const groups=[];
+  /* pass 1, on the whole string: a multi-word alias has to be consumed before
+     tokenising, or "pani patashi" becomes two words that must both appear */
+  FOOD_ALIAS.forEach(function(a){
+    if(/\\s/.test(a[0].source) && a[0].test(s)){ s=s.replace(a[0],' '); groups.push(a[1]); }
+  });
+  const words=s.split(/\s+/).filter(Boolean);
+  const kept=words.filter(function(t){ return !FOOD_STOP.test(t); });
+  /* if the query was nothing BUT joining words, keep them rather than
+     silently searching for everything */
+  /* pass 2, per word: the single-word aliases are anchored, so they only ever
+     matched when the whole query was that one word */
+  (kept.length||groups.length? kept : words).forEach(function(t){
+    let alts=null;
+    for(let i=0;i<FOOD_ALIAS.length && !alts;i++) if(FOOD_ALIAS[i][0].test(t)) alts=FOOD_ALIAS[i][1];
+    groups.push(alts? alts.concat([t]) : [t]);
+  });
+  return groups;
+}
+/* Transliterated Hindi has no fixed spelling: pattod, patod, patode and pattode
+   are one dish, and nobody should have to guess which one the row used. Collapse
+   doubled letters and drop a trailing vowel, and they all land on "patod". */
+function foodStem(w){
+  return String(w||'').toLowerCase()
+    .replace(/[^a-z0-9]+/g,'')
+    .replace(/([a-z])\1+/g,'$1')
+    .replace(/[aeiou]+$/,'');
+}
+function nameStems(name){
+  return String(name||'').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(foodStem);
+}
+function foodMatches(name, groups){
+  const n=String(name||'').toLowerCase();
+  let stems=null;
+  return groups.every(function(alts){
+    if(alts.some(function(a){ return n.indexOf(a)>-1; })) return true;
+    /* Stems are compared whole word to whole word, never as a substring: an
+       over-stemmed fragment used as a substring would match half the database. */
+    if(!stems) stems=nameStems(name);
+    return alts.some(function(a){
+      const st=foodStem(a);
+      return st.length>2 && stems.indexOf(st)>-1;
+    });
+  });
 }
 function fdbSearch(q){
   FDQ=(q||'').trim();
   const box=$('#fdbRes'); FDITEM=null; $('#fdbSel').innerHTML='';
   if(!FDQ){ box.innerHTML=''; return; }
-  const toks=FDQ.toLowerCase().split(/\s+/);
+  const groups=foodTokens(FDQ);
+  const first=(groups[0]||[''])[0];
   const hist=foodHistoryCounts();
   FDRES=fdbAllFoods().filter(function(f){
-    const n=f.name.toLowerCase();
-    return toks.every(function(t){ return n.indexOf(t)>-1; });
+    return foodMatches(f.name, groups);
   }).sort(function(a,b){
-    /* what you log often should not be buried under what you never eat */
+    /* what you log often should not be buried under what you never eat, but a
+       name that STARTS with what you typed beats history: typing "dal" wants
+       Dal tadka, not Moong dal halwa. */
+    const pa=a.name.toLowerCase().indexOf(first)===0?1:0, pb=b.name.toLowerCase().indexOf(first)===0?1:0;
+    if(pa!==pb) return pb-pa;
     const ca=(hist[a.name]||{}).n||0, cb=(hist[b.name]||{}).n||0;
     return cb-ca;
-  }).slice(0,8);
+    /* 12, not 8: with 480 rows a broad word like "paneer" overflowed the list
+       and the row you wanted was cut off with no way to see it */
+  }).slice(0,12);
   box.innerHTML = FDRES.map(function(f,i){
     return '<div class="listrow" style="cursor:pointer" onclick="fdbPick('+i+')"><span class="small">'+esc(f.name)+
       (f.mine? ' <span class="tiny" style="color:var(--wk)">★ mine</span>':'')+'</span>'+
       '<span class="row" style="gap:8px"><span class="tiny muted num">'+f.kcal+' kcal · P'+f.p+'</span>'+
       (f.mine? '<button class="btn ghost sm danger" onclick="event.stopPropagation();delMyFood(\''+f.id+'\')">✕</button>':'')+'</span></div>';
   }).join('')
-  + '<div class="tiny" style="padding:8px 2px"><a href="#" style="color:var(--wk)" onclick="myFoodForm();return false">＋ Not here? Save “'+esc(FDQ)+'” as my food</a></div>';
+  + (FDRES.length
+      ? '<div class="tiny" style="padding:8px 2px"><a href="#" style="color:var(--wk)" onclick="myFoodForm();return false">＋ Not here? Save “'+esc(FDQ)+'” as my food</a></div>'
+      /* a dead end here is why a dish goes unlogged: asking for four macro
+         numbers nobody knows is not an offer, it is a refusal */
+      : '<div style="padding:6px 2px 2px"><div class="tiny muted" style="margin-bottom:8px; line-height:1.5">Nothing matched “'+esc(FDQ)+'”. Home cooking has a longer tail than any database — estimate it instead.</div>'+
+        '<button class="btn food wide" onclick="sabziSheet()">Estimate “'+esc(FDQ)+'”</button>'+
+        '<div class="tiny" style="padding:8px 2px"><a href="#" style="color:var(--wk)" onclick="myFoodForm();return false">＋ Or enter the numbers yourself</a></div></div>');
 }
 function fdbPick(i){
   FDITEM=FDRES[i]; if(!FDITEM) return;
@@ -4559,6 +5518,103 @@ function fdbAdd(){
   (day[FDMEAL]=day[FDMEAL]||[]).push(e);
   save(); closeSheet(); renderFood();
   toast(e.name+': '+e.kcal+' kcal logged');
+}
+/* ---------- the sabzi estimator ----------
+   Three rounds of "I cannot find X" said the same thing: the tail of Indian
+   home cooking has no end, and 553 rows still will not cover one household.
+   The old dead end asked for calories, protein, carbs and fat, none of which
+   anyone knows for their mother's pattod — so the honest choices were to log
+   something wrong or log nothing.
+
+   Six shapes cover almost all of it. Per-100g figures, calibrated against the
+   component rows already in the database (Dry sabzi / Sabzi gravy only / Dal
+   plain boiled, per katori) so the estimates agree with it rather than
+   inventing a second scale. Marked as estimates wherever they appear: a guess
+   must never look like a measurement. */
+const SABZI_TPL=[
+  {key:'dry',   name:'Dry sabzi',        note:'Vegetable, oil, masala. Bhindi, aloo, gobi, cabbage.',
+   per100:[75,2,7,4.5,2.8]},
+  {key:'gravy', name:'Gravy sabzi',      note:'Onion-tomato base, more oil. Aloo matar, mixed veg.',
+   per100:[95,2.5,9,5.5,2.6]},
+  {key:'besan', name:'Besan-based',      note:'Gatte, pattod, pakodi, mangodi. Carries real protein.',
+   per100:[165,7,14,9,2.5]},
+  {key:'stuff', name:'Stuffed / bharwan',note:'Bharwan baingan or mirch: vegetable, filling and the oil it cooked in.',
+   per100:[140,3,10,10,3.2]},
+  {key:'dal',   name:'Dal',              note:'Any lentil, tadka included.',
+   per100:[95,6,14,2,5.2]},
+  {key:'leafy', name:'Leafy / saag',     note:'Palak, methi, sarson.',
+   per100:[80,3.5,6,4.5,3.4]}
+];
+const SABZI_PORTION=[['katori',150],['bowl',250],['plate',350]];
+let SABZI_PICK={tpl:'dry', g:150};
+function sabziEstimate(key, grams){
+  const t=SABZI_TPL.find(function(x){ return x.key===key; })||SABZI_TPL[0];
+  const k=grams/100;
+  const r=function(v,d){ const m=Math.pow(10,d||0); return Math.round(v*k*m)/m; };
+  return {kcal:r(t.per100[0]), p:r(t.per100[1],1), c:r(t.per100[2],1),
+          f:r(t.per100[3],1), fb:r(t.per100[4],1), tpl:t};
+}
+function sabziSheet(){
+  const e=sabziEstimate(SABZI_PICK.tpl, SABZI_PICK.g);
+  const label=(SABZI_PORTION.find(function(x){ return x[1]===SABZI_PICK.g; })||['',0])[0];
+  openSheet('<h3>Estimate a dish</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 14px; line-height:1.55">No database can hold every dish cooked at home. '+
+      'Pick the shape it is closest to and roughly how much — near enough beats not logging it. '+
+      'The entry is marked as an estimate so you can tell it apart later.</p>'+
+    '<div class="field"><label for="sbName">What was it?</label>'+
+      '<input id="sbName" value="'+esc(FDQ)+'" placeholder="e.g. pattod"></div>'+
+    '<div class="tiny muted" style="font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin:6px 0 6px">Closest shape</div>'+
+    SABZI_TPL.map(function(t){
+      /* selection is shown with a border and an accent title, not .btn.primary:
+         that class uppercases everything inside it, which turned the one-line
+         explanation into unreadable amber capitals */
+      const on=(SABZI_PICK.tpl===t.key);
+      return '<button class="btn wide" style="margin-bottom:7px; justify-content:flex-start; text-align:left'+
+        (on?'; border-color:var(--wk); background:#f2a03d1a':'')+'" '+
+        'onclick="sabziPick(\'tpl\',\''+t.key+'\')"><span><b'+(on?' style="color:var(--wk)"':'')+'>'+
+        (on?'✓ ':'')+t.name+'</b>'+
+        '<span class="tiny muted" style="display:block; font-weight:500; text-transform:none; letter-spacing:0">'+esc(t.note)+'</span></span></button>';
+    }).join('')+
+    '<div class="tiny muted" style="font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin:12px 0 6px">How much</div>'+
+    '<div class="seg three">'+SABZI_PORTION.map(function(o){
+      return '<button class="'+(SABZI_PICK.g===o[1]?'on':'')+'" onclick="sabziPick(\'g\','+o[1]+')">'+o[0]+'</button>';
+    }).join('')+'</div>'+
+    '<div class="card" style="background:var(--raised); margin:14px 0 4px">'+
+      '<div class="spread"><b class="small">'+esc(e.tpl.name)+', one '+label+'</b>'+
+      '<span class="num" style="font-size:26px; font-family:var(--fd-disp); font-weight:700">'+e.kcal+'</span></div>'+
+      '<div class="tiny muted num" style="margin-top:2px">kcal · P '+e.p+' · C '+e.c+' · F '+e.f+' · Fib '+e.fb+'</div></div>'+
+    '<div class="row" style="gap:8px; margin-top:10px">'+
+      '<button class="btn food grow" onclick="sabziLog()">Log it</button>'+
+      '<button class="btn grow" onclick="sabziSave()">Save as my food</button></div>'+
+    '<p class="tiny muted" style="margin-top:12px; line-height:1.55">Saving it keeps the name you typed, so the second time it is yours. '+
+      'If you ever weigh the real thing, edit it there and the estimate is gone for good.</p>');
+}
+function sabziPick(k,v){ SABZI_PICK[k]= (k==='g')? +v : v; sabziSheet(); }
+function sabziName(){
+  const el=$('#sbName'), n=(el? el.value.trim() : '') || FDQ || 'Dish';
+  const label=(SABZI_PORTION.find(function(x){ return x[1]===SABZI_PICK.g; })||['',0])[0];
+  /* the tilde is the whole point: six months later you can still tell which
+     numbers you measured and which you guessed */
+  return n+' ('+label+', ~est)';
+}
+function sabziLog(){
+  const e=sabziEstimate(SABZI_PICK.tpl, SABZI_PICK.g);
+  const day=S.food[foodDate]=S.food[foodDate]||{};
+  (day[FDMEAL]=day[FDMEAL]||[]).push({id:uid(), name:sabziName(),
+    kcal:e.kcal, p:e.p, c:e.c, f:e.f, fb:e.fb, est:true});
+  save(); vib(12); closeSheet(); renderFood();
+  toast(sabziName()+': '+e.kcal+' kcal logged');
+}
+function sabziSave(){
+  const e=sabziEstimate(SABZI_PICK.tpl, SABZI_PICK.g);
+  const name=sabziName();
+  S.myFoods.push({id:uid(), name:name, kcal:e.kcal, p:e.p, c:e.c, f:e.f, fb:e.fb, est:true});
+  save(); vib(12);
+  const keep=PLATE;
+  addFoodForm(FDMEAL);
+  PLATE=keep; renderPlate();
+  const q=$('#fdbQ'); if(q){ q.value=name; fdbSearch(name); }
+  toast(name+' saved to your foods');
 }
 function myFoodForm(){
   openSheet('<h3>Save a “my food”</h3>'+
@@ -4738,11 +5794,12 @@ function barcodeLink(code){
 let BCRES=[];
 function bcSearch(q){
   const box=$('#bcRes'); if(!box) return;
-  const toks=String(q||'').trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if(!toks.length){ box.innerHTML=''; BCRES=[]; return; }
+  const groups=foodTokens(q);
+  if(!groups.length){ box.innerHTML=''; BCRES=[]; return; }
+  /* same synonym layer as the food search: a packet you know as "cucumber"
+     should still find the kheera row to attach the barcode to */
   BCRES=fdbAllFoods().filter(function(f){
-    const n=f.name.toLowerCase();
-    return toks.every(function(t){ return n.indexOf(t)>-1; });
+    return foodMatches(f.name, groups);
   }).slice(0,6);
   box.innerHTML=BCRES.map(function(f,i){
     return '<div class="listrow" style="cursor:pointer" onclick="bcAttach('+i+')"><span class="small">'+esc(f.name)+'</span>'+
@@ -5116,6 +6173,10 @@ function openSettings(){
     '<div class="field"><label for="sCarb">Carb goal (g)</label><input id="sCarb" type="number" inputmode="numeric" value="'+st.carbGoal+'"></div>'+
     '<div class="field"><label for="sFat">Fat goal (g)</label><input id="sFat" type="number" inputmode="numeric" value="'+st.fatGoal+'"></div></div>'+
     '<div class="field"><label for="sGoalW">Goal weight ('+st.unit+', shows on chart)</label><input id="sGoalW" type="number" inputmode="decimal" value="'+esc(st.goalWeight)+'" placeholder="optional"></div>'+
+    '<div class="field"><label for="sDiet">How you eat (filters food search)</label><select id="sDiet">'+
+      [['nonveg','Non-vegetarian'],['egg','Eggetarian'],['veg','Vegetarian'],['vegan','Vegan']].map(function(d){
+        return '<option value="'+d[0]+'"'+((st.diet||'veg')===d[0]?' selected':'')+'>'+d[1]+'</option>'; }).join('')+
+    '</select></div>'+
     '<hr style="border:0;border-top:1px solid var(--line); margin:14px 0">'+
     '<label class="row small" style="gap:8px; cursor:pointer; margin-bottom:10px"><input type="checkbox" id="sWaterRemind" '+(st.waterRemind?'checked':'')+' style="width:20px;height:20px;accent-color:var(--wa)">Water reminders (while app is open)</label>'+
     '<div class="fields2">'+
@@ -5185,6 +6246,7 @@ function collectSettings(){
   st.rest=+$('#sRest').value||90; st.calGoal=+$('#sCal').value||2200;
   st.proteinGoal=+$('#sProt').value||130; st.carbGoal=+$('#sCarb').value||250; st.fatGoal=+$('#sFat').value||70;
   st.goalWeight=$('#sGoalW').value;
+  if($('#sDiet')) st.diet=$('#sDiet').value;
   st.waterRemind=$('#sWaterRemind').checked; st.waterEvery=Math.max(10,+$('#sWaterEvery').value||60);
   st.workoutRemind=$('#sWkRemind').value;
   st.sleepRemind=$('#sSlRemind').value; st.sleepGoal=+$('#sSlGoal').value||8;
@@ -5312,15 +6374,31 @@ function obGoal(){
     [['gain','Build muscle','Small calorie surplus, high protein'],
      ['lose','Lose fat','Moderate deficit, protein protected'],
      ['fit','Stay fit','Maintenance calories, balanced']].map(function(g){
-      return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obPlan(\''+g[0]+'\')"><span><b>'+g[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+g[2]+'</span></span></button>';
+      return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obDiet(\''+g[0]+'\')"><span><b>'+g[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+g[2]+'</span></span></button>';
     }).join(''));
 }
-function obPlan(goal){
+/* One tap, and it decides which of the 343 foods you are ever offered, plus how
+   the B12 and omega-3 guidance is framed. Vegan is a separate answer from
+   vegetarian on purpose: the supplement advice genuinely differs. */
+function obDiet(goal){
   OB.goal=goal;
+  openSheet('<h3>How do you eat?</h3>'+
+    '<p class="tiny muted" style="margin:-6px 0 14px">This filters the food search to things you actually eat, and changes the supplement advice. Change it any time in Settings.</p>'+
+    [['nonveg','Non-vegetarian','Everything: meat, fish, eggs and dairy'],
+     ['egg','Eggetarian','Eggs and dairy, no meat or fish'],
+     ['veg','Vegetarian','Dairy, no eggs, meat or fish'],
+     ['vegan','Vegan','Plants only: no dairy, eggs, meat or fish']].map(function(d){
+      return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obPlan(\''+goal+'\',\''+d[0]+'\')"><span><b>'+d[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+d[2]+'</span></span></button>';
+    }).join(''));
+}
+function obPlan(goal, diet){
+  OB.goal=goal;
+  if(diet) OB.diet=diet;
   openSheet('<h3>Your training week</h3>'+
     '<p class="tiny muted" style="margin:-6px 0 14px">The Today screen will tell you what to do each day. Swap any day later in Edit weekly plan.</p>'+
     [['ppl3','3 days a week','Push · Pull · Legs with rest between: the honest starting point'],
      ['ppl6','6 days a week','Full Push-Pull-Legs ×2, for experienced lifters'],
+     ['cardio','Strength + VO2max','Push · Pull · Legs plus two 4×4 interval sessions, the best-evidenced cardio there is'],
      ['gentle','Gentle start','3 joint-friendly days + mobility, returning after a break or injury']].map(function(p){
       return '<button class="btn wide" style="margin-bottom:10px; justify-content:flex-start; text-align:left" onclick="obFinish(\''+p[0]+'\')"><span><b>'+p[1]+'</b><span class="tiny muted" style="display:block; font-weight:500">'+p[2]+'</span></span></button>';
     }).join(''));
@@ -5332,6 +6410,7 @@ function obFinish(planKey){
   /* the onboarding already asks for these for the BMR maths; keep them, or
      VO2max banding has nothing to work with later */
   st.age=String(age); st.sex=(OB.sex==='f'?'f':'m'); st.fiberGoal=30;
+  st.diet=DIET_ALLOWS[OB.diet]?OB.diet:'veg';
   const bmr = 10*w + 6.25*hgt - 5*age + (OB.sex==='f' ? -161 : 5);
   const adj = OB.goal==='gain' ? 300 : (OB.goal==='lose' ? -350 : 0);
   st.calGoal = Math.round((bmr*1.5 + adj)/50)*50;
@@ -5341,15 +6420,13 @@ function obFinish(planKey){
   st.waterGoal = Math.round(w*35/250)*250;
   st.goalWeight = OB.goal==='gain' ? String(Math.round(w+4)) : (OB.goal==='lose' ? String(Math.round(w-4)) : '');
   if(w>0 && !S.weights.length) S.weights.push({date:today(), kg:w});
-  /* friendlier public names for the joint-friendly routines */
-  S.routines.forEach(function(r){
-    r.name=r.name.replace(': wrist-safe return',': joint-friendly')
-                 .replace(': knee-safe return',': joint-friendly (legs)')
-                 .replace('Rehab: knee & wrist (~15 min)','Joint prep (~15 min)');
-  });
   function rid(n){ const r=S.routines.find(function(x){return x.name===n;}); return r?r.id:''; }
   if(planKey==='ppl6') S.plan={1:rid('Push day'),2:rid('Pull day'),3:rid('Legs day'),4:rid('Push day'),5:rid('Pull day'),6:rid('Legs day'),0:''};
   else if(planKey==='gentle') S.plan={1:rid('Push: joint-friendly'),2:rid('Joint prep (~15 min)'),3:rid('Pull: joint-friendly'),4:'',5:rid('Legs: joint-friendly (legs)'),6:rid('Mobility & flexibility (~20 min)'),0:''};
+  /* Lifting on the odd days, 4×4 intervals on the even ones: hard cardio never
+     lands the day before legs, and the two interval sessions sit three days
+     apart, which is the spacing the Norwegian protocol was tested at. */
+  else if(planKey==='cardio') S.plan={1:rid('Push day'),2:rid('VO2max intervals (4×4)'),3:rid('Pull day'),4:'',5:rid('Legs day'),6:rid('VO2max intervals (4×4)'),0:''};
   else S.plan={1:rid('Push day'),2:'',3:rid('Pull day'),4:'',5:rid('Legs day'),6:rid('Mobility & flexibility (~20 min)'),0:''};
   S.programStart=today();
   S.lastPhase=null; st.onboarded=true;

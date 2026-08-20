@@ -7,6 +7,19 @@ const path = require('path');
 
 const APP = 'file://' + path.resolve(__dirname, '..', 'index.html');
 const EXE = process.env.CHROME_PATH || '/opt/pw-browsers/chromium';
+/* Read the schema out of the source rather than hard-coding it. What these
+   checks are really for is that the stamp gets written and persisted, and that
+   the pre-upgrade snapshot records the right jump — not that the number is 23.
+   Hard-coding it made every migration break five unrelated assertions. */
+const SCHEMA = +require('fs')
+  .readFileSync(path.resolve(__dirname, '..', 'core.html'), 'utf8')
+  .match(/const SCHEMA=(\d+)/)[1];
+
+/* every pillar met its own threshold: strong>=2, healthy>=150 min, agile>=1,
+   flexible>=2, longevity>=1 */
+function PILLARS_OK(p) {
+  return p.strong >= 2 && p.healthy >= 150 && p.agile >= 1 && p.flexible >= 2 && p.longevity >= 1;
+}
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -35,12 +48,12 @@ function check(name, cond, detail) {
     weights: S.weights.length,
     shake: S.myFoods.some((m) => /post-workout shake/i.test(m.name)),
   }));
-  check('38 imported sessions + the re-entered 10 August push', boot.sessions === 39, boot.sessions);
+  check('38 imported sessions, the 10 August push and the first VO2max block', boot.sessions === 40, boot.sessions);
   check('11 supplements seeded, including the shake', boot.supps === 11, boot.supps);
   check('routines seeded', boot.routines >= 10, boot.routines);
   check('weekly plan seeded', boot.planDays === 7, boot.planDays);
   check('wedding break seeded', boot.wedding);
-  check('schemaVersion stamped', boot.schema === 23, boot.schema);
+  check('schemaVersion stamped', boot.schema === SCHEMA, boot.schema);
   check('post-workout shake seeded to My Foods', boot.shake === true, boot.shake);
   check('weight journey present', boot.weights >= 4, boot.weights);
 
@@ -571,8 +584,13 @@ function check(name, cond, detail) {
     g.stats = routineStats(rt.exIds);
     const id = rt.exIds[0];
     const rx = prescribe(id);
-    g.tag = rx.tag; g.sets = rx.sets.length; g.mins = rx.sets[0].r;
-    g.hrInWhy = /158-177/.test(rx.why);
+    g.tag = rx.tag; g.sets = rx.sets.length;
+    /* the plan no longer pre-fills reps: 4 minutes is the same every session and
+       carries no information, so that column holds the peak heart rate now. The
+       protocol still has to be stated in the copy. */
+    g.mins = rx.sets[0].r;
+    g.minsInWhy = /4 × 4 min hard/.test(rx.why);
+    g.hrInWhy = /\b\d{3}-\d{3} bpm\b/.test(rx.why) && /full band is 167-177/.test(rx.why);
     g.hrMax = hrMax();
     // all four modalities carry the protocol
     g.modalities = ['bike', 'rower', 'SkiErg', 'incline walk'].map((m) => {
@@ -616,8 +634,9 @@ function check(name, cond, detail) {
   });
   check('the 4×4 routine exists', ivt.routine);
   check('it estimates ~28 min over 4 intervals, not a flat cardio guess', ivt.stats.mins >= 25 && ivt.stats.mins <= 32 && ivt.stats.sets === 4, ivt.stats);
-  check('it prescribes 4 work bouts of 4 minutes', ivt.tag === 'intervals' && ivt.sets === 4 && ivt.mins === 4, ivt);
-  check('heart-rate target from Tanaka (186 max, 158-177 band)', ivt.hrMax === 186 && ivt.hrInWhy, ivt);
+  check('it prescribes 4 work bouts of 4 minutes', ivt.tag === 'intervals' && ivt.sets === 4 && ivt.minsInWhy, ivt.why);
+  check('the reps column is left blank for the peak heart rate', ivt.mins === '', ivt.mins);
+  check('heart-rate target from Tanaka (186 max, full band 167-177)', ivt.hrMax === 186 && ivt.hrInWhy, ivt.why);
   check('all four modalities carry the protocol', ivt.modalities.every(Boolean), ivt.modalities);
   check('ordinary cardio still gets the steady prescription', ivt.plainCardio === 'steady', ivt.plainCardio);
   check('no age falls back to words, never NaN', ivt.noAgeSafe);
@@ -828,6 +847,299 @@ function check(name, cond, detail) {
   check('underweight band works', bmi.under === 'Underweight', bmi.under);
   check('missing height prompts instead of rendering NaN', bmi.missingHandled, bmi.missingHandled);
 
+  console.log('the five pillars');
+  const pil = await page.evaluate(() => {
+    const byName = (n) => (S.exercises.find((e) => e.name === n) || {}).id;
+    const rx = (n) => prescribe(byName(n));
+    const z2 = rx('Zone 2 (bike)'), thr = rx('Threshold 4×8 (bike)'), vo2 = rx('VO2max 4×4 (bike)');
+    const jump = byName('Box jump');
+    /* a week built to contain exactly the five, then one built to contain two */
+    const keep = S.sessions.slice(), keepT = (S.tests || []).slice();
+    const ws = wkMonday(today());
+    const ses = (day, names) => ({ id: 'p' + day, name: 'x', date: dShift(ws, day), vol: 0, prs: [],
+      ex: names.map((n) => ({ exId: byName(n), sets: [{ w: '', r: 45, done: true }] })) });
+    /* four zone 2 rides, because 150 min a week is the threshold and three
+       forty-five-minute sessions is 135 — the fixture has to clear the bar the
+       guideline actually sets, not the one that makes the test pass */
+    S.sessions = [
+      ses(0, ['Bench press', 'Zone 2 (bike)']), ses(1, ['Squat']),
+      ses(2, ['Box jump', 'Zone 2 (bike)']), ses(3, ['Cat-cow']), ses(4, ['Couch stretch']),
+      ses(5, ['Zone 2 (bike)']), ses(6, ['Zone 2 (bike)']),
+    ];
+    S.tests = [{ date: today(), key: 'hang', val: 50 }];
+    const full = pillarWeek(ws);
+    S.sessions = [ses(0, ['Bench press']), ses(1, ['Squat'])];
+    S.tests = [];
+    const thin = pillarWeek(ws);
+    S.sessions = keep; S.tests = keepT;
+    return {
+      /* each type gets its own band and never the other's */
+      z2Band: [hrTarget('z2').lo, hrTarget('z2').hi],
+      thrBand: [hrTarget('thr').lo, hrTarget('thr').hi],
+      vo2Band: [hrTarget('vo2').lo, hrTarget('vo2').hi],
+      z2Block: z2.sets.length === 1 && /continuous/.test(z2.why),
+      z2NoIntervalBand: !/167-177/.test(z2.why) && /112-130/.test(z2.why),
+      thrRounds: thr.sets.length === 4 && /8 min hard/.test(thr.why),
+      vo2Rounds: vo2.sets.length === 4 && /4 min hard/.test(vo2.why),
+      levers: ['Zone 2 (bike)', 'Threshold 4×8 (bike)', 'VO2max 4×4 (bike)'].every((n) => /Resistance, not speed/.test(rx(n).why)),
+      z2TooHard: hrVerdict(150, 'z2').k,
+      /* power: quality scheme, long rest, its own copy */
+      powTag: rx('Box jump').tag,
+      powScheme: schemeFor(jump),
+      powRest: exRest(jump),
+      powNoWeightAdvice: !/pick a weight/.test(rx('Box jump').why) && /gets slower/.test(rx('Box jump').why),
+      powerCount: S.exercises.filter((e) => e.group === 'Power').length,
+      /* the weight column on a box jump holds centimetres; counting it as
+         tonnage added 240 kg to the week for four jumps */
+      powerNoVolume: (() => {
+        const keepS = S.sessions.slice(), keepA = S.active;
+        startSession(); closeSheet();
+        addExToSession(jump);
+        setVal(0, 0, 'w', '60'); setVal(0, 0, 'r', '4'); toggleSet(0, 0); restSkip();
+        finishSession(); closeSheet();
+        const v = S.sessions[S.sessions.length - 1].vol;
+        S.sessions = keepS; S.active = keepA; save();
+        return v === 0;
+      })(),
+      /* the four longevity tests + range, read in both directions */
+      bands: {
+        hangLow: testBand('hang', 15).label, hangHigh: testBand('hang', 65).label,
+        gaitClinical: testBand('gait', 0.7).label,
+        stsGood: testBand('sts', 25).ok,
+        shoulderBigGap: testBand('shoulder', 12).label,
+        shoulderSmallGap: testBand('shoulder', 1).label,
+      },
+      roundTrip: (() => { saveTest('balance', 21); const l = lastTest('balance'); saveTest('balance', 24);
+        return l.val === 21 && lastTest('balance').val === 24 && testHistory('balance').length === 1; })(),
+      full, thin,
+      routines: S.routines.map((r) => r.name),
+      noHyrox: !S.routines.some((r) => /hyrox/i.test(r.name)) && !JSON.stringify(PROGRAM).match(/hyrox/i),
+      kitSurvived: ['Wall balls', 'Rowing (erg)', 'SkiErg', 'Sandbag lunges'].every((n) => !!byName(n)),
+      protos: PROTOCOLS.map((p) => p[0]),
+    };
+  });
+  check('each cardio type has its own band, none borrowing another',
+    pil.z2Band.join('-') === '112-130' && pil.thrBand.join('-') === '149-164' && pil.vo2Band.join('-') === '149-162',
+    [pil.z2Band, pil.thrBand, pil.vo2Band]);
+  check('zone 2 is one continuous block, never prescribed as rounds', pil.z2Block);
+  check('zone 2 never shows the interval band', pil.z2NoIntervalBand);
+  check('threshold and VO2max keep their own round shapes', pil.thrRounds && pil.vo2Rounds);
+  check('every bike session names the same machine lever', pil.levers);
+  check('going too hard on an easy day is flagged, not praised', pil.z2TooHard === 'over', pil.z2TooHard);
+  check('power gets its own prescription, not the lifting default',
+    pil.powTag === 'power' && pil.powNoWeightAdvice, pil.powTag);
+  check('power is prescribed by quality: low reps, long rest',
+    pil.powScheme.lo === 3 && pil.powScheme.hi === 6 && pil.powRest >= 120, [pil.powScheme, pil.powRest]);
+  check('a power library exists', pil.powerCount >= 10, pil.powerCount);
+  check('power contributes no tonnage: a jump height is not a weight',
+    pil.powerNoVolume, pil.powerNoVolume);
+  check('longevity bands read low and high correctly',
+    pil.bands.hangLow === 'Below average' && pil.bands.hangHigh === 'Excellent'
+    && pil.bands.gaitClinical === 'Below average' && pil.bands.stsGood === true, pil.bands);
+  check('a smaller-is-better test is not read upside down',
+    pil.bands.shoulderBigGap === 'Below average' && pil.bands.shoulderSmallGap === 'Excellent', pil.bands);
+  check('a test saves, reads back, and re-testing the same day replaces rather than duplicates', pil.roundTrip);
+  check('a week containing all five reports all five',
+    PILLARS_OK(pil.full), pil.full);
+  check('a week containing two reports exactly two',
+    pil.thin.strong >= 2 && pil.thin.agile === 0 && pil.thin.flexible === 0 && pil.thin.longevity === 0, pil.thin);
+  check('the new routines are seeded',
+    ['Zone 2 base (~45 min)', 'Threshold 4×8', 'Power & agility (~20 min)', 'Balance & bone (~10 min)', 'Deep flexibility (~20 min)']
+      .every((n) => pil.routines.includes(n)), pil.routines);
+  check('nothing Hyrox-specific remains in routines or the phase ladder', pil.noHyrox);
+  check('the conditioning kit survived the rename', pil.kitSurvived);
+  check('protocols cover grip, balance, power, bone and stretching',
+    ['Grip strength as a marker', 'Balance training', 'Power and jump training', 'Impact loading for bone', 'Stretching for range']
+      .every((n) => pil.protos.includes(n)), pil.protos.slice(0, 6));
+
+  console.log('VO2max intervals: the on-ramp, the recovery floor and the verdict');
+  const iv = await page.evaluate(() => {
+    const bike = S.exercises.find((e) => e.name === 'VO2max 4×4 (bike)').id;
+    const ses = S.sessions.filter((s) => /VO2max/.test(s.name));
+    const first = ses[0];
+    const keep = S.sessions.slice();
+    /* the ramp is driven by how many interval sessions are logged, so walk it */
+    const bands = [];
+    S.sessions = keep.filter((s) => !/VO2max/.test(s.name));
+    for (let n = 0; n <= 4; n++) {
+      const t = hrTarget();
+      bands.push([t.lo, t.hi]);
+      S.sessions = S.sessions.concat([{ id: 'x' + n, name: 'VO2max intervals (4×4)', date: today(), ex: [{ exId: bike, sets: [] }] }]);
+    }
+    S.sessions = keep;
+    const rx = prescribe(bike);
+    const t = hrTarget();
+    return {
+      logged: ses.length,
+      /* per-interval peak HR, not a constant 4 minutes */
+      hrs: first ? first.ex[0].sets.map((s) => s.r) : [],
+      noFakeDistance: first ? first.ex[0].sets.every((s) => !s.w) : false,
+      noteHonest: first ? /estimate/i.test(first.note) && /16\.42/.test(first.note) : false,
+      bands,
+      planBlank: rx.sets.every((s) => s.r === '' && s.w === ''),
+      why: rx.why,
+      verdicts: [hrVerdict(120).k, hrVerdict(145).k, hrVerdict(155).k, hrVerdict(200).k],
+      recovery: [t.recLo, t.recHi],
+      allHaveLever: Object.keys(EX_IV).every((k) => !!EX_IV[k].lever),
+    };
+  });
+  check('the first VO2max session is logged with per-interval peak HR',
+    iv.logged === 1 && iv.hrs.join(',') === '140,140,145,151', iv.hrs);
+  check('no per-interval distance invented from a flywheel total', iv.noFakeDistance);
+  check('the note says what was measured and what was estimated', iv.noteHonest);
+  check('the target band ramps over four sessions, then holds at 90-95%',
+    JSON.stringify(iv.bands) === JSON.stringify([[149, 162], [149, 162], [158, 167], [158, 167], [167, 177]]), iv.bands);
+  check('the prescription leaves both columns blank to fill, not pre-filled with 4', iv.planBlank);
+  check('the prescription names the recovery floor and the in-interval step-ups',
+    /112-130/.test(iv.why) && /2:00/.test(iv.why) && /do not stop/.test(iv.why), iv.why.slice(0, 80));
+  check('the prescription names the machine lever, not the console number',
+    /[Rr]esistance, not speed/.test(iv.why) && /Ignore the distance/.test(iv.why));
+  check('every interval machine has its own lever cue', iv.allHaveLever);
+  check('recovery floor is 60-70% of max', iv.recovery.join('-') === '112-130', iv.recovery);
+  check('the verdict reads under / near / in / over correctly',
+    iv.verdicts.join(',') === 'under,near,in,over', iv.verdicts);
+
+  /* The gap that prompted all this was not "the food is missing" — half the
+     time the row existed and the search could not find it. So the assertion is
+     on the SEARCH, driven from the words actually typed, not on the array. */
+  console.log('food search: every word from the ask resolves');
+  const searchWords = [
+    'muesli', 'roti sabzi', 'loki ke gufte', 'lauki ke gufte', 'kachri', 'parwal', 'kande',
+    'palak', 'methi', 'turai', 'bhindi masala', 'bhindi', 'aloo', 'kaddu', 'arbi',
+    'sev bhaji', 'sev tomato', 'sev tamatar', 'dahi puri', 'idli sambhar', 'vada', 'dosa',
+    'bhelpuri', 'bhel puri', 'sev puri', 'pani patashi', 'aloo tikki', 'momos', 'chips',
+    'burger', 'yogurt', 'kheera', 'cucumber', 'achar', 'makhani', 'lasagna', 'gatte',
+    'samosa', 'wrap', 'shake', 'coffee', 'ravioli', 'cajun', 'waffle', 'tres leches',
+    'rabri ghewar', 'kachori', 'poha', 'thali', 'dal chawal', 'greek yogurt', 'espresso',
+    'mocha', 'cold brew', 'matcha', 'lemonade', 'paneer roll', 'soya chaap', 'rajma',
+    /* the local sabzis, and the transliteration variants of the same dish */
+    'pattod', 'patod', 'patode', 'pattode', 'patra', 'aloo vadi',
+    'besan ki sabzi', 'besan sabzi', 'mangodi', 'moong badi', 'gatta', 'launji',
+    'govind gatte', 'kumatiya', 'raab', 'dal dhokli', 'khoba', 'lehsun chutney',
+    'patta gobi', 'cabbage', 'kathal', 'shalgam', 'chukandar', 'drumstick', 'kachnar',
+    'bharwan baingan', 'bharwan mirch', 'aloo pyaaz', 'aloo tamatar', 'sem phali',
+    'french beans', 'nutrela', 'lobia', 'baby corn', 'zucchini', 'broccoli',
+  ];
+  const search = await page.evaluate((words) => {
+    const all = fdbAllFoods();
+    const hits = (q) => all.filter((f) => foodMatches(f.name, foodTokens(q))).length;
+    const names = FOODDB.map((r) => r[0]);
+    /* fiber yields ~2 kcal/g, not 4, and alcohol is not in any macro column,
+       so the Atwater check accounts for both or it flags correct rows */
+    const outliers = FOODDB.filter((r) => {
+      if (/beer|whisky|wine|rum|vodka/i.test(r[0])) return false;
+      const est = 4 * r[2] + 4 * Math.max(0, r[3] - r[5]) + 2 * r[5] + 9 * r[4];
+      return Math.abs(est - r[1]) > Math.max(30, r[1] * 0.18);
+    }).map((r) => r[0]);
+    return {
+      rows: FOODDB.length,
+      shape: FOODDB.every((r) => r.length === 6 && r.every((v, i) => (i ? typeof v === 'number' && isFinite(v) && v >= 0 : !!String(v).trim()))),
+      dupes: names.filter((n, i) => names.indexOf(n) !== i),
+      outliers,
+      misses: words.filter((w) => hits(w) === 0),
+      /* aliases doing real work: these words appear in NO row name, so a hit
+         can only have come through the synonym layer */
+      aliasReal: ['okra', 'pumpkin', 'cottage cheese', 'lady finger', 'ridge gourd', 'chickpeas']
+        .map((w) => [w, hits(w), names.some((n) => n.toLowerCase().includes(w))])
+        .filter((x) => x[1] === 0 || x[2]),
+      stopwords: hits('loki ke gufte') === hits('lauki gufte'),
+      /* a name that starts with the query beats a merely-frequent one */
+      prefixFirst: (() => {
+        const g = foodTokens('dal');
+        const r = all.filter((f) => foodMatches(f.name, g))
+          .sort((a, b) => (b.name.toLowerCase().indexOf('dal') === 0 ? 1 : 0) - (a.name.toLowerCase().indexOf('dal') === 0 ? 1 : 0));
+        return r[0].name.toLowerCase().indexOf('dal') === 0;
+      })(),
+      /* everything added in this pass is vegetarian or vegan; a stray nonveg or
+         egg tag would silently hide a sabzi from a vegetarian */
+      badDiet: FOODDB.map((r) => r[0])
+        .filter((n) => /sabzi|gufte|thali|muesli|chaat|roll|wrap|latte|shake|cooler|espresso/i.test(n))
+        .filter((n) => !/chicken|mutton|fish|prawn|egg|anda/i.test(n))
+        .filter((n) => ['nonveg', 'egg'].includes(foodDiet(n))),
+      /* the substring trap that hid a vegetarian thali: "standard" contains
+         "anda", "no ghee" contains "ghee", "kheera" contains "kheer" */
+      substringTraps: [
+        ['Veg thali (standard)', 'veg'], ['Rajasthani thali (full)', 'veg'],
+        ['Atta roti / phulka, no ghee (1)', 'veg'], ['Peanut butter (1 tbsp)', 'veg'],
+        ['Salad: kheera/tamatar/pyaaz (plate)', 'veg'], ['Anda bhurji pav (plate)', 'egg'],
+        ['Paneer bhurji (bowl)', 'dairy'], ['Egg bhurji (bowl)', 'egg'],
+      ].filter((t) => foodDiet(t[0]) !== t[1]).map((t) => t[0] + ' → ' + foodDiet(t[0])),
+      milkIsDairy: ['Muesli + milk (bowl)', 'Caramel latte (cup)', 'Thick shake, any flavour (glass)']
+        .every((n) => foodDiet(n) === 'dairy'),
+      blackCoffeeVegan: foodDiet('Espresso (single shot)') === 'veg' && foodDiet('Cold brew black (glass)') === 'veg',
+    };
+  }, searchWords);
+  check('550+ foods, all six fields, no duplicates',
+    search.rows >= 550 && search.shape && search.dupes.length === 0, { rows: search.rows, dupes: search.dupes });
+  check('every row\'s calories match its macros (fiber and alcohol aware)',
+    search.outliers.length === 0, search.outliers);
+  check('every word from the ask finds at least one food', search.misses.length === 0, search.misses);
+  check('the alias layer is doing real work, not matching literal names',
+    search.aliasReal.length === 0, search.aliasReal);
+  check('joining words (ke/ki/ka) are ignored', search.stopwords);
+  check('a name starting with the query sorts first', search.prefixFirst);
+  check('no sabzi, wrap or cafe drink is tagged nonveg or egg', search.badDiet.length === 0, search.badDiet);
+  check('milk-based cafe drinks and muesli count as dairy', search.milkIsDairy);
+  check('black coffee stays vegan', search.blackCoffeeVegan);
+
+  console.log('spelling tolerance and the estimator');
+  const est = await page.evaluate(() => {
+    const all = fdbAllFoods();
+    const hits = (q) => all.filter((f) => foodMatches(f.name, foodTokens(q))).map((f) => f.name);
+    /* the nonveg rows are filtered out of fdbAllFoods for a vegetarian, so the
+       maas classification is asserted against FOODDB itself */
+    const nonveg = FOODDB.map((r) => r[0]).filter((n) => foodDiet(n) === 'nonveg');
+    const combos = [];
+    SABZI_TPL.forEach((t) => SABZI_PORTION.forEach((o) => {
+      const e = sabziEstimate(t.key, o[1]);
+      const atw = 4 * e.p + 4 * Math.max(0, e.c - e.fb) + 2 * e.fb + 9 * e.f;
+      combos.push([t.key + '/' + o[0], Math.abs(atw - e.kcal) <= Math.max(30, e.kcal * 0.18),
+        e.kcal > 0 && e.p >= 0 && e.c >= 0 && e.f >= 0]);
+    }));
+    /* the dead end: a query nothing matches must still offer a way through */
+    FDMEAL = 'l'; addFoodForm('l');
+    document.querySelector('#fdbQ').value = 'zzz nonsense dish';
+    fdbSearch('zzz nonsense dish');
+    const deadEnd = { res: FDRES.length, offersEstimator: document.querySelector('#fdbRes').textContent.includes('Estimate') };
+    /* and the estimate is labelled as one, everywhere it lands */
+    SABZI_PICK = { tpl: 'besan', g: 250 };
+    sabziLog();
+    const logged = (S.food[today()].l || []).slice(-1)[0];
+    SABZI_PICK = { tpl: 'dal', g: 150 };
+    sabziSave();
+    const saved = S.myFoods.slice(-1)[0];
+    return {
+      spellings: ['pattod', 'patod', 'patode', 'pattode'].map((w) => hits(w).join('|')),
+      gatta: hits('gatta').length > 0 && hits('gatta').join(' ').toLowerCase().includes('gatte'),
+      stems: [foodStem('pattod'), foodStem('patode'), foodStem('gatta'), foodStem('gatte')],
+      maas: ['Laal maas (bowl)', 'Safed maas (bowl)', 'Junglee maas (bowl)'].every((n) => nonveg.includes(n)),
+      newRowsVeg: FOODDB.map((r) => r[0])
+        .filter((n) => /pattod|besan|mangodi|kumatiya|launji|gatte|shalgam|kathal|kachnar|nutrela/i.test(n))
+        .filter((n) => foodDiet(n) !== 'veg' && foodDiet(n) !== 'dairy'),
+      combos,
+      deadEnd,
+      loggedName: logged.name, loggedEst: logged.est === true, loggedKcal: logged.kcal,
+      savedName: saved.name, savedEst: saved.est === true,
+    };
+  });
+  check('every spelling of one dish finds the same row',
+    new Set(est.spellings).size === 1 && est.spellings[0].length > 0, est.spellings);
+  check('the stemmer collapses transliteration variants',
+    est.stems[0] === est.stems[1] && est.stems[2] === est.stems[3], est.stems);
+  check('gatta finds gatte', est.gatta);
+  check('laal, safed and junglee maas classify as non-vegetarian', est.maas);
+  check('no new local row is misclassified as meat or egg', est.newRowsVeg.length === 0, est.newRowsVeg);
+  check('every estimator template and portion gives consistent macros',
+    est.combos.every((c) => c[1] && c[2]), est.combos.filter((c) => !c[1] || !c[2]));
+  check('a query nothing matches offers the estimator instead of dead-ending',
+    est.deadEnd.res === 0 && est.deadEnd.offersEstimator, est.deadEnd);
+  check('a logged estimate is marked as an estimate, in the name and on the entry',
+    /~est/.test(est.loggedName) && est.loggedEst && est.loggedKcal > 0, est);
+  check('saving keeps the typed name and the estimate flag',
+    /~est/.test(est.savedName) && est.savedEst, est.savedName);
+  check('substring traps classify by meaning, not by letters',
+    search.substringTraps.length === 0, search.substringTraps);
+
   console.log('food database + My Foods');
   const food = await page.evaluate(() => {
     function hits(q) {
@@ -962,8 +1274,8 @@ function check(name, cond, detail) {
     stampedNow: S.schemaVersion,
     persisted: (JSON.parse(localStorage.getItem('fitlog.v1') || '{}')).schemaVersion,
   }));
-  check('an upgrade writes the pre-update snapshot', snap.hasSnapshot && snap.meta && snap.meta.to === 23 && snap.meta.from === 12, snap.meta);
-  check('the schema stamp is actually persisted, not left to chance', snap.persisted === 23 && snap.stampedNow === 23, snap);
+  check('an upgrade writes the pre-update snapshot', snap.hasSnapshot && snap.meta && snap.meta.to === SCHEMA && snap.meta.from === 12, snap.meta);
+  check('the schema stamp is actually persisted, not left to chance', snap.persisted === SCHEMA && snap.stampedNow === SCHEMA, snap);
 
   const past = await page.evaluate(() => {
     const d = dShift(today(), -3);
@@ -1132,7 +1444,7 @@ function check(name, cond, detail) {
   check('steps state deleted by migration', migAfter.steps, migAfter);
   check('past ticks converted to logged minutes', migAfter.ticksConverted, migAfter.ticksConverted);
   check('breathwork supp retired from list + checklist', migAfter.suppGone && migAfter.checklistClean && migAfter.supps === mig.supps - 1, migAfter);
-  check('migration stamps schema 23', migAfter.schema === 23, migAfter.schema);
+  check('migration stamps the current schema', migAfter.schema === SCHEMA, migAfter.schema);
 
   console.log('em-dash removal: parsers + v17 migration');
   const dash = await page.evaluate(() => ({
@@ -1187,7 +1499,7 @@ function check(name, cond, detail) {
   check('user-authored routine renamed, wording kept', v17After.rt === 'Push: my own routine', v17After.rt);
   check('stored session + PR text renamed', v17After.ses === 'Return: full body (light)' && v17After.pr === '70×5: heaviest ever', v17After);
   check('S.lastPhase migrated (no false phase celebration)', v17After.lastPhase === 'Phase 0: Rebuild' && !v17After.celebrated, v17After);
-  check('migration stamps schema 23', v17After.schema === 23, v17After.schema);
+  check('migration stamps the current schema', v17After.schema === SCHEMA, v17After.schema);
 
   console.log('workout cards: preview before starting');
   const cards = await page.evaluate(() => {
