@@ -505,6 +505,26 @@ const DEF_EX=[
      comparable, so they must not share a history */
   ['VO2max 4×4 (bike)','Cardio'],['VO2max 4×4 (rower)','Cardio'],
   ['VO2max 4×4 (SkiErg)','Cardio'],['VO2max 4×4 (incline walk)','Cardio'],
+  /* the easy end and the middle. Without their own entries the coach could not
+     tell a long easy ride from a set of intervals and prescribed the interval
+     band for both, which makes the easy day too hard and the hard day too easy */
+  ['Zone 2 (bike)','Cardio'],['Zone 2 (rower)','Cardio'],['Zone 2 (walk/run)','Cardio'],
+  ['Threshold 4×8 (bike)','Cardio'],['Threshold 4×8 (rower)','Cardio'],['Threshold 4×8 (run)','Cardio'],
+  /* Power. Separate from Conditioning on purpose: conditioning is about how
+     long you can keep going, power is about how fast you can produce force,
+     and it declines roughly twice as fast with age as strength does. It is
+     also the impact loading that keeps bone density up. */
+  ['Pogo hops','Power'],['Skater bounds','Power'],['Box jump','Power'],
+  ['Depth drop landing','Power'],['Countermovement jump','Power'],
+  ['Med-ball slam','Power'],['Med-ball rotational throw','Power'],
+  ['Med-ball chest pass','Power'],['A-skip','Power'],['Lateral shuffle','Power'],
+  ['Sprint 20 m','Power'],['Single-leg hop (control)','Power'],
+  /* end-range work: what turns range you can be put into into range you can
+     actually produce. Passive stretching alone does not do this. */
+  ['Jefferson curl (light)','Mobility'],['Loaded hamstring stretch','Mobility'],
+  ['End-range hip lift (90/90)','Mobility'],['Shoulder CARs','Mobility'],
+  ['Hip CARs','Mobility'],['Copenhagen plank','Mobility'],
+  ['Single-leg balance (eyes closed)','Mobility'],['Tandem stance','Mobility'],
   ['Wall balls','Conditioning'],['Burpee broad jump','Conditioning'],
   ['Sled push','Conditioning'],['Sled pull','Conditioning'],['Sandbag lunges','Conditioning'],
   ['Dumbbell bench press','Chest'],['Decline dumbbell press','Chest'],['Goblet squat','Legs'],
@@ -520,10 +540,18 @@ const SEED_RT=[
   {name:'Legs: knee-safe return', ex:['Glute bridge','Romanian deadlift','Hip thrust','Leg curl','Calf raise','Wall sit (pain-free)']},
   {name:'Rehab: knee & wrist (~15 min)', ex:['Wrist circles & prayer stretch','Straight-leg raise','Wall sit (pain-free)','Glute bridge','Ankle rocks','Deep squat hold']},
   {name:'Conditioning: joint-friendly', ex:['Cycling','Kettlebell swing','Farmer’s carry','Glute bridge','Plank']},
-  {name:'Hyrox stations', ex:['Rowing (erg)','Wall balls','Burpee broad jump','Farmer’s carry','Sandbag lunges','Kettlebell swing']},
+  /* the kit is excellent conditioning; it just is not organised around a race */
+  {name:'Conditioning circuit', ex:['Rowing (erg)','Wall balls','Burpee broad jump','Farmer’s carry','Sandbag lunges','Kettlebell swing']},
   {name:'Mobility & flexibility (~20 min)', ex:['Cat-cow','Downward dog to cobra',"World's greatest stretch",'90/90 hip switch','Deep squat hold','Couch stretch','Standing hamstring fold','Shoulder dislocates (stick)','Cossack squat','Dead hang']},
   {name:'Agility & conditioning', ex:['Jumping jacks','High knees','Mountain climbers','Cossack squat','Bear crawl','Burpees','Kettlebell swing']},
-  {name:'VO2max intervals (4×4)', ex:['VO2max 4×4 (bike)']}
+  {name:'VO2max intervals (4×4)', ex:['VO2max 4×4 (bike)']},
+  {name:'Zone 2 base (~45 min)', ex:['Zone 2 (bike)']},
+  {name:'Threshold 4×8', ex:['Threshold 4×8 (bike)']},
+  /* Power before anything that makes you tired: these are quality reps, and a
+     fatigued jump trains the opposite of what a jump is for. */
+  {name:'Power & agility (~20 min)', ex:['Pogo hops','Countermovement jump','Skater bounds','Box jump','Med-ball slam','Med-ball rotational throw','A-skip','Sprint 20 m']},
+  {name:'Balance & bone (~10 min)', ex:['Single-leg balance (eyes closed)','Tandem stance','Pogo hops','Single-leg hop (control)','Farmer’s carry']},
+  {name:'Deep flexibility (~20 min)', ex:['Jefferson curl (light)','Loaded hamstring stretch','End-range hip lift (90/90)','Shoulder CARs','Hip CARs','Copenhagen plank','Couch stretch','Dead hang']}
 ];
 /* The four injury-specific names describe one person's wrist and knee, and the
    Hyrox branding is a niche race. Renaming them at onboarding was too late: a
@@ -534,7 +562,8 @@ const RT_PUB_NAME={
   'Pull: wrist-safe return':   'Pull: joint-friendly',
   'Legs: knee-safe return':    'Legs: joint-friendly (legs)',
   'Rehab: knee & wrist (~15 min)': 'Joint prep (~15 min)',
-  'Hyrox stations':            'Station circuit'
+  'Hyrox stations':            'Conditioning circuit',
+  'Station circuit':           'Conditioning circuit'
 };
 if(PUB) SEED_RT.forEach(function(r){ if(RT_PUB_NAME[r.name]) r.name=RT_PUB_NAME[r.name]; });
 const SEED_QK=[
@@ -555,7 +584,7 @@ function defaults(){
       sleepRemind:'22:30', sleepGoal:8, breathGoal:15, theme:'dark'},
     exercises: DEF_EX.map(function(e,i){ return {id:'ex'+i, name:e[0], group:e[1]}; }),
     routines:[], sessions:[], active:null,
-    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], caff:{}, light:{}, sauna:{}, skipped:[], barcodes:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
+    water:{}, food:{}, quick:[], weights:[], sleep:{}, breath:{}, vo2:[], tests:[], caff:{}, light:{}, sauna:{}, skipped:[], barcodes:{}, measures:[], reminders:[], plan:{}, photos:[], supps:[], suppLog:{}, breaks:[], myFoods:[], trash:[]
   };
 }
 let S;
@@ -782,7 +811,7 @@ function seedV9(){
      dashboard tile with minutes and a streak (see seedV16) */
   save();
 }
-/* v5: Hyrox station exercises + routine */
+/* v5: conditioning station exercises + routine */
 function seedV5(){
   if(S.seedV5) return; S.seedV5=true;
   DEF_EX.forEach(function(e){
@@ -1178,12 +1207,34 @@ function seedV25(){
   save();
 }
 
+/* v26: the five-pillar build-out reaches existing stores. New exercises (zone 2,
+   threshold, power, end-range mobility, balance), the routines that use them,
+   and the Hyrox rename in the personal build too — that name described a race
+   the plan no longer builds toward, and the routine itself is unchanged. */
+function seedV26(){
+  if(S.seedV26) return; S.seedV26=true;
+  DEF_EX.forEach(function(e){
+    if(!S.exercises.some(function(x){return x.name===e[0];}))
+      S.exercises.push({id:uid(), name:e[0], group:e[1]});
+  });
+  SEED_RT.forEach(function(r){
+    if(S.routines.some(function(x){return x.name===r.name;})) return;
+    const ids=r.ex.map(function(n){ const e=S.exercises.find(function(x){return x.name===n;}); return e&&e.id; }).filter(Boolean);
+    if(ids.length) S.routines.push({id:uid(), name:r.name, exIds:ids});
+  });
+  /* keeps the id, so the weekly plan and every logged session still resolve */
+  (S.routines||[]).forEach(function(r){
+    if(r.name==='Hyrox stations'||r.name==='Station circuit') r.name='Conditioning circuit';
+  });
+  save();
+}
+
 /* ============ migration runner ============
    Ordered and append-only — this list IS the execution order (it preserves
    the historical file order the app shipped with). Each step stays
    internally idempotent via its S.seedV* flag, so old and new installs
    converge. To add a migration: define seedV<n> above, append it here. */
-const SCHEMA=25;
+const SCHEMA=26;
 /* Snapshot the store as it was BEFORE this build's migrations touch it, so a bad
    upgrade is recoverable instead of permanent. Written once per schema bump. */
 (function(){
@@ -1196,7 +1247,7 @@ const SCHEMA=25;
 })();
 [seedV2, seedV3, seedV4, seedV8, seedV9, seedV5, seedV7, seedV6,
  seedV10, seedV12, seedV13, seedV11, seedV14, seedV15, seedV16, seedV17, seedV19, seedV20, seedV21, seedV22, seedV23,
- seedV24, seedV25].forEach(function(step){ step(); });
+ seedV24, seedV25, seedV26].forEach(function(step){ step(); });
 /* Persist the stamp explicitly. It used to ride along on whatever happened to
    call save() next, which made both the migration guards and the pre-upgrade
    snapshot depend on timing rather than intent. */
@@ -1428,10 +1479,15 @@ const PROGRAM= PUB ? {start:null, phases:[
   {w:16,  name:'Phase 2: Build', desc:'Progressive overload. Chase the amber targets, grow your cardio base, hit protein daily. Exit test: visibly stronger across twelve weeks.'},
   {w:999, name:'Phase 3: Perform', desc:'Train for something: a race, a number, a photo. PRs, a deload every 6–8 weeks, and a streak that never dies.'}
 ]} : {start:'2026-08-09', phases:[
-  {w:4,  name:'Phase 0: Rebuild', desc:'Daily rehab block, the three return routines, daily breathwork, sleep by 11. Exit test: one fully pain-free week + a brisk 30-minute walk feeling easy.'},
-  {w:12, name:'Phase 1: Base', desc:'Run/walk intervals 3×/week, strength rebuilt to ~80% of May weights, full Push/Pull/Legs returns. Exit test: 5 km continuous run and squat 50×8, both pain-free.'},
-  {w:20, name:'Phase 2: Hyrox strength', desc:'Runs grow to 6–8 km with one weekly tempo. Hyrox stations once a week: wall balls light, burpee broad jumps low volume. Exit test: 8 km easy run, 50 unbroken wall balls.'},
-  {w:32, name:'Phase 3: Simulation', desc:'Weekly bricks (1 km run + station + 1 km run), half-simulation ~week 26, full simulation ~week 30, then enter the race.'}
+  /* Rewritten away from a Hyrox race ladder. Hyrox is a goal, not a health
+     input: everything it develops comes more cheaply from zone 2, 4x4s and
+     ordinary lifting, and the race-specific work carries injury cost with no
+     longevity return. These four phases build the five qualities instead, and
+     each exit test is something you can actually measure in the app. */
+  {w:4,  name:'Phase 0: Rebuild', desc:'Daily joint work, the three return routines, daily breathwork, sleep by 11. Exit test: one fully pain-free week and a brisk 30-minute walk that feels easy.'},
+  {w:12, name:'Phase 1: Base', desc:'Zone 2 three times a week, strength rebuilt toward May weights, full Push/Pull/Legs. Power work introduced light. Exit test: 45 minutes of zone 2 with nasal breathing intact, and squat 50×8 pain-free.'},
+  {w:22, name:'Phase 2: Build', desc:'One 4×4 and one threshold session a week on top of the base. Power and agility once a week, deep flexibility once. Exit test: VO2max measurably up, and every one of the four longevity tests inside its age band.'},
+  {w:99, name:'Phase 3: Keep it', desc:'The maintenance the rest of it was for: strength progressing slowly, one hard cardio session, one easy long one, power and balance defended weekly. Re-test every eight weeks and hold the bands.'}
 ]};
 function programWeek(){
   const startD = PUB ? (S.programStart||today()) : PROGRAM.start;
@@ -1445,7 +1501,7 @@ function currentPhase(){
 }
 function phaseInfo(){
   const wk=programWeek(), cur=currentPhase();
-  let from=1, h='<h3>'+(PUB?'Your training journey':'Your Hyrox comeback')+'</h3><p class="tiny muted" style="margin:-6px 0 12px">Week '+wk+' since '+(PUB?'you started':'restart')+' ('+fmtD(PUB?(S.programStart||today()):PROGRAM.start)+')</p>';
+  let from=1, h='<h3>Your training journey</h3><p class="tiny muted" style="margin:-6px 0 12px">Week '+wk+' since '+(PUB?'you started':'restart')+' ('+fmtD(PUB?(S.programStart||today()):PROGRAM.start)+')</p>';
   PROGRAM.phases.forEach(function(p){
     const on=p.name===cur.name;
     h+='<div style="border-left:3px solid '+(on?'var(--wk)':'var(--line)')+'; padding:2px 0 2px 12px; margin-bottom:14px'+(on?'':'; opacity:.65')+'">'+
@@ -1462,7 +1518,7 @@ function round25(x){ return Math.round(x/2.5)*2.5; }
    three sessions rather than a single top set, so a session that fell apart
    and one that was comfortable no longer look identical. */
 
-const RXLABEL={up:'↑', deload:'↓', reps:'→', comeback:'⟲', first:'•', progress:'↑', steady:'→', hold:'=', intervals:'⚡'};
+const RXLABEL={up:'↑', deload:'↓', reps:'→', comeback:'⟲', first:'•', progress:'↑', steady:'→', hold:'=', intervals:'⚡', power:'💥'};
 /* One banner explaining any readiness hold, so a lighter day is never a
    mystery. Returns '' when nothing is being held back. */
 function readinessBanner(){
@@ -1481,6 +1537,10 @@ function schemeFor(exId){
   if(iv) return {sets:iv.rounds, lo:0, hi:0};
   const g=exGroupOf(exId);
   if(g==='Cardio') return {sets:1, lo:0, hi:0};
+  /* Power is prescribed by quality, never by fatigue. Low reps, long rest, and
+     you stop when the reps get slower rather than when you cannot do more —
+     grinding out a tenth slow jump trains endurance and un-trains power. */
+  if(g==='Power') return {sets:4, lo:3, hi:6};
   if(g==='Mobility') return {sets:2, lo:30, hi:45};
   if(isTimedEx(exId)) return {sets:3, lo:20, hi:60};
   if(g==='Legs') return {sets:3, lo:8, hi:12};
@@ -1598,22 +1658,47 @@ function prescribe(exId){
 
   const iv=exIv(exId);
   if(iv){
-    const hr=hrTarget();
-    const mins=Math.round(iv.work/60);
+    const hr=hrTarget(iv.type);
     const prev=hist.length? hist[0].sets : null;
     const best=prev? Math.max.apply(null, prev.map(function(t){return +t.w||0;})) : 0;
+    /* no age means no Tanaka estimate, so fall back to the talk test rather
+       than printing a band computed from nothing */
+    const band=hr? 'Aim for '+hr.lo+'-'+hr.hi+' bpm'
+      : 'Hard enough that talking is down to a few words at a time; set your age in Settings for a heart-rate target.';
+    /* Zone 2 is one continuous block, not rounds. Prescribing it as sets would
+       invite you to break it up, and the unbroken duration is the stimulus. */
+    if(iv.block){
+      return {sets:mk('', '', 1),
+        why: iv.mins+' min continuous, easy. '+band+
+          (hr? ' — '+hr.note+'.' : '')+' '+iv.check+
+          (iv.lever? ' '+iv.lever : '')+
+          (best? ' Last time '+best+' km.' : ''),
+        tag:'intervals', iv:iv};
+    }
+    const mins=Math.round(iv.work/60);
     /* reps used to be prescribed as "4", which is the same 4 every session and
        tells the next prescription nothing. The number that decides whether the
        session worked is the peak heart rate, so that column holds it instead. */
     return {sets:mk('', '', iv.rounds),
       why: iv.rounds+' × '+mins+' min hard, '+Math.round(iv.rest/60)+' min between. '+
-        (hr? 'Aim for '+hr.lo+'-'+hr.hi+' bpm ('+hr.note+'; the full band is '+hr.full+'). '+
-             'Keep pedalling through the recovery at '+hr.recLo+'-'+hr.recHi+', do not stop. '+
-             'It should still be climbing at the four-minute mark: step up at 2:00 and again at 3:00.'
-           : 'Hard enough that talking is down to a few words at a time; set your age in Settings for a heart-rate target.')+
+        band+
+        (hr? ' ('+hr.note+(iv.ramp? '; the full band is '+hr.full : '')+'). '+
+             'Keep moving through the recovery at '+hr.recLo+'-'+hr.recHi+', do not stop. ' : ' ')+
+        iv.check+
         (iv.lever? ' '+iv.lever : '')+
         (best? ' Best interval so far '+best+' km.' : ''),
       tag:'intervals', iv:iv};
+  }
+  /* Power gets its own branch or it falls through to the lifting default and
+     tells you to pick a weight for a pogo hop. The rule it has to communicate
+     is the one that makes power training work: stop on quality, not on failure. */
+  if(g==='Power'){
+    const prevBest=hist.length? Math.max.apply(null, hist[0].sets.map(function(t){return +t.w||0;})) : 0;
+    return {sets:mk(prevBest||'', sc.hi),
+      why: sc.sets+' × '+sc.lo+'-'+sc.hi+', full recovery between. Stop the set the moment a rep '+
+        'gets slower or lands heavier — a tired jump trains the opposite of what a jump is for. '+
+        (prevBest? 'Last time '+prevBest+' '+unit()+' or height.' : 'Log height, distance or load, whichever the movement has.'),
+      tag:'power'};
   }
   if(g==='Cardio'){
     const cb=hist.length? hist[0].sets[0] : null;
@@ -1783,6 +1868,23 @@ const PATTERNS={
     '<circle cx="90" cy="22" r="6.5" class="fe"/><polyline points="90,29 90,62" class="fe"/><polyline points="90,62 87,86 88,110" class="fe"/><polyline points="90,62 94,86 93,110" class="fe"/>'+
     '<polyline points="90,36 94,62" class="fs"/><circle cx="95" cy="66" r="4" class="fs"/>'+
     '<polyline points="90,36 116,34" class="fe"/><circle cx="121" cy="34" r="4" class="fe"/><path d="M100,60 Q116,52 118,40" class="fa"/>'},
+  jump:{label:'Jump: soft landing, hips back, knees tracking', svg:
+    '<circle cx="100" cy="18" r="6.5" class="fe"/><polyline points="100,25 100,54" class="fe"/>'+
+    '<polyline points="100,30 78,18" class="fe"/><polyline points="100,30 122,18" class="fe"/>'+
+    '<polyline points="100,54 88,76 92,96" class="fe"/><polyline points="100,54 112,76 108,96" class="fe"/>'+
+    '<path d="M70,110 L130,110" class="fs"/><path d="M84,102 L84,110" class="fa"/><path d="M116,102 L116,110" class="fa"/>'},
+  throw:{label:'Throw: drive from the hips, arms follow', svg:
+    '<circle cx="92" cy="24" r="6.5" class="fe"/><polyline points="92,31 96,62" class="fe"/>'+
+    '<polyline points="93,38 116,28" class="fe"/><circle cx="124" cy="25" r="7" class="fs"/>'+
+    '<polyline points="93,38 74,34" class="fe"/>'+
+    '<polyline points="96,62 84,86 82,110" class="fe"/><polyline points="96,62 110,86 114,110" class="fe"/>'+
+    '<path d="M134,20 Q150,26 152,40" class="fa"/>'},
+  balance:{label:'Balance: one leg, tall, still', svg:
+    '<circle cx="100" cy="20" r="6.5" class="fe"/><polyline points="100,27 100,62" class="fe"/>'+
+    '<polyline points="100,36 84,44" class="fe"/><polyline points="100,36 116,44" class="fe"/>'+
+    '<polyline points="100,62 98,88 98,110" class="fe"/>'+
+    '<polyline points="100,62 114,78 106,92" class="fs"/>'+
+    '<path d="M78,110 L122,110" class="fs"/>'},
   cardio:{label:'Steady effort: a pace you could talk through', svg:
     '<circle cx="92" cy="20" r="6.5" class="fe"/><polyline points="92,27 100,56" class="fe"/><polyline points="94,34 106,42 114,34" class="fe"/><polyline points="94,34 84,44" class="fe"/><polyline points="100,56 114,74 110,96" class="fe"/><polyline points="100,56 90,80 80,102" class="fe"/><path d="M50,40 L66,40" class="fa"/><path d="M44,52 L60,52" class="fa"/>'}
 };
@@ -1799,6 +1901,9 @@ const PATTERN_STEPS={
   stretch:['Ease in, no bouncing.','Hold 45–60 seconds per side, breathing slowly.','Stretch to tension, never into sharp pain.'],
   curl:['Elbows pinned to your sides.','Curl up without swinging the body.','Lower slowly on a 2–3 count.'],
   raise:['Slight bend in the elbow throughout.','Raise to shoulder height, no higher.','Lead with the elbows, not the hands.'],
+  jump:['Load by sitting the hips back, not by bending the knees alone.','Drive up fast and reach full extension.','Land quietly, absorbing through hips and knees; stop the set when it stops being quiet.'],
+  throw:['Set the feet and brace before anything moves.','Drive from the hips and let the arms follow, not lead.','Throw at full effort or not at all: a half-speed throw trains nothing.'],
+  balance:['Stand tall, weight through the whole foot.','Fix your eyes, then close them.','Let the ankle do the correcting; stop the clock the moment a hand or foot moves.'],
   cardio:['Start easier than feels necessary.','Hold a pace where short sentences are possible.','Finish feeling able to do a little more.']
 };
 /* Movements with no honest photo in the public-domain set get their own drawing
@@ -1811,16 +1916,55 @@ const PATTERN_STEPS={
    is never the number the console shows biggest. On a bike, distance is a
    flywheel revolution count: spinning fast against no resistance inflates it
    while the effort stays easy, so distance and calories disagree. */
-const EX_IV={
-  'VO2max 4×4 (bike)':        {work:240, rest:180, rounds:4,
-    lever:'Resistance, not speed. Set it so you cannot hold more than 90 rpm; if you can spin past 100 rpm it is too light. Ignore the distance readout.'},
-  'VO2max 4×4 (rower)':       {work:240, rest:180, rounds:4,
-    lever:'Watts per stroke, not stroke rate. Keep the rate near 26-28 and pull harder, watching the split, not the metres.'},
-  'VO2max 4×4 (SkiErg)':      {work:240, rest:180, rounds:4,
-    lever:'Drive with the hips and lats, not the arms. Hold the split you set in the first minute rather than fading into a fast, light pull.'},
-  'VO2max 4×4 (incline walk)':{work:240, rest:180, rounds:4,
-    lever:'Incline first, speed second, and never hold the rails: holding on drops the cost of the work by roughly a fifth.'}
+/* Three cardio sessions, three different jobs, three different heart rates.
+   The app used to know only the 4x4, so a long easy ride and a set of intervals
+   were indistinguishable to the coach and both got the interval band - which
+   makes the easy day too hard and, because you arrive tired, the hard day too
+   easy. That is the single most common way an endurance week fails. */
+const IV_TYPE={
+  z2:  {label:'Zone 2', lo:0.60, hi:0.70, ramp:false, block:true, mins:45,
+        why:'The base. Mitochondria and fat oxidation improve at an intensity that costs almost nothing to recover from, which is the whole point: it has to be easy enough that it does not eat into the hard days.',
+        check:'If you cannot hold a conversation, or you cannot breathe through your nose, you are above zone 2 and getting less from it, not more.'},
+  thr: {label:'Threshold', lo:0.80, hi:0.88, ramp:false, work:480, rest:120, rounds:4,
+        why:'The pace you could hold for about an hour. This is what raises the ceiling on how hard you can go for a long time.',
+        check:'Comfortably hard: two or three words at a time, and it should feel repeatable at the end of the last block.'},
+  vo2: {label:'VO2max 4×4', ramp:true, work:240, rest:180, rounds:4,
+        why:'Four minutes hard, three easy, four times. Long intervals rather than the fashionable 30/30, because three-to-five minute work bouts hold you above 90% VO2max for considerably longer.',
+        check:'It should still be climbing at the four-minute mark: step up at 2:00 and again at 3:00.'}
 };
+/* `lever` is the thing that actually raises heart rate on that machine, and it
+   is never the number the console shows biggest. On a bike, distance is a
+   flywheel revolution count: spinning fast against no resistance inflates it
+   while the effort stays easy, so distance and calories disagree. */
+const IV_LEVER={
+  bike:  'Resistance, not speed. Set it so you cannot hold more than 90 rpm; if you can spin past 100 rpm it is too light. Ignore the distance readout.',
+  rower: 'Watts per stroke, not stroke rate. Keep the rate near 26-28 and pull harder, watching the split, not the metres.',
+  ski:   'Drive with the hips and lats, not the arms. Hold the split you set in the first minute rather than fading into a fast, light pull.',
+  walk:  'Incline first, speed second, and never hold the rails: holding on drops the cost of the work by roughly a fifth.',
+  run:   'Pace by breathing, not by the watch. On a treadmill add 1% incline so the effort matches running outside.'
+};
+const EX_IV_RAW={
+  'VO2max 4×4 (bike)':        {type:'vo2', lever:'bike'},
+  'VO2max 4×4 (rower)':       {type:'vo2', lever:'rower'},
+  'VO2max 4×4 (SkiErg)':      {type:'vo2', lever:'ski'},
+  'VO2max 4×4 (incline walk)':{type:'vo2', lever:'walk'},
+  'Zone 2 (bike)':            {type:'z2',  lever:'bike'},
+  'Zone 2 (rower)':           {type:'z2',  lever:'rower'},
+  'Zone 2 (walk/run)':        {type:'z2',  lever:'run'},
+  'Threshold 4×8 (bike)':     {type:'thr', lever:'bike'},
+  'Threshold 4×8 (rower)':    {type:'thr', lever:'rower'},
+  'Threshold 4×8 (run)':      {type:'thr', lever:'run'}
+};
+/* Flattened once at boot so every caller sees one object with work/rest/rounds
+   already resolved, exactly the shape the 4x4 code was written against. */
+const EX_IV=(function(){
+  const out={};
+  Object.keys(EX_IV_RAW).forEach(function(k){
+    const r=EX_IV_RAW[k], t=IV_TYPE[r.type];
+    out[k]=Object.assign({}, t, r, {lever:IV_LEVER[r.lever]||''});
+  });
+  return out;
+})();
 function exIv(exId){ return EX_IV[exName(exId)]||null; }
 /* Tanaka rather than 220-age: better fit in adults, and the app knows your age */
 function hrMax(){ const a=+S.settings.age||0; return a? Math.round(208 - 0.7*a) : null; }
@@ -1840,18 +1984,32 @@ const HR_RAMP=[
   {lo:0.85, hi:0.90, note:'closing on the real zone now'},
   {lo:0.85, hi:0.90, note:'one more step before the full band'}
 ];
-function hrTarget(){
+/* `type` is a key of IV_TYPE. Only the 4x4 ramps: zone 2 and threshold are
+   defined by a physiological boundary, not by how brave you are feeling, so
+   walking those up would just be prescribing the wrong session. */
+function hrTarget(type){
   const m=hrMax(); if(!m) return null;
-  const step=HR_RAMP[ivSessions()] || {lo:0.90, hi:0.95, note:'the full 4×4 band'};
-  return {lo:Math.round(m*step.lo), hi:Math.round(m*step.hi), max:m, note:step.note,
+  const t=IV_TYPE[type||'vo2']||IV_TYPE.vo2;
+  let lo, hi, note;
+  if(t.ramp){
+    const step=HR_RAMP[ivSessions()] || {lo:0.90, hi:0.95, note:'the full 4×4 band'};
+    lo=step.lo; hi=step.hi; note=step.note;
+  } else {
+    lo=t.lo; hi=t.hi; note=t.label.toLowerCase()+' is a fixed band, not something to push';
+  }
+  return {lo:Math.round(m*lo), hi:Math.round(m*hi), max:m, note:note, label:t.label,
     full:Math.round(m*0.90)+'-'+Math.round(m*0.95),
     /* active recovery, not standing still: keeping the floor at 60-70% is what
        lets intervals 3 and 4 climb higher than interval 1 */
     recLo:Math.round(m*0.60), recHi:Math.round(m*0.70)};
 }
 /* Read back against the band that was in force when it was logged. */
-function hrVerdict(bpm){
-  const t=hrTarget(); if(!t||!bpm) return null;
+function hrVerdict(bpm, type){
+  const t=hrTarget(type); if(!t||!bpm) return null;
+  /* going too hard on an easy day is a real error, not a bonus: it is what
+     turns a three-session week into one good session and two mediocre ones */
+  if((type||'vo2')==='z2' && bpm > t.hi+6)
+    return {k:'over', s:'Above zone 2 — easy days have to stay easy or the hard days suffer'};
   if(bpm < t.lo-8)  return {k:'under', s:'Well under the zone — the resistance was the limit, not you'};
   if(bpm < t.lo)    return {k:'near',  s:'Just short. One step more resistance next time'};
   if(bpm > t.max)   return {k:'over',  s:'Above your estimated max, so either the estimate is low or the reading is'};
@@ -1981,7 +2139,18 @@ Object.assign(PATTERN_STEPS, {
 function patternOf(n,g){
   if(PAT_EX[n]) return PAT_EX[n];
   n=n.toLowerCase();
-  if(g==='Mobility') return /hang/.test(n) ? 'vpull' : 'stretch';
+  /* Power reads before everything else: a med-ball slam is a throw, not a
+     press, and a pogo hop is a jump, not a squat. */
+  if(/balance|tandem stance|single[- ]leg stand/.test(n)) return 'balance';
+  if(/med[- ]?ball|slam|throw|chest pass/.test(n)) return 'throw';
+  if(g==='Power') return 'jump';
+  if(g==='Mobility'){
+    if(/hang/.test(n)) return 'vpull';
+    if(/plank/.test(n)) return 'core';
+    if(/curl|hamstring|hip lift|90\/90/.test(n)) return 'hinge';
+    if(/cars|circles|dislocate/.test(n)) return 'raise';
+    return 'stretch';
+  }
   if(g==='Cardio') return 'cardio';
   if(/leg extension|leg curl|calf/.test(n)) return null;
   if(/bench|push[- ]?up|fly|crossover|dip/.test(n)) return 'hpush';
@@ -2560,6 +2729,16 @@ function lightStreak(){
   return n;
 }
 const PROTOCOLS=[
+  ['Grip strength as a marker','strong','Dead hang, or a dynamometer if you own one.',
+   'Grip is not magic, it is a readout. In the 140,000-participant PURE study across 17 countries, each 5 kg drop in grip strength carried a 16% higher risk of death from any cause, predicting mortality better than systolic blood pressure did. It works because it indexes total muscle mass and neural drive, which is also why training the rest of the body moves it.'],
+  ['Balance training','strong','Single-leg stands, eyes closed, most days.',
+   'A cohort of 1,700 adults found those who could not hold a 10-second one-legged stand had roughly double the all-cause mortality over the following decade, adjusted for age, sex and comorbidities. Balance also responds fast, which is unusual: weeks, not years. Eyes closed is the version that matters, because vision compensates for the loss until it cannot.'],
+  ['Power and jump training','strong','Low reps, full recovery, stop when they slow.',
+   'Muscle power declines roughly twice as fast as maximal strength with age, and it is power, not strength, that governs whether you catch a stumble. Training it takes little volume: a few sets of a few fast reps, never to fatigue, since a slow rep trains the opposite quality.'],
+  ['Impact loading for bone','moderate','Hops and jumps, 50-100 contacts, a few days a week.',
+   'Bone responds to rate of loading rather than to time spent moving, which is why swimming and cycling do nothing for it. Trials of hopping protocols show meaningful hip bone density gains in a year. Modest effect sizes, but nothing else non-pharmacological does better, and it costs five minutes.'],
+  ['Stretching for range','moderate','Long holds, most days, measured every few weeks.',
+   'Static stretching does increase range, but much of the early gain is a change in how much stretch you will tolerate rather than in tissue length. That is why range trained passively vanishes if you never use it: end-range strength work and full-range lifting are what make it stick.'],
   ['Sleep regularity','strong','Same bed and wake time daily, within about half an hour.',
    'The strongest finding here. In 61,000 UK Biobank participants, regularity of sleep timing predicted all-cause mortality better than sleep duration did: the least regular quintile carried 20-48% higher risk, independent of how long they slept. Worth more than an extra hour in bed.'],
   ['Steam bath, 2-3+ times a week','moderate','15-20 minutes, as hot as is comfortable.',
@@ -2756,6 +2935,70 @@ function coachNotes(cur,prv,adh){
   if(cur.wLast && prv.wLast && cur.wLast<prv.wLast-0.3 && cur.vol>=prv.vol) n.push('Body weight fell while training rose. You are under-eating for a muscle-building goal. Add ~200 kcal/day.');
   return n.slice(0,3);
 }
+/* The five qualities, and whether the week actually contained each one. This is
+   the answer to "am I doing everything?", which no other screen answers: the
+   app could tell you your tonnage and your protein and still leave you unable
+   to see that you had not jumped, stretched or balanced in a month. */
+const PILLARS=[
+  {key:'strong', name:'Strong', need:2, what:'2 lifting sessions',
+   why:'Muscle and bone are the tissues you lose without a reason to keep them.'},
+  {key:'healthy', name:'Healthy', need:150, what:'150 min zone 2 or cardio',
+   why:'Aerobic base: the strongest single fitness predictor of how long you live.'},
+  {key:'agile', name:'Agile', need:1, what:'1 power session',
+   why:'Power fades about twice as fast as strength. Jumping and throwing defend it, and the impact loads bone.'},
+  {key:'flexible', name:'Flexible', need:2, what:'2 mobility sessions',
+   why:'Range you do not use is range you lose, and it goes quietly.'},
+  {key:'longevity', name:'Longevity', need:1, what:'a test in the last 8 weeks',
+   why:'Grip, balance, sit-to-stand and gait speed. Measured, not assumed.'}
+];
+function pillarWeek(ws){
+  const we=dShift(ws,6);
+  const out={strong:0, healthy:0, agile:0, flexible:0, longevity:0};
+  (S.sessions||[]).forEach(function(s){
+    if(s.date<ws||s.date>we) return;
+    const groups={};
+    s.ex.forEach(function(e){ groups[exGroupOf(e.exId)]=true; });
+    /* a session counts once per quality it contains, not once per exercise:
+       eight jumps in one session is one power session, not eight */
+    if(['Chest','Back','Legs','Shoulders','Arms','Core'].some(function(g){ return groups[g]; })) out.strong++;
+    if(groups.Power) out.agile++;
+    if(groups.Mobility) out.flexible++;
+  });
+  /* minutes, not sessions: 150 a week is the number the guidelines are built on */
+  out.healthy=cardioMins(ws, we);
+  out.longevity=(S.tests||[]).filter(function(r){ return daysSince(r.date)<=56; }).length;
+  return out;
+}
+/* Every cardio minute in the week, from the minutes column on cardio sets plus
+   the prescribed duration of any interval session that was actually done. */
+function cardioMins(ws, we){
+  let m=0;
+  (S.sessions||[]).forEach(function(s){
+    if(s.date<ws||s.date>we) return;
+    s.ex.forEach(function(e){
+      if(exGroupOf(e.exId)!=='Cardio') return;
+      const iv=exIv(e.exId);
+      const done=e.sets.filter(function(t){ return t.done!==false; }).length;
+      if(iv){
+        m += iv.block ? iv.mins : Math.round(done*(iv.work+iv.rest)/60);
+      } else {
+        e.sets.forEach(function(t){ m += (+t.r||0); });
+      }
+    });
+  });
+  return Math.round(m);
+}
+function pillarRows(ws){
+  const p=pillarWeek(ws);
+  return PILLARS.map(function(pl){
+    const v=p[pl.key], ok=v>=pl.need;
+    return '<div class="listrow"><span class="small">'+
+      '<span style="color:'+(ok?'var(--good)':'var(--ink3)')+'">'+(ok?'●':'○')+'</span> '+pl.name+
+      '<span class="tiny muted" style="display:block; margin-left:15px">'+esc(pl.what)+'</span></span>'+
+      '<span class="small num" style="text-align:right; color:'+(ok?'var(--good)':'var(--bad)')+'">'+v+
+      '<span class="tiny muted" style="display:block">of '+pl.need+'</span></span></div>';
+  }).join('');
+}
 function openReport(ws){
   ws = ws || wkMonday(today());
   const curWk = wkMonday(today());
@@ -2785,6 +3028,8 @@ function openReport(ws){
     '<div class="datebar" style="margin-bottom:4px"><button class="btn sm" onclick="openReport(\''+dShift(ws,-7)+'\')">‹</button>'+
     '<b class="num">'+fmtD(ws)+' – '+fmtD(dShift(ws,6))+(ws===curWk?' (this week)':'')+'</b>'+
     '<button class="btn sm" onclick="openReport(\''+dShift(ws,7)+'\')" '+(ws>=curWk?'disabled style="opacity:.35"':'')+'>›</button></div>';
+  h+=sect('The five')+pillarRows(ws)+
+    '<div class="tiny muted" style="margin-top:6px; line-height:1.55">A filled dot is a quality this week actually contained. An empty one is not a failure, it is the next thing to schedule.</div>';
   h+=sect('Training')+
     row('Workouts', cur.ses, dif(cur.ses,prv.ses,''))+
     (adh.planned? row('Plan adherence', adh.done+' / '+adh.planned,'') : '')+
@@ -3144,6 +3389,23 @@ function achievements(){
     {i:'🥬', t:'Fiber goal ×7 days', ok:Object.keys(S.food||{}).filter(function(d){
       return foodTotals(d).fb >= (+S.settings.fiberGoal||30); }).length>=7},
     {i:'🫀', t:'First VO2max test', ok:(S.vo2||[]).length>=1},
+    {i:'🤙', t:'First longevity test', ok:(S.tests||[]).some(function(r){ return (fieldTest(r.key)||{}).group==='longevity'; })},
+    {i:'🧬', t:'All four longevity tests done', ok:(function(){
+      const keys=['hang','balance','sts','gait'];
+      return keys.every(function(k){ return testHistory(k).length>0; });
+    })()},
+    {i:'🏅', t:'Every longevity test inside its band', ok:(function(){
+      const keys=['hang','balance','sts','gait'];
+      return keys.every(function(k){ const l=lastTest(k); const b=l&&testBand(k,l.val); return b&&b.ok; });
+    })()},
+    {i:'📐', t:'Range of motion measured', ok:(S.tests||[]).some(function(r){ return (fieldTest(r.key)||{}).group==='range'; })},
+    {i:'💥', t:'First power session', ok:(S.sessions||[]).some(function(ss){
+      return ss.ex.some(function(e){ return exGroupOf(e.exId)==='Power'; }); })},
+    {i:'🕸', t:'A week covering all five', ok:(function(){
+      const p=pillarWeek(wkMonday(today()));
+      return PILLARS.every(function(pl){ return p[pl.key]>=pl.need; });
+    })()},
+    {i:'🦴', t:'60 s dead hang', ok:(function(){ const l=lastTest('hang'); return !!l && l.val>=60; })()},
     {i:'📈', t:'VO2max improved', ok:(function(){
       const v=S.vo2||[]; if(v.length<2) return false;
       return v[v.length-1].val > v[0].val; })()},
@@ -3499,6 +3761,190 @@ function vo2Band(v, age, sex){
   return {label:'Excellent', ok:true};
 }
 function lastVo2(){ const l=(S.vo2||[]); return l.length? l[l.length-1] : null; }
+
+/* ============ field tests: longevity and range ============
+   The app was good at prescribing and blind at assessing: outside strength and
+   body weight it could not tell you whether any of it was working. These are
+   the tests worth having — every one needs no equipment beyond a bar, a chair
+   and a wall, and the first four are among the best-validated predictors of
+   how the next thirty years go.
+
+   `norm` returns the cut-offs for an age and sex as [poor, fair, good], read
+   the same way vo2Band reads VO2_BANDS. Where the published norms are thin
+   for young adults the entry says so rather than inventing precision. */
+const FIELD_TESTS=[
+  {key:'hang', group:'longevity', name:'Dead hang', unit:'s', better:'up',
+   how:'Hang from a bar, arms straight, feet off the floor. Time it until you drop. Do not kip or re-grip.',
+   why:'A proxy for grip strength, which tracks all-cause mortality more closely than almost any other single measure. Grip is not the cause — it is the readout of total body strength and neural health.',
+   norm:function(){ return [20,40,60]; },
+   normNote:'A general adult guide rather than a published band: hang time has no large reference dataset. 60 s is a good target for anyone under 40.'},
+  {key:'grip', group:'longevity', name:'Grip (dynamometer)', unit:'kg', better:'up', optional:true,
+   how:'Squeeze a hand dynamometer, best of three per hand, standing with the elbow at 90°. Record the better hand.',
+   why:'The measured version of the dead hang. Worth doing if you own the device; the norms below are the ones the research uses.',
+   norm:function(age,sexM){
+     const m=[[30,[41,49,57]],[40,[41,49,56]],[50,[38,46,53]],[60,[35,42,49]],[99,[29,36,43]]];
+     const f=[[30,[25,30,35]],[40,[24,29,34]],[50,[22,27,32]],[60,[20,24,29]],[99,[17,21,25]]];
+     const rows=sexM?m:f; for(let i=0;i<rows.length;i++) if(age<=rows[i][0]) return rows[i][1];
+     return rows[rows.length-1][1];
+   }},
+  {key:'balance', group:'longevity', name:'Single-leg balance, eyes closed', unit:'s', better:'up',
+   how:'Stand on one leg, hands on hips, eyes closed. Stop the clock when a foot moves, the hands come off, or the eyes open. Best of three.',
+   why:'One of the sharpest fall and mortality signals there is, and the quality that declines first and most quietly. Eyes closed is the whole test: with eyes open, vision hides the loss.',
+   norm:function(age){
+     const rows=[[30,[8,15,25]],[40,[7,12,20]],[50,[5,9,15]],[60,[4,7,11]],[99,[2,4,7]]];
+     for(let i=0;i<rows.length;i++) if(age<=rows[i][0]) return rows[i][1];
+     return rows[rows.length-1][1];
+   }},
+  {key:'sts', group:'longevity', name:'30-second sit-to-stand', unit:'reps', better:'up',
+   how:'From a standard chair, arms crossed on the chest, stand fully and sit fully as many times as you can in 30 seconds.',
+   why:'Leg power and the ability to get off a chair unaided, which is the difference between independent and not in later life. Rikli–Jones norms.',
+   norm:function(age,sexM){
+     const m=[[40,[17,22,27]],[60,[14,18,22]],[70,[12,16,20]],[99,[10,13,17]]];
+     const f=[[40,[15,20,25]],[60,[12,16,20]],[70,[11,14,18]],[99,[9,12,16]]];
+     const rows=sexM?m:f; for(let i=0;i<rows.length;i++) if(age<=rows[i][0]) return rows[i][1];
+     return rows[rows.length-1][1];
+   }},
+  {key:'gait', group:'longevity', name:'4-metre gait speed', unit:'m/s', better:'up',
+   how:'Mark 4 metres. Walk it at your normal comfortable pace, timed, from a standing start. Best of two.',
+   why:'Usual walking speed predicts survival across every adult age band studied. Under 0.8 m/s is a clinical flag; healthy adults sit well above 1.2.',
+   norm:function(){ return [1.0,1.2,1.4]; },
+   normNote:'Under 0.8 m/s is the clinical threshold at any age.'},
+  /* range of motion: the flexibility work had no way of telling you it worked */
+  {key:'sitreach', group:'range', name:'Sit-and-reach', unit:'cm', better:'up',
+   how:'Sit with legs straight, feet against a box or wall. Reach forward slowly. Measure past the toes as positive, short of them as negative.',
+   why:'Posterior chain length. The classic field measure, and the one most responsive to consistent hamstring work.',
+   norm:function(age,sexM){ return sexM? [-5,3,11] : [0,8,16]; }},
+  {key:'ankle', group:'range', name:'Ankle dorsiflexion (knee to wall)', unit:'cm', better:'up',
+   how:'Foot square to a wall, drive the knee forward to touch it without the heel lifting. Slide the foot back until it only just touches. Measure toe to wall.',
+   why:'The single most common limiter of squat depth and a real factor in Achilles and knee load. Under 10 cm restricts almost everyone.',
+   norm:function(){ return [8,10,13]; }},
+  {key:'shoulder', group:'range', name:'Shoulder flexion (wall gap)', unit:'cm', better:'down',
+   how:'Back flat to a wall, knees bent, low back pressed down. Raise straight arms overhead and measure the gap between wrists and wall.',
+   why:'Overhead range without stealing it from the lower back. A large gap is why overhead pressing hurts for most people who think it is a shoulder problem.',
+   norm:function(){ return [10,5,2]; }},
+  {key:'hipir', group:'range', name:'Hip internal rotation', unit:'°', better:'up',
+   how:'Sit on a bench, knee bent to 90°, let the lower leg swing outward. Estimate the angle from vertical.',
+   why:'Loss here shows up long before hip pain does, and it changes how you squat and run whether you notice or not.',
+   norm:function(){ return [20,30,40]; }},
+  {key:'thoracic', group:'range', name:'Thoracic rotation', unit:'°', better:'up',
+   how:'On all fours, one hand behind the head, rotate the chest open. Estimate the angle the elbow travels from the floor.',
+   why:'Upper-back rotation, which the lower back and shoulders both pay for when it is missing.',
+   norm:function(){ return [35,45,55]; }}
+];
+function fieldTest(key){ return FIELD_TESTS.find(function(t){ return t.key===key; })||null; }
+/* Same three-band read as vo2Band, but `better:'down'` inverts it: on the wall
+   gap a smaller number is the good one, and reading it the other way would
+   congratulate you for the worst shoulders in the room. */
+function testBand(key, val){
+  const t=fieldTest(key); if(!t||val===''||val==null||isNaN(+val)) return null;
+  const st=S.settings, age=+st.age||30, sexM=st.sex!=='f';
+  const c=t.norm(age, sexM), v=+val;
+  const up=(t.better!=='down');
+  const pass=function(cut){ return up ? v>=cut : v<=cut; };
+  if(!pass(c[0])) return {label:'Below average', ok:false, cuts:c};
+  if(!pass(c[1])) return {label:'Fair', ok:false, cuts:c};
+  if(!pass(c[2])) return {label:'Good', ok:true, cuts:c};
+  return {label:'Excellent', ok:true, cuts:c};
+}
+function testHistory(key){ return (S.tests||[]).filter(function(r){ return r.key===key; }); }
+function lastTest(key){ const h=testHistory(key); return h.length? h[h.length-1] : null; }
+/* One screen for everything measurable that is not a lift or a weigh-in. Split
+   by what the number is for, because "how long can you hang" and "how far can
+   you reach" answer completely different questions. */
+/* A compact read of every field test with a result, plus how stale it is. Eight
+   weeks is the re-test interval these move on; anything fresher is noise. */
+function fieldTestSummary(){
+  const st=S.settings;
+  const done=FIELD_TESTS.map(function(t){ return {t:t, last:lastTest(t.key)}; })
+    .filter(function(r){ return !!r.last; });
+  const stale=done.filter(function(r){ return daysSince(r.last.date)>70; }).length;
+  let h='<div class="osec"><h2><span class="dot" style="background:var(--good)"></span>Longevity &amp; range</h2>';
+  if(!done.length){
+    h+='<div class="empty">Grip, balance, sit-to-stand and walking speed predict the next thirty years better than almost anything else you can measure at home. None of them take equipment.</div>';
+  } else {
+    h+=done.map(function(r){
+      const b=testBand(r.t.key, r.last.val);
+      return '<div class="listrow"><span class="small">'+esc(r.t.name)+
+        '<span class="tiny muted num" style="display:block">'+fmtD(r.last.date)+
+        (daysSince(r.last.date)>70? ' · due a re-test':'')+'</span></span>'+
+        '<span class="small num" style="text-align:right">'+r.last.val+' '+r.t.unit+
+        (b? '<span class="tiny" style="display:block; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:'+
+            (b.ok?'var(--good)':'var(--bad)')+'">'+b.label+'</span>':'')+'</span></div>';
+    }).join('');
+    if(stale) h+='<div class="tiny" style="color:var(--wk); margin-top:8px">'+stale+' test'+(stale===1?'':'s')+' older than 10 weeks.</div>';
+  }
+  h+='<div class="row" style="gap:8px; margin-top:10px">'+
+    '<button class="btn grow" onclick="assessSheet(\'longevity\')">Longevity tests</button>'+
+    '<button class="btn grow" onclick="assessSheet(\'range\')">Range of motion</button></div></div>';
+  return h;
+}
+function assessSheet(grp){
+  const g=grp||'longevity';
+  const st=S.settings;
+  const rows=FIELD_TESTS.filter(function(t){ return t.group===g; });
+  let h='<h3>'+(g==='longevity'?'Longevity tests':'Range of motion')+'</h3>'+
+    '<div class="seg" style="margin:-2px 0 12px">'+
+      '<button class="'+(g==='longevity'?'on':'')+'" onclick="assessSheet(\'longevity\')">Longevity</button>'+
+      '<button class="'+(g==='range'?'on':'')+'" onclick="assessSheet(\'range\')">Range</button></div>'+
+    '<p class="tiny muted" style="margin:-4px 0 14px; line-height:1.55">'+
+    (g==='longevity'
+      ? 'Nothing here needs equipment beyond a bar, a chair and four metres of floor. Re-test every 8 weeks — these move slowly, and checking weekly just measures noise.'
+      : 'Measure cold, before training, always the same way. The point is the trend, so an imperfect method repeated identically beats a perfect one done differently each time.')+
+    '</p>';
+  if(!st.age) h+='<div class="card" style="border-left:3px solid var(--wk); padding:10px 12px"><div class="tiny" style="color:var(--wk)">Set your age and sex in Settings — every band below is age-referenced.</div></div>';
+  rows.forEach(function(t){
+    const last=lastTest(t.key), b=last? testBand(t.key, last.val) : null;
+    const hist=testHistory(t.key);
+    const prev=hist.length>1? hist[hist.length-2] : null;
+    let delta='';
+    if(prev && last){
+      const d=Math.round((last.val-prev.val)*100)/100;
+      if(d!==0){
+        const good=(t.better==='down')? d<0 : d>0;
+        delta='<span class="tiny num" style="color:'+(good?'var(--good)':'var(--bad)')+'">'+(d>0?'+':'')+d+' vs last</span>';
+      }
+    }
+    h+='<div style="border-bottom:1px solid var(--line); padding:12px 0">'+
+      '<div class="spread"><b class="small">'+esc(t.name)+(t.optional?' <span class="tiny muted">optional</span>':'')+'</b>'+
+      (b? '<span class="tiny" style="font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:'+
+          (b.ok?'var(--good)':'var(--bad)')+'">'+b.label+'</span>' : '')+'</div>'+
+      '<div class="tiny muted" style="line-height:1.5; margin-top:3px">'+esc(t.how)+'</div>'+
+      '<div class="tiny" style="color:var(--ink2); line-height:1.5; margin-top:4px">'+esc(t.why)+'</div>'+
+      (b? '<div class="tiny muted num" style="margin-top:4px">Your '+last.val+' '+t.unit+
+          ' · bands '+b.cuts.join(' / ')+' '+t.unit+' for '+(+st.age||30)+
+          (t.normNote? '. '+esc(t.normNote) : '')+'</div>'
+        : (t.normNote? '<div class="tiny muted" style="margin-top:4px">'+esc(t.normNote)+'</div>' : ''))+
+      '<div class="row" style="gap:8px; margin-top:8px; align-items:center">'+
+        '<input id="ft_'+t.key+'" type="number" inputmode="decimal" step="0.1" placeholder="'+(last? last.val : t.unit)+
+        '" style="max-width:110px; padding:9px 10px; font-size:15px">'+
+        '<span class="tiny muted">'+t.unit+'</span>'+
+        '<button class="btn sm" onclick="saveTestFrom(\''+t.key+'\')">Save</button>'+
+        delta+
+      '</div></div>';
+  });
+  h+='<p class="tiny muted" style="margin-top:14px; line-height:1.6">Bands are population reference ranges, not a diagnosis. '+
+    'A number below the band is a reason to train the quality, not a reason to worry.</p>';
+  openSheet(h);
+}
+function saveTestFrom(key){
+  const el=$('#ft_'+key); if(!el) return;
+  if(!saveTest(key, el.value)){ toast('Enter a number first'); return; }
+  const t=fieldTest(key), b=testBand(key, el.value);
+  vib(12);
+  toast(t.name+': '+el.value+' '+t.unit+(b? ' — '+b.label : ''));
+  assessSheet(t.group);
+}
+function saveTest(key, val){
+  const t=fieldTest(key); if(!t) return false;
+  const v=+val;
+  if(val===''||isNaN(v)) return false;
+  S.tests=(S.tests||[]).filter(function(r){ return !(r.key===key && r.date===today()); });
+  S.tests.push({date:today(), key:key, val:v});
+  S.tests.sort(function(a,b){ return a.date<b.date?-1:1; });
+  save();
+  return true;
+}
+
 /* Zone 2 is conversational pace: only sets flagged as such count. */
 function zone2Mins(days){
   const from=dShift(today(), -(days||7));
@@ -3532,6 +3978,9 @@ function cardioHTML(){
   h+='<div class="row" style="gap:8px; margin-top:10px">'+
     '<button class="btn grow" onclick="vo2Form(\'rockport\')">Walk test</button>'+
     '<button class="btn grow" onclick="vo2Form(\'cooper\')">Run test</button></div></div>';
+  /* The other four tests, given the same weight as VO2max on the same screen.
+     Buried one tap deeper they would simply never get done. */
+  h+=fieldTestSummary();
   const z=zone2Mins(7), lo=150, hi=300;
   h+='<div class="osec"><h2><span class="dot" style="background:var(--wk)"></span>Zone 2 this week</h2>'+
     '<div class="row" style="align-items:baseline; gap:8px"><span class="num" style="font-size:34px; font-family:var(--fd-disp); font-weight:700">'+z+'</span>'+
@@ -3689,9 +4138,15 @@ function sessionHTML(){
       '<span class="row" style="gap:6px"><button class="btn ghost sm" onclick="restPicker(\''+e.exId+'\')">⏱ '+fmtRest(exRest(e.exId))+'</button>'+
       '<button class="btn ghost sm danger" onclick="rmSessionEx('+ei+')">✕</button></span></div>';
     const rx=prescribe(e.exId), tg=rx.why;
-    if(rx.tag==='intervals')
+    /* a continuous block wants a countdown, not the rounds timer: offering
+       rounds on a zone 2 ride invites breaking up the one thing that must not
+       be broken up */
+    if(rx.tag==='intervals' && !rx.iv.block)
       h+='<button class="btn primary wide" style="margin-top:10px" onclick="startIntervals(\''+e.exId+'\')">'+
         '⚡ Start the '+rx.iv.rounds+' × '+Math.round(rx.iv.work/60)+' min timer</button>';
+    if(rx.tag==='intervals' && rx.iv.block)
+      h+='<button class="btn primary wide" style="margin-top:10px" onclick="go(\'timers\')">'+
+        '⏱ '+rx.iv.mins+' min — open the stopwatch</button>';
     if(pv||tg){
       h+='<div style="background:var(--raised); border-radius:10px; padding:8px 10px; margin-top:8px">';
       if(pv) h+='<div class="tiny muted num">prev &nbsp;'+pv+'</div>';
@@ -3743,7 +4198,7 @@ function sessionHTML(){
          row, while the next interval is still ahead of you, is worth far more
          than a verdict after the session has ended. */
       if(ivEx && st.done && +st.r){
-        const v=hrVerdict(+st.r);
+        const v=hrVerdict(+st.r, exIv(e.exId).type);
         if(v) h+='<div class="tiny" style="margin:-2px 0 8px 45px; color:'+
           (v.k==='in'?'var(--good)':v.k==='near'?'var(--wk)':'var(--bad)')+'">'+esc(v.s)+'</div>';
       }
@@ -3815,11 +4270,17 @@ function toggleSet(ei,si){
   const g=exGroupOf(ex.exId);
   if(st.done && g!=='Cardio') startRest(exRest(ex.exId));
 }
+const POW_REST=150;
 const MOB_REST=25;   /* long enough to switch sides, short enough to keep flowing */
 function exRest(exId){
   const e=S.exercises.find(function(x){return x.id===exId;});
   if(e && e.rest) return e.rest;
-  return exGroupOf(exId)==='Mobility' ? MOB_REST : S.settings.rest;
+  const g=exGroupOf(exId);
+  if(g==='Mobility') return MOB_REST;
+  /* Power needs full recovery between efforts, not the lifting default: the
+     rep is the point, and a rushed jump is a worse jump. */
+  if(g==='Power') return POW_REST;
+  return S.settings.rest;
 }
 function fmtRest(s){ return s<60 ? s+'s' : (s%60===0 ? (s/60)+'m' : Math.floor(s/60)+':'+pad(s%60)); }
 function restPicker(exId){
